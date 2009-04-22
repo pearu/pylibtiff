@@ -8,7 +8,7 @@ See TIFF.__doc__ for usage information.
 __author__ = 'Pearu Peterson'
 __date__ = 'April 2009'
 __license__ = 'BSD'
-__version__ = '0.1'
+__version__ = '0.1-svn'
 __all__ = ['libtiff', 'TIFF']
 
 import numpy as np
@@ -143,12 +143,20 @@ class TIFF(ctypes.c_void_p):
       
     To read an image from a tiff file, use
 
-      arr = tiff.read_image()
+      image = tiff.read_image()
+
+    where image will be a numpy array.
+
+    To read all images from a tiff file, use
+
+      for image in tiff.iter_images():
+          # do stuff with image
 
     To creat a tiff file containing numpy array as image, use
 
       tiff = TIFF.open(filename, mode='w')
       tiff.write_image(array)
+      tiff.close()
 
     """
 
@@ -226,11 +234,8 @@ class TIFF(ctypes.c_void_p):
                 if self.LastDirectory():
                     break
 
-    closed = False
     def __del__(self):
-        if not self.closed and self.value is not None:
-            self.Close()
-            self.closed = True
+        self.close()
 
     def FileName(self): return libtiff.TIFFFileName(self)
     def CurrentRow(self): return libtiff.TIFFCurrentRow(self)
@@ -257,7 +262,12 @@ class TIFF(ctypes.c_void_p):
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
         assert r.value==size,`r.value, size`
 
-    def Close(self): libtiff.TIFFClose(self)
+    closed = False
+    def close(self): 
+        if not self.closed and self.value is not None:
+            libtiff.TIFFClose(self)
+            self.closed = True
+        return
     #def (self): return libtiff.TIFF(self)
 
     def GetField(self, tag):

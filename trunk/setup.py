@@ -24,7 +24,7 @@ if __name__=='__main__':
           version='0.1-svn',
           author = 'Pearu Peterson',
           author_email = 'pearu.peterson@gmail.com',
-          #license = 'http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
+          license = 'http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
           url = 'http://pylibtiff.googlecode.com',
           download_url = 'http://code.google.com/p/pylibtiff/downloads/',
           classifiers=filter(None, CLASSIFIERS.split('\n')),
