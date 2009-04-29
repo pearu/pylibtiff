@@ -16,6 +16,11 @@ from numpy import ctypeslib
 import ctypes
 import ctypes.util
 
+lib = ctypes.util.find_library('tiff')
+assert lib, `lib`
+libtiff = ctypes.cdll.LoadLibrary(lib)
+include_tiff_h = '/usr/include/tiff.h'
+
 # types defined by tiff.h
 class c_ttag_t(ctypes.c_uint): pass
 class c_tdir_t(ctypes.c_uint16): pass
@@ -34,7 +39,6 @@ define_to_name_map = dict(Orientation={}, Compression={},
                           )
 
 # Read and initialize TIFFTAG_* constants:
-include_tiff_h = '/usr/include/tiff.h'
 f = open (include_tiff_h, 'r')
 for line in f.readlines():
     if not line.startswith('#define'): continue
@@ -343,10 +347,6 @@ class TIFF(ctypes.c_void_p):
                 l.append('%s: %s' % (tagname, v))
         return '\n'.join(l)
         
-
-lib = ctypes.util.find_library('tiff')
-assert lib, `lib`
-libtiff = ctypes.cdll.LoadLibrary(lib)
 
 libtiff.TIFFGetVersion.restype = ctypes.c_char_p
 libtiff.TIFFGetVersion.argtypes = []
