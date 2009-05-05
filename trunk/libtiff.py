@@ -138,6 +138,14 @@ tifftags = {
 
 }
 
+def debug(func):
+    return func
+    def new_func(*args, **kws):
+        print 'Calling',func.__name__
+        r = func (*args, **kws)
+        return r
+    return new_func
+
 class TIFF(ctypes.c_void_p):
     """ Holds a pointer to TIFF object.
 
@@ -173,6 +181,7 @@ class TIFF(ctypes.c_void_p):
             raise TypeError ('Failed to open file '+`filename`)
         return tiff
 
+    @debug
     def read_image(self, verbose=False):
         """ Read image from TIFF and return it as an array.
         """
@@ -208,6 +217,7 @@ class TIFF(ctypes.c_void_p):
     def write_image(self, arr):
         """ Write array as TIFF image.
         """
+        arr = np.ascontiguousarray(arr)
         shape=arr.shape
         if len(shape)!=2:
             raise NotImplementedError (`shape`)
@@ -241,27 +251,44 @@ class TIFF(ctypes.c_void_p):
     def __del__(self):
         self.close()
 
+    @debug
     def FileName(self): return libtiff.TIFFFileName(self)
+    @debug
     def CurrentRow(self): return libtiff.TIFFCurrentRow(self)
+    @debug
     def CurrentStrip(self): return libtiff.TIFFCurrentStrip(self)
+    @debug
     def CurrentTile(self): return libtiff.TIFFCurrentTile(self)
+    @debug
     def CurrentDirectory(self): return libtiff.TIFFCurrentDirectory(self)
+    @debug
     def LastDirectory(self): return libtiff.TIFFLastDirectory(self)
+    @debug
     def ReadDirectory(self): return libtiff.TIFFReadDirectory(self)
+    @debug
     def WriteDirectory(self): 
         r = libtiff.TIFFWriteDirectory(self)
         assert r==1, `r`
+    @debug
     def Fileno(self): return libtiff.TIFFFileno(self)
+    @debug
     def GetMode(self): return libtiff.TIFFGetMode(self)
+    @debug
     def IsTiled(self): return libtiff.TIFFIsTiled(self)
+    @debug
     def IsByteSwapped(self): return libtiff.TIFFIsByteSwapped(self)
+    @debug
     def IsUpSampled(self): return libtiff.TIFFIsUpSampled(self)
+    @debug
     def IsMSB2LSB(self): return libtiff.TIFFIsMSB2LSB(self)
+    @debug
     def NumberOfStrips(self): return libtiff.TIFFNumberOfStrips(self).value
 
+    #@debug
     def ReadRawStrip(self, strip, buf, size): 
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
 
+    @debug
     def WriteRawStrip(self, strip, buf, size): 
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
         assert r.value==size,`r.value, size`
@@ -274,6 +301,7 @@ class TIFF(ctypes.c_void_p):
         return
     #def (self): return libtiff.TIFF(self)
 
+    @debug
     def GetField(self, tag):
         """ Return TIFF field value with tag.
 
@@ -294,6 +322,7 @@ class TIFF(ctypes.c_void_p):
             return None
         return convert(data)
 
+    @debug
     def SetField (self, tag, value):
         """ Set TIFF field value with tag.
 
@@ -429,8 +458,12 @@ def _test_read(filename=None):
     print tiff.info()
     print '-'*10,'ok'
     print 'Trying show images ...'
+    i = 0
     for image in tiff.iter_images(verbose=True):
         print image
+        if i > 2:
+            break
+        i += 1
     print '\tok'
 
 def _test_write():
@@ -444,6 +477,6 @@ def _test_write():
     del tiff
 
 if __name__=='__main__':
-    _test_write()
+    #_test_write()
     _test_read()
 
