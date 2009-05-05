@@ -21,3 +21,22 @@ def test_write_read():
         assert image.dtype==image2.dtype
         assert (image==image2).all()
 
+def test_slicing():
+    shape = (16, 16)
+    image = random.randint(255, size=shape)
+    
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            image1 = image[:i+1,:j+1]
+            fn = mktemp('.tif')
+            tif = TIFF.open(fn,'w')
+            tif.write_image(image1)
+            tif.close()
+        
+            tif = TIFF.open(fn,'r')
+            image2 = tif.read_image()
+            tif.close()
+            
+            assert (image1==image2).all(),`i,j`
+
+    os.remove(fn)
