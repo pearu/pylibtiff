@@ -219,23 +219,39 @@ class TIFF(ctypes.c_void_p):
         """
         arr = np.ascontiguousarray(arr)
         shape=arr.shape
-        if len(shape)!=2:
-            raise NotImplementedError (`shape`)
-        height, width = shape
-        bits = arr.itemsize * 8
-        size = width * height * arr.itemsize
+        if len(shape)==2:
+            height, width = shape
+            bits = arr.itemsize * 8
+            size = width * height * arr.itemsize
 
-        self.SetField(TIFFTAG_IMAGEWIDTH, width)
-        self.SetField(TIFFTAG_IMAGELENGTH, height)
-        self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+            self.SetField(TIFFTAG_IMAGEWIDTH, width)
+            self.SetField(TIFFTAG_IMAGELENGTH, height)
+            self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
 
-        #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
-        self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-        self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
-        self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+            #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
+            self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+            self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
         
-        self.WriteRawStrip(0, arr.ctypes.data, size)
-        self.WriteDirectory()
+            self.WriteRawStrip(0, arr.ctypes.data, size)
+            self.WriteDirectory()
+        elif len(shape)==3:
+            depth, height, width = shape
+            bits = arr.itemsize * 8
+            size = width * height * arr.itemsize
+            for n in range(depth):
+                self.SetField(TIFFTAG_IMAGEWIDTH, width)
+                self.SetField(TIFFTAG_IMAGELENGTH, height)
+                self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+                
+                #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
+                self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+                self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+                self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+                self.WriteRawStrip(0, arr[n].ctypes.data, size)
+                self.WriteDirectory()
+        else:
+            raise NotImplementedError (`shape`)
 
     def iter_images(self, verbose=False):
         """ Iterator of all images in a TIFF file.
@@ -308,7 +324,15 @@ class TIFF(ctypes.c_void_p):
         tag can be numeric constant TIFFTAG_<tagname> or a
         string containing <tagname>.
         """
-
+        if tag in ['PixelSizeX', 'PixelSizeY', 'RelativeTime']:
+            descr = self.GetField('ImageDescription')
+            if not descr:
+                return
+            i = descr.find (tag)
+            if i==-1:
+                return
+            value = eval(descr[i+len (tag):].lstrip().split()[0])
+            return value
         if isinstance(tag, str):
             tag = eval('TIFFTAG_' + tag.upper())
         t = tifftags.get(tag)
@@ -367,7 +391,8 @@ class TIFF(ctypes.c_void_p):
                         #'Stonits',
                         'XPosition', 'YPosition', 'XResolution', 'YResolution',
                         'PrimaryChromaticities', 'ReferenceBlackWhite',
-                        'WhitePoint', 'YCBCRCoefficients'
+                        'WhitePoint', 'YCBCRCoefficients',
+                        'PixelSizeX','PixelSizeY', 'RelativeTime'
                         ]:
             v = self.GetField(tagname)
             if v:
@@ -446,6 +471,7 @@ libtiff.TIFFClose.argtypes = [TIFF]
 
 def _test_read(filename=None):
     import sys
+    import time
     if filename is None:
         if len(sys.argv) != 2:
             print 'Run `libtiff.py <filename>` for testing.'
@@ -458,13 +484,12 @@ def _test_read(filename=None):
     print tiff.info()
     print '-'*10,'ok'
     print 'Trying show images ...'
+    t = time.time ()
     i = 0
     for image in tiff.iter_images(verbose=True):
-        print image
-        if i > 2:
-            break
+        #print image.min(), image.max(), image.mean ()
         i += 1
-    print '\tok'
+    print '\tok',(time.time ()-t)*1e3,'ms',i,'images'
 
 def _test_write():
     tiff = TIFF.open('/tmp/libtiff_test_write.tiff', mode='w')
