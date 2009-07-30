@@ -188,8 +188,19 @@ class TIFF(ctypes.c_void_p):
         width = self.GetField('ImageWidth')
         height = self.GetField('ImageLength')
         bits = self.GetField('BitsPerSample')
+        sample_format = self.GetField('SampleFormat')
 
-        typ = {32: np.uint32, 16: np.uint16, 8: np.uint8, 64: np.uint64}.get(bits)
+        if sample_format==SAMPLEFORMAT_IEEEFP:
+            typ = getattr(np,'float%s' % (bits))
+        elif sample_format==SAMPLEFORMAT_UINT or sample_format is None:
+            typ = getattr(np,'uint%s' % (bits))
+        elif sample_format==SAMPLEFORMAT_INT:
+            typ = getattr(np,'int%s' % (bits))
+        elif sample_format==SAMPLEFORMAT_COMPLEXIEEEFP:
+            typ = getattr(np,'complex%s' % (bits))
+        else:
+            raise NotImplementedError (`sample_format`)
+
         if typ is None:
             if bits==1: # TODO: check for correctness
                 typ = np.uint8
@@ -201,6 +212,7 @@ class TIFF(ctypes.c_void_p):
                 raise NotImplementedError (`bits`)
         else:
             itemsize = bits/8            
+
         size = width * height * itemsize
         arr = np.zeros((height, width), typ)
 
@@ -218,6 +230,17 @@ class TIFF(ctypes.c_void_p):
         """ Write array as TIFF image.
         """
         arr = np.ascontiguousarray(arr)
+        sample_format = None
+        if arr.dtype in np.sctypes['float']:
+            sample_format = SAMPLEFORMAT_IEEEFP
+        elif arr.dtype in np.sctypes['uint']:
+            sample_format = SAMPLEFORMAT_UINT
+        elif arr.dtype in np.sctypes['int']:
+            sample_format = SAMPLEFORMAT_INT
+        elif arr.dtype in np.sctypes['complex']:
+            sample_format = SAMPLEFORMAT_COMPLEXIEEEFP
+        else:
+            raise NotImplementedError(`arr.dtype`)
         shape=arr.shape
         if len(shape)==2:
             height, width = shape
@@ -227,12 +250,15 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, height)
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-
+            
             #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
         
+            if sample_format is not None:
+                self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+
             self.WriteRawStrip(0, arr.ctypes.data, size)
             self.WriteDirectory()
         elif len(shape)==3:
@@ -248,6 +274,10 @@ class TIFF(ctypes.c_void_p):
                 self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
                 self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
                 self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+
+                if sample_format is not None:
+                    self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+
                 self.WriteRawStrip(0, arr[n].ctypes.data, size)
                 self.WriteDirectory()
         else:
@@ -501,7 +531,23 @@ def _test_write():
     tiff.write_image(arr)
     del tiff
 
+def _test_write_float():
+    tiff = TIFF.open('/tmp/libtiff_test_write.tiff', mode='w')
+    arr = np.zeros ((5,6), np.float64)
+    for i in range(arr.shape[0]):
+        for j in range (arr.shape[1]):
+            arr[i,j] = i + 10*j
+    print arr
+    tiff.write_image(arr)
+    del tiff
+
+    tiff = TIFF.open('/tmp/libtiff_test_write.tiff', mode='r')
+    print tiff.info()
+    arr2 = tiff.read_image()
+    print arr2
+
 if __name__=='__main__':
+    _test_write_float()
     #_test_write()
-    _test_read()
+    #_test_read()
 
