@@ -33,6 +33,7 @@ if __name__=='__main__':
 PyLibTiff? is a package that wraps the libtiff library to Python using ctypes.
 ''',
           platforms = ["All"],
-          #package_dir = {'libtiff': '.'},
-          py_modules = ['libtiff']
+          packages = ['libtiff'],
+          package_dir = {'libtiff': '.'},
+          #py_modules = ['libtiff']
           )

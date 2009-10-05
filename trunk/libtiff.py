@@ -8,19 +8,85 @@ See TIFF.__doc__ for usage information.
 __author__ = 'Pearu Peterson'
 __date__ = 'April 2009'
 __license__ = 'BSD'
-__version__ = '0.1-svn'
+__version__ = '0.2-svn'
 __all__ = ['libtiff', 'TIFF']
 
+import os
+import sys
 import numpy as np
 from numpy import ctypeslib
 import ctypes
 import ctypes.util
 
-lib = ctypes.util.find_library('tiff')
-assert lib, `lib`
-libtiff = ctypes.cdll.LoadLibrary(lib)
-include_tiff_h = '/usr/include/tiff.h'
+if os.name=='nt':
+    # assume that the directory of libtiff3.dll is in PATH.
+    lib = ctypes.util.find_library('libtiff3')
+else:
+    lib = ctypes.util.find_library('tiff')
+if lib is None:
+    raise ImportError('Failed to find TIFF library. Make sure that libtiff is installed and its location is listed in PATH|LD_LIBRARY_PATH|..')
 
+libtiff = ctypes.cdll.LoadLibrary(lib)
+
+libtiff.TIFFGetVersion.restype = ctypes.c_char_p
+libtiff.TIFFGetVersion.argtypes = []
+
+libtiff_version_str = libtiff.TIFFGetVersion()
+i = libtiff_version_str.lower().split().index('version')
+assert i!=-1,`libtiff_version_str`
+libtiff_version = libtiff_version_str.split()[i+1]
+
+tiff_h_name = 'tiff_h_%s' % (libtiff_version.replace ('.','_'))
+
+try:
+    exec 'import %s as tiff_h' % (tiff_h_name)
+except ImportError:
+    tiff_h = None
+
+if tiff_h is None:
+    include_tiff_h = os.path.join('/usr','include','tiff.h')
+    assert os.path.isfile(include_tiff_h), `include_tiff_h, lib`
+    # Read TIFFTAG_* constants for the header file:
+    f = open (include_tiff_h, 'r')
+    l = []
+    d = {}
+    for line in f.readlines():
+        if not line.startswith('#define'): continue
+        words = line[7:].lstrip().split()[:2]
+        if len (words)!=2: continue
+        name, value = words
+        i = value.find('/*')
+        if i!=-1: value = value[:i]
+        if value in d:
+            value = d[value]
+        else:
+            value = eval(value)
+        d[name] = value
+        l.append('%s = %s' % (name, value))
+    f.close()
+
+
+    fn = os.path.join (os.path.dirname (os.path.abspath (__file__)), tiff_h_name+'.py')
+    print 'Generating %r' % (fn)
+    f = open(fn, 'w')
+    f.write ('\n'.join(l) + '\n')
+    f.close()
+else:
+    d = tiff_h.__dict__
+
+define_to_name_map = dict(Orientation={}, Compression={},
+                          PhotoMetric={}, PlanarConfig={},
+                          SampleFormat={}, FillOrder={},
+                          FaxMode={}, 
+                          )
+
+for name, value in d.items():
+    if name.startswith ('_'): continue
+    exec '%s = %s' % (name, value)
+    for n in define_to_name_map:
+        if name.startswith(n.upper()):
+            define_to_name_map[n][value] = name        
+                
 # types defined by tiff.h
 class c_ttag_t(ctypes.c_uint): pass
 class c_tdir_t(ctypes.c_uint16): pass
@@ -31,26 +97,6 @@ class c_tsize_t(ctypes.c_int32): pass
 class c_toff_t(ctypes.c_int32): pass
 class c_tdata_t(ctypes.c_void_p): pass
 class c_thandle_t(ctypes.c_void_p): pass
-
-define_to_name_map = dict(Orientation={}, Compression={},
-                          PhotoMetric={}, PlanarConfig={},
-                          SampleFormat={}, FillOrder={},
-                          FaxMode={}, 
-                          )
-
-# Read and initialize TIFFTAG_* constants:
-f = open (include_tiff_h, 'r')
-for line in f.readlines():
-    if not line.startswith('#define'): continue
-    words = line[7:].lstrip().split()[:2]
-    if len (words)!=2: continue
-    name, value = words
-    i = value.find('/*')
-    if i!=-1: value = value[:i]
-    exec '%s = %s' % (name, value)
-    for n in define_to_name_map:
-        if name.startswith(n.upper()):
-            define_to_name_map[n][eval(value)] = name
 
 tifftags = {
 
@@ -432,8 +478,7 @@ class TIFF(ctypes.c_void_p):
         return '\n'.join(l)
         
 
-libtiff.TIFFGetVersion.restype = ctypes.c_char_p
-libtiff.TIFFGetVersion.argtypes = []
+
 
 libtiff.TIFFOpen.restype = TIFF
 libtiff.TIFFOpen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
