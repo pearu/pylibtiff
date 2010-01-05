@@ -58,7 +58,7 @@ Basic usage
 
 Import pylibtiff with
 
->>> from pylibtiff import *
+>>> from libtiff import *
 
 that will provide a class TIFF to hold a tiff file:
 

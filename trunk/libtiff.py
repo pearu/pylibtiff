@@ -4,6 +4,7 @@ Ctypes based wrapper to libtiff library.
 
 See TIFF.__doc__ for usage information.
 
+Homepage:  http://pylibtiff.googlecode.com/
 """
 __author__ = 'Pearu Peterson'
 __date__ = 'April 2009'
@@ -21,6 +22,13 @@ import ctypes.util
 if os.name=='nt':
     # assume that the directory of libtiff3.dll is in PATH.
     lib = ctypes.util.find_library('libtiff3')
+    if lib is None:
+        # try default installation path:
+        lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
+        if os.path.isfile (lib):
+            print 'You should add %r to PATH environment variable and reboot.' % (os.path.dirname (lib))
+        else:
+            lib = None
 else:
     lib = ctypes.util.find_library('tiff')
 if lib is None:
