@@ -370,6 +370,8 @@ class TIFF(ctypes.c_void_p):
         r = libtiff.TIFFWriteDirectory(self)
         assert r==1, `r`
     @debug
+    def SetDirectory(self, dirnum): return libtiff.TIFFSetDirectory(self, dirnum)
+    @debug
     def Fileno(self): return libtiff.TIFFFileno(self)
     @debug
     def GetMode(self): return libtiff.TIFFGetMode(self)
@@ -514,6 +516,9 @@ libtiff.TIFFReadDirectory.argtypes = [TIFF]
 
 libtiff.TIFFWriteDirectory.restype = ctypes.c_int
 libtiff.TIFFWriteDirectory.argtypes = [TIFF]
+
+libtiff.TIFFSetDirectory.restype = ctypes.c_int
+libtiff.TIFFSetDirectory.argtypes = [TIFF, c_tdir_t]
 
 libtiff.TIFFFileno.restype = ctypes.c_int
 libtiff.TIFFFileno.argtypes = [TIFF]
