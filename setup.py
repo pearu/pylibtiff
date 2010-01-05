@@ -35,5 +35,4 @@ PyLibTiff? is a package that wraps the libtiff library to Python using ctypes.
           platforms = ["All"],
           packages = ['libtiff'],
           package_dir = {'libtiff': '.'},
-          #py_modules = ['libtiff']
           )
