@@ -51,7 +51,7 @@ Testing
 
 To test pure Python pylibtiff from source directory, run::
 
-  python setup.py test
+  nosetests tests/
 
 Basic usage
 ===========
