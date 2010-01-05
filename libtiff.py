@@ -551,6 +551,17 @@ libtiff.TIFFWriteRawStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
 
+# Support for TIFFWarningHandler
+TIFFWarningHandler = ctypes.CFUNCTYPE(None,
+                                      ctypes.c_char_p, # Module
+                                      ctypes.c_char_p, # Format
+                                      ctypes.c_void_p) # va_list
+
+# This has to be at module scope so it is not garbage-collected
+_null_warning_handler = TIFFWarningHandler(lambda module, fmt, va_list: None)
+
+def suppress_warnings():
+    libtiff.TIFFSetWarningHandler(_null_warning_handler)
 
 def _test_read(filename=None):
     import sys
