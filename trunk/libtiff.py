@@ -296,9 +296,24 @@ class TIFF(ctypes.c_void_p):
         else:
             raise NotImplementedError(`arr.dtype`)
         shape=arr.shape
-        if len(shape)==2:
+        bits = arr.itemsize * 8
+
+        if len(shape)==1:
+            width, = shape
+            size = width * arr.itemsize
+            self.SetField(TIFFTAG_IMAGEWIDTH, width)
+            self.SetField(TIFFTAG_IMAGELENGTH, 1)
+            self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+            self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+            self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+            if sample_format is not None:
+                self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+            self.WriteRawStrip(0, arr.ctypes.data, size)
+            self.WriteDirectory()
+
+        elif len(shape)==2:
             height, width = shape
-            bits = arr.itemsize * 8
             size = width * height * arr.itemsize
 
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
@@ -317,7 +332,6 @@ class TIFF(ctypes.c_void_p):
             self.WriteDirectory()
         elif len(shape)==3:
             depth, height, width = shape
-            bits = arr.itemsize * 8
             size = width * height * arr.itemsize
             for n in range(depth):
                 self.SetField(TIFFTAG_IMAGEWIDTH, width)
