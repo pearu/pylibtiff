@@ -85,13 +85,13 @@ else:
 define_to_name_map = dict(Orientation={}, Compression={},
                           PhotoMetric={}, PlanarConfig={},
                           SampleFormat={}, FillOrder={},
-                          FaxMode={}, 
+                          FaxMode={}, TiffTag = {}
                           )
 
 name_to_define_map = dict(Orientation={}, Compression={},
                           PhotoMetric={}, PlanarConfig={},
                           SampleFormat={}, FillOrder={},
-                          FaxMode={}, 
+                          FaxMode={}, TiffTag = {}
                           )
 
 for name, value in d.items():
@@ -234,6 +234,23 @@ class TIFF(ctypes.c_void_p):
 
     """
 
+    @staticmethod
+    def get_tag_name(tagvalue):
+        for kind in define_to_name_map:
+            tagname = define_to_name_map[kind].get (tagvalue)
+            if tagname is not None:
+                return tagname
+
+    @staticmethod
+    def get_tag_define(tagname):
+        if '_' in tagname:
+            kind, name = tagname.rsplit('_',1)
+            return name_to_define_map[kind.title()][tagname.upper()]
+        for kind in define_to_name_map:
+            tagvalue = name_to_define_map[kind].get((kind+'_'+tagname).upper ())
+            if tagvalue is not None:
+                return tagvalue
+
     @classmethod
     def open(cls, filename, mode='r'):
         """ Open tiff file as TIFF.
@@ -294,6 +311,15 @@ class TIFF(ctypes.c_void_p):
             pos += elem
         return arr
 
+    @staticmethod
+    def _fix_compression(value):
+        if isinstance(value, int):
+            return value
+        elif value is None:
+            return COMPRESSION_NONE
+        else:
+            return name_to_define_map['Compression']['COMPRESSION_'+value.upper()]
+
     def write_image(self, arr, compression=None):
         """ Write array as TIFF image.
 
@@ -303,13 +329,7 @@ class TIFF(ctypes.c_void_p):
           Specify image data of rank 1 to 3.
         compression : {None, 'ccittrle', 'ccittfax3','ccitt_t4','ccittfax4','ccitt_t6','lzw','ojpeg','jpeg','next','ccittrlew','packbits','thunderscan','it8ctpad','it8lw','it8mp','it8bl','pixarfilm','pixarlog','deflate','adobe_deflate','dcs','jbig','sgilog','sgilog24','jp2000'}
         """
-        if isinstance(compression, int):
-            assert name_to_define_map['Compression'].has_key(compression),`compression`
-            COMPRESSION = compression
-        elif compression is None:
-            COMPRESSION = COMPRESSION_NONE
-        else:
-            COMPRESSION = name_to_define_map['Compression']['COMPRESSION_'+compression.upper()]
+        COMPRESSION = self._fix_compression (compression)
 
         arr = np.ascontiguousarray(arr)
         sample_format = None
@@ -440,6 +460,11 @@ class TIFF(ctypes.c_void_p):
     def ReadEncodedStrip(self, strip, buf, size): 
         return libtiff.TIFFReadEncodedStrip(self, strip, buf, size).value
 
+    def StripSize(self): 
+        return libtiff.TIFFStripSize(self).value
+    def RawStripSize(self, strip): 
+        return libtiff.TIFFStripSize(self, strip).value
+
     @debug
     def WriteRawStrip(self, strip, buf, size): 
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
@@ -451,7 +476,7 @@ class TIFF(ctypes.c_void_p):
         assert r.value==size,`r.value, size`
 
     closed = False
-    def close(self): 
+    def close(self, libtiff=libtiff): 
         if not self.closed and self.value is not None:
             libtiff.TIFFClose(self)
             self.closed = True
@@ -459,7 +484,7 @@ class TIFF(ctypes.c_void_p):
     #def (self): return libtiff.TIFF(self)
 
     @debug
-    def GetField(self, tag):
+    def GetField(self, tag, ignore_undefined_tag=True):
         """ Return TIFF field value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
@@ -478,7 +503,8 @@ class TIFF(ctypes.c_void_p):
             tag = eval('TIFFTAG_' + tag.upper())
         t = tifftags.get(tag)
         if t is None:
-            print 'Warning: no tag %r defined' % (tag)
+            if not ignore_undefined_tag:
+                print 'Warning: no tag %r defined' % (tag)
             return
         data_type, convert = t
         data = data_type()
@@ -505,7 +531,7 @@ class TIFF(ctypes.c_void_p):
         data = data_type(value)
         libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [data_type]
         r = libtiff.TIFFSetField(self, tag, data)
-        assert r, `r`
+        return r
 
     def info(self):
         """ Return a string containing <tag name: field value> map.
@@ -542,8 +568,40 @@ class TIFF(ctypes.c_void_p):
                 l.append('%s: %s' % (tagname, v))
         return '\n'.join(l)
         
+    def copy(self, filename, **kws):
+        """ Copy opened TIFF file to a new file.
 
-
+        Use keyword arguments to redefine tag values.
+        """
+        other = TIFF.open(filename, mode='w')
+        define_rewrite = {}
+        for name, value in kws.items():
+            define = TIFF.get_tag_define (name)
+            assert define is not None
+            if name=='compression':
+                value = TIFF._fix_compression (value)
+            define_rewrite[define] = value
+        self.SetDirectory(0)
+        self.ReadDirectory()
+        while 1:
+            other.SetDirectory(self.CurrentDirectory())
+            for name, define in name_to_define_map['TiffTag'].items():
+                value = define_rewrite.get (define)
+                if value is None:
+                    value = self.GetField(define)
+                if value is None:
+                    continue
+                other.SetField(define, value)
+            strip_size = self.StripSize()
+            buffer = np.zeros(strip_size, np.uint8)
+            for strip in range(self.NumberOfStrips()):
+                elem = self.ReadEncodedStrip(strip, buffer.ctypes.data, strip_size)
+                if elem>0:
+                    other.WriteEncodedStrip(strip, buffer.ctypes.data, elem)
+            self.ReadDirectory()
+            if self.LastDirectory ():
+                break
+        other.close ()
 
 libtiff.TIFFOpen.restype = TIFF
 libtiff.TIFFOpen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
@@ -614,6 +672,12 @@ libtiff.TIFFReadEncodedStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 libtiff.TIFFWriteEncodedStrip.restype = c_tsize_t
 libtiff.TIFFWriteEncodedStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 
+libtiff.TIFFStripSize.restype = c_tsize_t
+libtiff.TIFFStripSize.argtypes = [TIFF]
+
+libtiff.TIFFRawStripSize.restype = c_tsize_t
+libtiff.TIFFRawStripSize.argtypes = [TIFF, c_tstrip_t]
+
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
 
@@ -678,12 +742,14 @@ def _test_write_float():
 
 def _test_compression():
     tiff = TIFF.open('/tmp/libtiff_test_compression.tiff', mode='w')
-    arr = np.zeros ((500,500), np.uint32)
+    arr = np.zeros ((5,6), np.uint8)
     for i in range(arr.shape[0]):
         for j in range (arr.shape[1]):
-            arr[i,j] = i + 10*j
-
-    tiff.write_image(arr, compression='deflate')
+            arr[i,j] = 1+i + 10*j
+    #from scipy.stats import poisson
+    #arr = poisson.rvs (arr)
+    tiff.SetField('ImageDescription', 'Hey\nyou')
+    tiff.write_image(arr, compression='lzw')
     del tiff
 
     tiff = TIFF.open('/tmp/libtiff_test_compression.tiff', mode='r')
@@ -691,6 +757,16 @@ def _test_compression():
     arr2 = tiff.read_image()
 
     assert (arr==arr2).all(),'arrays not equal'
+
+    tiff.copy ('/tmp/libtiff_test_compression2.tiff', 
+               compression='none',
+               imagedescription='hoo')
+    tiff2 = TIFF.open('/tmp/libtiff_test_compression2.tiff', mode='r')
+    arr3 = tiff2.read_image()
+
+    print tiff2.info()
+    print arr3
+    assert (arr==arr3).all(),'arrays not equal'
 
 if __name__=='__main__':
     #_test_write_float()
