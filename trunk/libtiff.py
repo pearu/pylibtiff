@@ -88,12 +88,20 @@ define_to_name_map = dict(Orientation={}, Compression={},
                           FaxMode={}, 
                           )
 
+name_to_define_map = dict(Orientation={}, Compression={},
+                          PhotoMetric={}, PlanarConfig={},
+                          SampleFormat={}, FillOrder={},
+                          FaxMode={}, 
+                          )
+
 for name, value in d.items():
     if name.startswith ('_'): continue
     exec '%s = %s' % (name, value)
     for n in define_to_name_map:
         if name.startswith(n.upper()):
             define_to_name_map[n][value] = name        
+            name_to_define_map[n][name] = value
+
                 
 # types defined by tiff.h
 class c_ttag_t(ctypes.c_uint): pass
@@ -243,6 +251,7 @@ class TIFF(ctypes.c_void_p):
         height = self.GetField('ImageLength')
         bits = self.GetField('BitsPerSample')
         sample_format = self.GetField('SampleFormat')
+        compression = self.GetField('Compression')
 
         if sample_format==SAMPLEFORMAT_IEEEFP:
             typ = getattr(np,'float%s' % (bits))
@@ -270,19 +279,38 @@ class TIFF(ctypes.c_void_p):
         size = width * height * itemsize
         arr = np.zeros((height, width), typ)
 
+        if compression==COMPRESSION_NONE:
+            ReadStrip = self.ReadRawStrip
+        else:
+            ReadStrip = self.ReadEncodedStrip
+
         pos = 0
         elem = None
         for strip in range (self.NumberOfStrips()):
             if elem is None:
-                elem = self.ReadRawStrip(strip, arr.ctypes.data + pos, size)
+                elem = ReadStrip(strip, arr.ctypes.data + pos, size)
             elif elem:
-                elem = self.ReadRawStrip(strip, arr.ctypes.data + pos, min(size - pos, elem))
+                elem = ReadStrip(strip, arr.ctypes.data + pos, min(size - pos, elem))
             pos += elem
         return arr
 
-    def write_image(self, arr):
+    def write_image(self, arr, compression=None):
         """ Write array as TIFF image.
+
+        Parameters
+        ----------
+        arr : :numpy:`ndarray`
+          Specify image data of rank 1 to 3.
+        compression : {None, 'ccittrle', 'ccittfax3','ccitt_t4','ccittfax4','ccitt_t6','lzw','ojpeg','jpeg','next','ccittrlew','packbits','thunderscan','it8ctpad','it8lw','it8mp','it8bl','pixarfilm','pixarlog','deflate','adobe_deflate','dcs','jbig','sgilog','sgilog24','jp2000'}
         """
+        if isinstance(compression, int):
+            assert name_to_define_map['Compression'].has_key(compression),`compression`
+            COMPRESSION = compression
+        elif compression is None:
+            COMPRESSION = COMPRESSION_NONE
+        else:
+            COMPRESSION = name_to_define_map['Compression']['COMPRESSION_'+compression.upper()]
+
         arr = np.ascontiguousarray(arr)
         sample_format = None
         if arr.dtype in np.sctypes['float']:
@@ -298,18 +326,24 @@ class TIFF(ctypes.c_void_p):
         shape=arr.shape
         bits = arr.itemsize * 8
 
+        if compression==COMPRESSION_NONE:
+            WriteStrip = self.WriteRawStrip
+        else:
+            WriteStrip = self.WriteEncodedStrip
+
         if len(shape)==1:
             width, = shape
             size = width * arr.itemsize
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, 1)
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+            self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
             if sample_format is not None:
                 self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
-            self.WriteRawStrip(0, arr.ctypes.data, size)
+            WriteStrip(0, arr.ctypes.data, size)
             self.WriteDirectory()
 
         elif len(shape)==2:
@@ -319,16 +353,16 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, height)
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-            
+            self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
             #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-        
+
             if sample_format is not None:
                 self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
 
-            self.WriteRawStrip(0, arr.ctypes.data, size)
+            WriteStrip(0, arr.ctypes.data, size)            
             self.WriteDirectory()
         elif len(shape)==3:
             depth, height, width = shape
@@ -337,7 +371,7 @@ class TIFF(ctypes.c_void_p):
                 self.SetField(TIFFTAG_IMAGEWIDTH, width)
                 self.SetField(TIFFTAG_IMAGELENGTH, height)
                 self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-                
+                self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
                 #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
                 self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
                 self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
@@ -346,7 +380,7 @@ class TIFF(ctypes.c_void_p):
                 if sample_format is not None:
                     self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
 
-                self.WriteRawStrip(0, arr[n].ctypes.data, size)
+                WriteStrip(0, arr[n].ctypes.data, size)
                 self.WriteDirectory()
         else:
             raise NotImplementedError (`shape`)
@@ -403,10 +437,17 @@ class TIFF(ctypes.c_void_p):
     #@debug
     def ReadRawStrip(self, strip, buf, size): 
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
+    def ReadEncodedStrip(self, strip, buf, size): 
+        return libtiff.TIFFReadEncodedStrip(self, strip, buf, size).value
 
     @debug
     def WriteRawStrip(self, strip, buf, size): 
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
+        assert r.value==size,`r.value, size`
+
+    @debug
+    def WriteEncodedStrip(self, strip, buf, size): 
+        r = libtiff.TIFFWriteEncodedStrip(self, strip, buf, size)
         assert r.value==size,`r.value, size`
 
     closed = False
@@ -567,6 +608,12 @@ libtiff.TIFFReadRawStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 libtiff.TIFFWriteRawStrip.restype = c_tsize_t
 libtiff.TIFFWriteRawStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 
+libtiff.TIFFReadEncodedStrip.restype = c_tsize_t
+libtiff.TIFFReadEncodedStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
+
+libtiff.TIFFWriteEncodedStrip.restype = c_tsize_t
+libtiff.TIFFWriteEncodedStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
+
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
 
@@ -629,8 +676,25 @@ def _test_write_float():
     arr2 = tiff.read_image()
     print arr2
 
+def _test_compression():
+    tiff = TIFF.open('/tmp/libtiff_test_compression.tiff', mode='w')
+    arr = np.zeros ((500,500), np.uint32)
+    for i in range(arr.shape[0]):
+        for j in range (arr.shape[1]):
+            arr[i,j] = i + 10*j
+
+    tiff.write_image(arr, compression='deflate')
+    del tiff
+
+    tiff = TIFF.open('/tmp/libtiff_test_compression.tiff', mode='r')
+    print tiff.info()
+    arr2 = tiff.read_image()
+
+    assert (arr==arr2).all(),'arrays not equal'
+
 if __name__=='__main__':
-    _test_write_float()
+    #_test_write_float()
     #_test_write()
     #_test_read()
+    _test_compression()
 
