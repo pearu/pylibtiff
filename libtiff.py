@@ -260,16 +260,11 @@ class TIFF(ctypes.c_void_p):
             raise TypeError ('Failed to open file '+`filename`)
         return tiff
 
-    @debug
-    def read_image(self, verbose=False):
-        """ Read image from TIFF and return it as an array.
+    @staticmethod
+    def get_numpy_type(bits, sample_format=None):
+        """ Return numpy dtype corresponding to bits and sample format.
         """
-        width = self.GetField('ImageWidth')
-        height = self.GetField('ImageLength')
-        bits = self.GetField('BitsPerSample')
-        sample_format = self.GetField('SampleFormat')
-        compression = self.GetField('Compression')
-
+        typ = None
         if sample_format==SAMPLEFORMAT_IEEEFP:
             typ = getattr(np,'float%s' % (bits))
         elif sample_format==SAMPLEFORMAT_UINT or sample_format is None:
@@ -280,6 +275,19 @@ class TIFF(ctypes.c_void_p):
             typ = getattr(np,'complex%s' % (bits))
         else:
             raise NotImplementedError (`sample_format`)
+        return typ
+
+    @debug
+    def read_image(self, verbose=False):
+        """ Read image from TIFF and return it as an array.
+        """
+        width = self.GetField('ImageWidth')
+        height = self.GetField('ImageLength')
+        bits = self.GetField('BitsPerSample')
+        sample_format = self.GetField('SampleFormat')
+        compression = self.GetField('Compression')
+
+        typ = self.get_numpy_type(bits, sample_format)
 
         if typ is None:
             if bits==1: # TODO: check for correctness
@@ -291,7 +299,7 @@ class TIFF(ctypes.c_void_p):
             else:
                 raise NotImplementedError (`bits`)
         else:
-            itemsize = bits/8            
+            itemsize = bits/8
 
         size = width * height * itemsize
         arr = np.zeros((height, width), typ)
@@ -317,8 +325,22 @@ class TIFF(ctypes.c_void_p):
             return value
         elif value is None:
             return COMPRESSION_NONE
-        else:
+        elif isinstance(value, str):
             return name_to_define_map['Compression']['COMPRESSION_'+value.upper()]
+        else:
+            raise NotImplementedError(`value`)
+
+    @staticmethod
+    def _fix_sampleformat(value):
+        if isinstance(value, int):
+            return value
+        elif value is None:
+            return SAMPLEFORMAT_UINT            
+        elif isinstance(value, str):
+            return dict(int=SAMPLEFORMAT_INT, uint=SAMPLEFORMAT_UINT,
+                        float=SAMPLEFORMAT_IEEEFP, complex=SAMPLEFORMAT_COMPLEXIEEEFP)[value.lower()]
+        else:
+            raise NotImplementedError(`value`)
 
     def write_image(self, arr, compression=None):
         """ Write array as TIFF image.
@@ -513,7 +535,7 @@ class TIFF(ctypes.c_void_p):
             return None
         return convert(data)
 
-    @debug
+    #@debug
     def SetField (self, tag, value):
         """ Set TIFF field value with tag.
 
@@ -572,32 +594,64 @@ class TIFF(ctypes.c_void_p):
         """ Copy opened TIFF file to a new file.
 
         Use keyword arguments to redefine tag values.
+
+        Parameters
+        ----------
+        filename : str
+          Specify the name of file where TIFF file is copied to.
+        compression : {'none', 'lzw', 'deflate', ...}
+          Specify compression scheme.
+        bitspersample : {8,16,32,64,128,256}
+          Specify bit size of a sample.
+        sampleformat : {'uint', 'int', 'float', 'complex'}
+          Specify sample format.
         """
         other = TIFF.open(filename, mode='w')
         define_rewrite = {}
         for name, value in kws.items():
-            define = TIFF.get_tag_define (name)
+            define = TIFF.get_tag_define(name)
             assert define is not None
             if name=='compression':
-                value = TIFF._fix_compression (value)
+                value = TIFF._fix_compression(value)
+            if name=='sampleformat':
+                value = TIFF._fix_sampleformat(value)
             define_rewrite[define] = value
+        name_define_list = name_to_define_map['TiffTag'].items()
         self.SetDirectory(0)
         self.ReadDirectory()
         while 1:
             other.SetDirectory(self.CurrentDirectory())
-            for name, define in name_to_define_map['TiffTag'].items():
-                value = define_rewrite.get (define)
-                if value is None:
-                    value = self.GetField(define)
+            bits = self.GetField('BitsPerSample')
+            sample_format = self.GetField('SampleFormat')
+            assert bits >=8, `bits, sample_format, dtype`
+            itemsize = bits // 8
+            dtype = self.get_numpy_type(bits, sample_format)
+            for name, define in name_define_list:
+                orig_value = self.GetField(define)
+                if orig_value is None and define not in define_rewrite:
+                    continue
+                if name.endswith('OFFSETS') or name.endswith('BYTECOUNTS'):
+                    continue
+                if define in define_rewrite:
+                    value = define_rewrite[define]
+                else:
+                    value = orig_value
                 if value is None:
                     continue
                 other.SetField(define, value)
+            new_bits = other.GetField('BitsPerSample')
+            new_sample_format = other.GetField('SampleFormat')
+            new_dtype = other.get_numpy_type(new_bits, new_sample_format)
+            assert new_bits >=8, `new_bits, new_sample_format, new_dtype`
+            new_itemsize = new_bits // 8
             strip_size = self.StripSize()
-            buffer = np.zeros(strip_size, np.uint8)
+            new_strip_size = self.StripSize()
+            buf = np.zeros(strip_size // itemsize, dtype)
             for strip in range(self.NumberOfStrips()):
-                elem = self.ReadEncodedStrip(strip, buffer.ctypes.data, strip_size)
+                elem = self.ReadEncodedStrip(strip, buf.ctypes.data, strip_size)
                 if elem>0:
-                    other.WriteEncodedStrip(strip, buffer.ctypes.data, elem)
+                    new_buf = buf.astype(new_dtype)
+                    other.WriteEncodedStrip(strip, new_buf.ctypes.data, elem * new_itemsize)
             self.ReadDirectory()
             if self.LastDirectory ():
                 break
@@ -681,17 +735,24 @@ libtiff.TIFFRawStripSize.argtypes = [TIFF, c_tstrip_t]
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
 
-# Support for TIFFWarningHandler
+# Support for TIFF warning and error handlers:
 TIFFWarningHandler = ctypes.CFUNCTYPE(None,
+                                      ctypes.c_char_p, # Module
+                                      ctypes.c_char_p, # Format
+                                      ctypes.c_void_p) # va_list
+TIFFErrorHandler = ctypes.CFUNCTYPE(None,
                                       ctypes.c_char_p, # Module
                                       ctypes.c_char_p, # Format
                                       ctypes.c_void_p) # va_list
 
 # This has to be at module scope so it is not garbage-collected
 _null_warning_handler = TIFFWarningHandler(lambda module, fmt, va_list: None)
+_null_error_handler = TIFFErrorHandler(lambda module, fmt, va_list: None)
 
 def suppress_warnings():
     libtiff.TIFFSetWarningHandler(_null_warning_handler)
+def suppress_errors():
+    libtiff.TIFFSetErrorHandler(_null_error_handler)
 
 def _test_read(filename=None):
     import sys
@@ -740,9 +801,9 @@ def _test_write_float():
     arr2 = tiff.read_image()
     print arr2
 
-def _test_compression():
+def _test_copy():
     tiff = TIFF.open('/tmp/libtiff_test_compression.tiff', mode='w')
-    arr = np.zeros ((5,6), np.uint8)
+    arr = np.zeros ((5,6), np.uint32)
     for i in range(arr.shape[0]):
         for j in range (arr.shape[1]):
             arr[i,j] = 1+i + 10*j
@@ -758,19 +819,27 @@ def _test_compression():
 
     assert (arr==arr2).all(),'arrays not equal'
 
-    tiff.copy ('/tmp/libtiff_test_compression2.tiff', 
-               compression='none',
-               imagedescription='hoo')
-    tiff2 = TIFF.open('/tmp/libtiff_test_compression2.tiff', mode='r')
-    arr3 = tiff2.read_image()
-
-    print tiff2.info()
-    print arr3
-    assert (arr==arr3).all(),'arrays not equal'
+    for compression in ['none','lzw','deflate']:
+        for sampleformat in ['int','uint','float']:
+            for bitspersample in [256,128,64,32,16,8]:
+                if sampleformat=='float' and (bitspersample < 32 or bitspersample > 128):
+                    continue
+                if sampleformat in ['int','uint'] and bitspersample > 64:
+                    continue
+                #print compression, sampleformat, bitspersample
+                tiff.copy ('/tmp/libtiff_test_copy2.tiff', 
+                           compression=compression,
+                           imagedescription='hoo',
+                           sampleformat=sampleformat,
+                           bitspersample=bitspersample)
+                tiff2 = TIFF.open('/tmp/libtiff_test_copy2.tiff', mode='r')
+                arr3 = tiff2.read_image()
+                assert (arr==arr3).all(),'arrays not equal %r' % ((compression, sampleformat, bitspersample),)
+    print 'test copy ok'
 
 if __name__=='__main__':
     #_test_write_float()
     #_test_write()
     #_test_read()
-    _test_compression()
+    _test_copy()
 
