@@ -82,6 +82,8 @@ if tiff_h is None:
 else:
     d = tiff_h.__dict__
 
+d['TIFFTAG_CZ_LSMINFO'] = 34412
+
 define_to_name_map = dict(Orientation={}, Compression={},
                           PhotoMetric={}, PlanarConfig={},
                           SampleFormat={}, FillOrder={},
@@ -150,6 +152,7 @@ tifftags = {
     TIFFTAG_IMAGEDEPTH: (ctypes.c_uint32, lambda d:d.value),
     TIFFTAG_IMAGEWIDTH: (ctypes.c_uint32, lambda d:d.value),
     TIFFTAG_IMAGELENGTH: (ctypes.c_uint32, lambda d:d.value),
+    TIFFTAG_SAMPLESPERPIXEL: (ctypes.c_uint32, lambda d:d.value),
     TIFFTAG_ROWSPERSTRIP: (ctypes.c_uint32, lambda d:d.value),
     TIFFTAG_SUBFILETYPE: (ctypes.c_uint32, lambda d:d.value),
     TIFFTAG_TILEDEPTH: (ctypes.c_uint32, lambda d:d.value),
@@ -198,6 +201,8 @@ tifftags = {
     TIFFTAG_WHITEPOINT: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
     TIFFTAG_YCBCRCOEFFICIENTS: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
 
+    TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda d:d.value) # offset to CZ_LSMINFO record
+
 }
 
 def debug(func):
@@ -232,6 +237,10 @@ class TIFF(ctypes.c_void_p):
       tiff.write_image(array)
       tiff.close()
 
+    To copy and change tags from a tiff file:
+
+      tiff_in =  TIFF.open(filename_in)
+      tiff_in.copy (filename_out, compression=, bitspersample=, sampleformat=,...)
     """
 
     @staticmethod
@@ -532,6 +541,8 @@ class TIFF(ctypes.c_void_p):
         data = data_type()
         r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
         if not r: # tag not defined for current directory
+            if not ignore_undefined_tag:
+                print 'Warning: tag %r not defined in currect directory' % (tag)
             return None
         return convert(data)
 
@@ -581,13 +592,16 @@ class TIFF(ctypes.c_void_p):
                         'XPosition', 'YPosition', 'XResolution', 'YResolution',
                         'PrimaryChromaticities', 'ReferenceBlackWhite',
                         'WhitePoint', 'YCBCRCoefficients',
-                        'PixelSizeX','PixelSizeY', 'RelativeTime'
+                        'PixelSizeX','PixelSizeY', 'RelativeTime',
+                        'CZ_LSMInfo'
                         ]:
             v = self.GetField(tagname)
             if v:
                 if isinstance (v, int):
                     v = define_to_name_map.get(tagname, {}).get(v, v)
                 l.append('%s: %s' % (tagname, v))
+                if tagname=='CZ_LSMInfo':
+                    print CZ_LSMInfo(self)
         return '\n'.join(l)
         
     def copy(self, filename, **kws):
@@ -651,17 +665,58 @@ class TIFF(ctypes.c_void_p):
                 elem = self.ReadEncodedStrip(strip, buf.ctypes.data, strip_size)
                 if elem>0:
                     new_buf = buf.astype(new_dtype)
-                    other.WriteEncodedStrip(strip, new_buf.ctypes.data, elem * new_itemsize)
+                    other.WriteEncodedStrip(strip, new_buf.ctypes.data, (elem * new_itemsize)//itemsize)
             self.ReadDirectory()
             if self.LastDirectory ():
                 break
         other.close ()
 
+import struct
+import numpy
+class CZ_LSMInfo:
+
+    def __init__(self, tiff):
+        self.tiff = tiff
+        self.filename = tiff.FileName()
+        self.offset = tiff.GetField(TIFFTAG_CZ_LSMINFO)
+        self.extract_info()
+
+    def extract_info (self):
+        if self.offset is None:
+            return
+        f = libtiff.TIFFFileno(self.tiff)
+        fd = os.fdopen(f, 'r')
+        pos = fd.tell()
+        self.offset = self.tiff.GetField(TIFFTAG_CZ_LSMINFO)
+        print os.lseek(f, 0, 1)
+
+        print pos
+        #print libtiff.TIFFSeekProc(self.tiff, 0, 1)
+        fd.seek(0)
+        print struct.unpack ('HH', fd.read (4))
+        print struct.unpack('I',fd.read (4))
+        print struct.unpack('H',fd.read (2))
+        fd.seek(self.offset)
+        d = [('magic_number', 'i4'),
+             ('structure_size', 'i4')]
+        print pos, numpy.rec.fromfile(fd, d, 1)
+        fd.seek(pos)
+        #print hex (struct.unpack('I', fd.read (4))[0])
+        #fd.close()
+
+
+    def __str__ (self):
+        return '%s: %s' % (self.filename, self.offset)
+
 libtiff.TIFFOpen.restype = TIFF
 libtiff.TIFFOpen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 
+
 libtiff.TIFFFileName.restype = ctypes.c_char_p
 libtiff.TIFFFileName.argtypes = [TIFF]
+
+libtiff.TIFFFileno.restype = ctypes.c_int
+libtiff.TIFFFileno.argtypes = [TIFF]
 
 libtiff.TIFFCurrentRow.restype = ctypes.c_uint32
 libtiff.TIFFCurrentRow.argtypes = [TIFF]
@@ -776,6 +831,8 @@ def _test_read(filename=None):
         i += 1
     print '\tok',(time.time ()-t)*1e3,'ms',i,'images'
 
+
+
 def _test_write():
     tiff = TIFF.open('/tmp/libtiff_test_write.tiff', mode='w')
     arr = np.zeros ((5,6), np.uint32)
@@ -840,6 +897,6 @@ def _test_copy():
 if __name__=='__main__':
     #_test_write_float()
     #_test_write()
-    #_test_read()
-    _test_copy()
-
+    _test_read()
+    #_test_copy()
+    
