@@ -52,8 +52,12 @@ except ImportError:
     tiff_h = None
 
 if tiff_h is None:
-    include_tiff_h = os.path.join('/usr','include','tiff.h')
-    assert os.path.isfile(include_tiff_h), `include_tiff_h, lib`
+    include_tiff_h = os.path.join(os.path.split(lib)[0], '..', 'include', 'tiff.h')
+    if not os.path.isfile(include_tiff_h):
+        # fix me for windows:
+        include_tiff_h = os.path.join('/usr','include','tiff.h')
+    if not os.path.isfile(include_tiff_h):
+        raise ValueError('Failed to find TIFF header file.')
     # Read TIFFTAG_* constants for the header file:
     f = open (include_tiff_h, 'r')
     l = []
