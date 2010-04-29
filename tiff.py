@@ -3,6 +3,8 @@ import os
 import sys
 import numpy
 
+import lsm
+
 #<TagName> <Hex> <Type> <Number of values>
 tag_info = '''
 # standard tags:
@@ -97,8 +99,9 @@ ReferenceBlackWhite 214 LONG 2*SamplesPerPixel
 Copyright 8298 ASCII Any
 
 # non-standard tags:
-CZ_LSMInfo 866C BYTE
+CZ_LSMInfo 866C CZ_LSM
 '''
+
 lsmdtype = numpy.dtype([
     ('MagicNumber',numpy.uint32),
     ('StructureSize',numpy.int32),
@@ -137,7 +140,6 @@ lsmdtype = numpy.dtype([
     ('Reserved', numpy.dtype('(69,)u4')),
     ])
 
-acqinfo_lsmdtype = numpy.dtype([('Entry', numpy.uint32), ('Type', numpy.uint32), ('Size', numpy.uint32)])
 
 rational = numpy.dtype([('numer', numpy.uint32), ('denom', numpy.uint32)])
 srational = numpy.dtype([('numer', numpy.int32), ('denom', numpy.int32)])
@@ -173,7 +175,9 @@ type2dtype[lsmtype] = lsmdtype
 
 
 class TIFFView:
-    """
+    """ Data structure to access TIFF files via Numpy memmap.
+
+    
     """
 
     def __init__(self, filename):
@@ -201,8 +205,13 @@ class TIFFView:
         return self.data[offset:offset+2].view(dtype=numpy.int16)[0]
     def get_int32(self, offset):
         return self.data[offset:offset+4].view(dtype=numpy.int32)[0]
+    def get_float32(self, offset):
+        return self.data[offset:offset+4].view(dtype=numpy.float32)[0]
+    def get_float64(self, offset):
+        return self.data[offset:offset+8].view(dtype=numpy.float64)[0]
     get_short = get_uint16
     get_long = get_uint32
+    get_double = get_float64
 
     def get_value(self, offset, type):
         values = self.get_values(offset, type, 1)
@@ -225,6 +234,85 @@ class TIFFView:
         n = self.get_uint16(IFD0)
         for i in range(n):
             yield IFDEntry(self, IFD0 + 2 + i*12)
+
+class Entry:
+
+    def __init__(self, entry, type_name, label, data):
+        self.record = (entry, type_name, label, data)
+        self.footer = None
+        if type_name == 'ASCII':
+            self.type = 2
+            self.header = numpy.array([entry, 2, len(data)+1], dtype=numpy.uint32).view(dtype=numpy.uint8)
+        elif type_name == 'LONG':
+            self.type = 4
+            self.header = numpy.array([entry, 4, 4], dtype=numpy.uint32).view(dtype=numpy.uint8)
+        elif type_name == 'DOUBLE':
+            self.type = 5
+            self.header = numpy.array([entry, 5, 8], dtype=numpy.uint32).view(dtype=numpy.uint8)
+        elif type_name == 'SUBBLOCK':
+            self.type = 0
+            self.header = numpy.array([entry, 0, 0], dtype=numpy.uint32).view(dtype=numpy.uint8)
+            #self.footer = numpy.array([0x0ffffffff, 0, 0], dtype=numpy.uint32).view(dtype=numpy.uint8)
+        else:
+            raise NotImplementedError (`self.record`)
+
+    def get_size(self):
+        """ Return total memory size in bytes needed to fit the entry to memory.
+        """
+        (entry, type_name, label, data) = self.record
+        if type_name=='SUBBLOCK':
+            if data is None:
+                return 12
+            size = 0
+            for item in data:
+                size += item.get_size()
+            return 12 + size
+        if type_name=='LONG':
+            return 12 + 4
+        if type_name=='DOUBLE':
+            return 12 + 8
+        if type_name == 'ASCII':
+            return 12 + len(data) + 1
+        raise NotImplementedError (`self.record`)
+
+    def toarray(self, target = None):
+        if target is None:
+            target = numpy.zeros((self.get_size(),), dtype=numpy.uint8)
+        (entry, type_name, label, data) = self.record
+        target[:12] = self.header
+        if type_name=='SUBBLOCK':
+            if data is not None:
+                n = 12
+                for item in data:
+                    item.toarray(target[n:])
+                    n += item.get_size()
+        elif type_name == 'ASCII':
+            target[12:12+len(data)+1] = numpy.array([data+'\0']).view (dtype=numpy.uint8)
+        elif type_name == 'LONG':
+            target[12:12+4] = numpy.array([data], dtype=numpy.uint32).view(dtype=numpy.uint8)
+        elif type_name == 'DOUBLE':
+            target[12:12+8] = numpy.array([data], dtype=numpy.float64).view(dtype=numpy.uint8)
+        else:
+            raise NotImplementedError (`self.record`)
+        return target
+
+    def tostr(self, tab=''):
+        (entry, type_name, label, data) = self.record
+        if type_name=='SUBBLOCK':
+            if data is None:
+                return '%s%s' % (tab[:-2], label)
+            l = ['%s%s[size=%s]' % (tab, label, self.get_size ())]
+            for item in data:
+                l.append(item.tostr(tab=tab+'  '))
+            return '\n'.join (l)
+        return '%s%s = %r' % (tab, label, data)
+
+    __str__ = tostr
+
+    def append (self, entry):
+        assert self.record[1]=='SUBBLOCK',`self.record`
+        self.record[3].append(entry)
+
 
 class IFDEntry:
 
@@ -256,47 +344,59 @@ class IFDEntry:
         else:
             return 'IFD(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
 
-    _lsm_acqinfo_entry = {0x010000000: 'recording',
-                          0x010000001: 'recording name',
-                          0x010000002: 'recording description',
-                          0x010000003: 'recording notes',
-                          0x010000004: 'recording objective',
-                          0x010000005: 'recording processing summary',
-                          0x010000006: 'recording special scan mode',
-                          0x010000007: 'recording scan type',
-                          0x010000008: 'recording scan mode',
-                          0x010000009: 'recording number of stacks',
-                          0x01000000a: 'recording lines per plane',
-                          0x01000000b: 'recording samples per line',
-                          0x01000000c: 'recording planes per volume',
-                          0x01000000d: 'recording image width',
-                          0x030000000:'lasers', 0x050000000:'laser',
-                          0x020000000: 'tracks', 0x040000000:'track', 0x060000000:'detection channels',
-                          0x070000000: 'detection channel', 0x080000000: 'illumination channels',
-                          0x090000000: 'illumination channel', 0x0A0000000: 'beam splitters',
-                          0x0B0000000: 'beam splitter', 0x0C0000000:'data channels',
-                          0x0D0000000: 'data channel', 0x011000000: 'timers',
-                          0x012000000: 'timer', 0x013000000: 'markers', 0x014000000: 'marker'}
+    def get_lsm_scaninfo(self):
+        """
+        Return LSM scan information.
 
-    def get_lsm_acqinfo(self):
-        n = self.value['OffsetScanInformation'][0]
-        entry, type, size = self.tiff.get_values(n, 'LONG', 3)
-        assert self._lsm_acqinfo_entry.get(entry)=='recording',hex(entry)
-        n += 12
-        for i in range(20):
+        Returns
+        -------
+        record : Record
+        """
+        n = n1 = self.value['OffsetScanInformation'][0]
+        record = None
+        tab = ' '
+        while 1:
             entry, type, size = self.tiff.get_values(n, 'LONG', 3)
             n += 12
-            entry_name = self._lsm_acqinfo_entry.get(entry, hex(entry))
-            if type==2: # ASCII
-                s = self.tiff.get_string(n, size - 1)
-                n += size
-                print entry_name,`s`
-            elif type==4: # LONG
-                s = self.tiff.get_uint32(n)
-                n += size
-                print entry_name,`s`
+            label, type_name = lsm.scaninfo.get(entry, (None, None))
+            if label is None:
+                type_name = {0:'SUBBLOCK', 2:'ASCII', 4:'LONG', 5:'DOUBLE'}.get(type)
+                if type_name is None:
+                    raise NotImplementedError(`hex (entry), type, size`)
+                label = 'ENTRY%s' % (hex(entry))
+                lsm.scaninfo[entry] = label, type_name
+            if type_name=='SUBBLOCK':
+                assert type==0,`hex (entry), type, size`
+                if label == 'end':
+                    entry = Entry(entry, type_name, label, None)
+                    record.append(entry)
+                    if record.parent is None:
+                        break
+                    record.parent.append(record)
+                    record = record.parent
+                else:
+                    prev_record = record
+                    record = Entry(entry, type_name, label, [])
+                    record.parent = prev_record
+                assert size==0,`hex (entry), type, size`
+                continue
+            if type_name=='ASCII':
+                assert type==2,`hex (entry), type, size`
+                value = self.tiff.get_string (n, size-1)
+            elif type_name=='LONG':
+                assert type==4,`hex (entry), type, size`
+                value = self.tiff.get_long(n)
+            elif type_name=='DOUBLE':
+                assert type==5,`hex (entry), type, size`
+                value = self.tiff.get_double(n)
             else:
-                raise NotImplementedError(`hex(entry),type, size`)
+                raise NotImplementedError(`hex (entry), type, size`)
+            entry = Entry(entry, type_name, label, value)
+            n += size
+            record.append(entry)
+
+        print n - n1
+        return record
             
 def main ():
     filename = sys.argv[1]
@@ -306,10 +406,12 @@ def main ():
     t = TIFFView(filename)
 
     for IFD in t.iter_IFD():
-        pass
         print IFD
 
-    print IFD.get_lsm_acqinfo()
+    record = IFD.get_lsm_scaninfo()
+    print record
+    print record.get_size ()
+    print record.toarray().view (numpy.uint16)
 
 if __name__ == '__main__':
     main()
