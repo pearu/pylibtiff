@@ -355,7 +355,7 @@ class TIFF(ctypes.c_void_p):
         else:
             raise NotImplementedError(`value`)
 
-    def write_image(self, arr, compression=None):
+    def write_image(self, arr, compression=None, write_rgb=False):
         """ Write array as TIFF image.
 
         Parameters
@@ -363,6 +363,8 @@ class TIFF(ctypes.c_void_p):
         arr : :numpy:`ndarray`
           Specify image data of rank 1 to 3.
         compression : {None, 'ccittrle', 'ccittfax3','ccitt_t4','ccittfax4','ccitt_t6','lzw','ojpeg','jpeg','next','ccittrlew','packbits','thunderscan','it8ctpad','it8lw','it8mp','it8bl','pixarfilm','pixarlog','deflate','adobe_deflate','dcs','jbig','sgilog','sgilog24','jp2000'}
+        write_rgb: bool
+          Write rgb image if data is of size 3xWxH (otherwise, writes a multipage TIFF).
         """
         COMPRESSION = self._fix_compression (compression)
 
@@ -422,21 +424,35 @@ class TIFF(ctypes.c_void_p):
         elif len(shape)==3:
             depth, height, width = shape
             size = width * height * arr.itemsize
-            for n in range(depth):
+            if depth == 3 and write_rgb:
                 self.SetField(TIFFTAG_IMAGEWIDTH, width)
                 self.SetField(TIFFTAG_IMAGELENGTH, height)
                 self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
                 self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
-                #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
-                self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-                self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
-                self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+                self.SetField(TIFFTAG_SAMPLESPERPIXEL, 3)
+                self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
+                self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE)
 
                 if sample_format is not None:
                     self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+                for n in range(depth):
+                    WriteStrip(n, arr[n, :, :].ctypes.data, size)
+            else:
+                for n in range(depth):
+                    self.SetField(TIFFTAG_IMAGEWIDTH, width)
+                    self.SetField(TIFFTAG_IMAGELENGTH, height)
+                    self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+                    self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
+                    #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
+                    self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+                    self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+                    self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
 
-                WriteStrip(0, arr[n].ctypes.data, size)
-                self.WriteDirectory()
+                    if sample_format is not None:
+                        self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+
+                    WriteStrip(0, arr[n].ctypes.data, size)
+            self.WriteDirectory()
         else:
             raise NotImplementedError (`shape`)
 
