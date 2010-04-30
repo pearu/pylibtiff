@@ -2,7 +2,7 @@
 tiff - implements numpy.memmap based TIFF reader
 """
 
-__all__ = ['TIFF']
+__all__ = ['TIFFfile']
 
 import os
 import sys
@@ -132,19 +132,21 @@ for line in tag_info.split('\n'):
         tag_value2type[h]=t
         tag_name2value[n]=h
 
-IFDEntry_hooks = []
+IFDEntry_init_hooks = []
 
 # Register CZ LSM support:
 import lsm
 lsm.register(locals())
 
-class TIFF:
-    """ Holds numpy.memmap of a TIFF file.
+class TIFFfile:
+    """ Holds a numpy.memmap of a TIFF file.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, mode='r'):
+        if mode!='r':
+            raise NotImplementedError(`mode`)
         self.filename = filename
-        self.data = numpy.memmap(filename, dtype=numpy.byte, mode='r')        
+        self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
         self.init()
 
     def init(self):
@@ -164,11 +166,11 @@ class TIFF:
         IFD_offset = IFD0
         while IFD_offset:
             n = self.get_uint16(IFD_offset)
-            IFD_entries = []
+            ifd = IFD()
             for i in range(n):
                 entry = IFDEntry(self, IFD_offset + 2 + i*12)
-                IFD_entries.append(entry)
-            IFD_list.append(IFD_entries)
+                ifd.append(entry)
+            IFD_list.append(ifd)
             IFD_offset = self.get_uint32(IFD_offset + 2 + n*12)
         self.IFD = IFD_list
 
@@ -193,28 +195,51 @@ class TIFF:
 
     def get_value(self, offset, type):
         values = self.get_values(offset, type, 1)
-        if values is not None: return values[0]
-    def get_values(self, offset, type, count):
-        if isinstance(type, str):
-            type = name2type.get(type)
-        dtype = type2dtype.get(type)
-        bytes = type2bytes.get(type)
-        if dtype is None or bytes is None:
-            return
+        if values is not None:
+            return values[0]
+    def get_values(self, offset, typ, count):
+        if isinstance(typ, numpy.dtype):
+            dtype = typ
+            bytes = typ.itemsize
+        elif isinstance(typ, type) and  issubclass(typ, numpy.generic):
+            dtype = typ
+            bytes = typ().itemsize
+        else:
+            if isinstance(typ, str):
+                typ = name2type.get(typ)
+            dtype = type2dtype.get(typ)
+            bytes = type2bytes.get(typ)
+            if dtype is None or bytes is None:
+                sys.stderr.write('get_values: incomplete info for type=%r: dtype=%s, bytes=%s' % (typ, dtype, bytes))
+                return
         return self.data[offset:offset+bytes*count].view(dtype=dtype)
 
-    def get_string(self, offset, length):
+    def get_string(self, offset, length = None):
+        if length is None:
+            i = 0
+            while self.data[offset+i]:
+                i += 1
+            length = i
         string = self.get_values(offset, 'BYTE', length).tostring()
         return string
-    
-    def iter_IFD(self):
-        IFD0 = self.IFD0
-        n = self.get_uint16(IFD0)
-        for i in range(n):
-            yield IFDEntry(self, IFD0 + 2 + i*12)
+
+class IFD:
+    """ Image File Directory data structure.
+    """
+    def __init__(self):
+        self.entries = []
+    def append(self, entry):
+        self.entries.append (entry)
+
+    def __str__(self):
+        l = []
+        for entry in self.entries:
+            l.append(str (entry))
+        return '\n'.join(l)
+        
 
 class IFDEntry:
-    """ Image File Directory data structure.
+    """ Entry for Image File Directory data structure.
     """
     def __init__(self, tiff, offset):
         self.tiff = tiff
@@ -224,7 +249,7 @@ class IFDEntry:
         self.tag = tiff.get_uint16(offset)
         self.type = tiff.get_uint16(offset+2)
         self.count = tiff.get_uint32(offset+4)
-        for hook in IFDEntry_hooks:
+        for hook in IFDEntry_init_hooks:
             hook(self)
         
         bytes = type2bytes.get(self.type,0)
@@ -239,10 +264,14 @@ class IFDEntry:
         self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type,))
         
     def __str__(self):
+        if hasattr(self, 'str_hook'):
+            r = self.str_hook(self)
+            if isinstance (r, str):
+                return r
         if hasattr(self, 'value'):
-            return 'IFD(tag=%(tag_name)s, value=%(value)r)' % (self.__dict__)
+            return 'IFDEntry(tag=%(tag_name)s, value=%(value)r)' % (self.__dict__)
         else:
-            return 'IFD(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
+            return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.tiff, self.offset)
@@ -252,14 +281,12 @@ def main ():
     if not os.path.isfile(filename):
         raise ValueError('File %r does not exists' % (filename))
 
-    t = TIFF(filename)
-    print lsm.scaninfo(t.IFD[0][-1])
-    #print map(str,t.IFD[-1])
-    #for IFD in t.iter_IFD():
-    #    print IFD
-
-    #record = lsm.scaninfo(IFD)
-    #print record
+    t = TIFFfile(filename)
+    e = t.IFD[0].entries[-1]
+    assert e.is_lsm
+    print e
+    #print lsm.timestamps(e)
+    print lsm.channelwavelength(e)
 
 if __name__ == '__main__':
     main()
