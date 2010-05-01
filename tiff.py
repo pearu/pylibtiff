@@ -133,6 +133,7 @@ for line in tag_info.split('\n'):
         tag_name2value[n]=h
 
 IFDEntry_init_hooks = []
+IFDEntry_finalize_hooks = []
 
 # Register CZ LSM support:
 import lsm
@@ -142,25 +143,30 @@ class TIFFfile:
     """ Holds a numpy.memmap of a TIFF file.
     """
 
-    def __init__(self, filename, mode='r'):
+    def __init__(self, filename, mode='r', first_byte = 0):
         if mode!='r':
             raise NotImplementedError(`mode`)
         self.filename = filename
+        self.first_byte = first_byte
         self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
         self.init()
 
     def init(self):
-        byteorder = self.get_uint16(0)
+
+        first_byte = self.first_byte
+        self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
+        byteorder = self.get_uint16(first_byte)
         if byteorder==0x4949:
             self.endian = 'little'
         elif byteorder==0x4d4d:
             self.endian = 'big'
         else:
             raise ValueError('unrecognized byteorder: %s' % (hex(byteorder)))
-        magic = self.get_uint16(2)
+        magic = self.get_uint16(first_byte+2)
         if magic!=42:
             raise ValueError('wrong magic number for TIFF file: %s' % (magic))
-        self.IFD0 = IFD0 = self.get_uint32(4)
+        self.IFD0 = IFD0 = first_byte + self.get_uint32(first_byte+4)
+        self.memory_usage.append((first_byte, first_byte+8, 'file header'))
         n = self.get_uint16(IFD0)
         IFD_list = []
         IFD_offset = IFD0
@@ -168,9 +174,12 @@ class TIFFfile:
             n = self.get_uint16(IFD_offset)
             ifd = IFD()
             for i in range(n):
-                entry = IFDEntry(self, IFD_offset + 2 + i*12)
+                entry = IFDEntry(ifd, self, IFD_offset + 2 + i*12)
                 ifd.append(entry)
+            #print ifd
+            ifd.finalize()
             IFD_list.append(ifd)
+            self.memory_usage.append((IFD_offset, IFD_offset + 2 + n*12 + 4, 'IFD %s entries' % (len(IFD_list))))
             IFD_offset = self.get_uint32(IFD_offset + 2 + n*12)
         self.IFD = IFD_list
 
@@ -223,25 +232,60 @@ class TIFFfile:
         string = self.get_values(offset, 'BYTE', length).tostring()
         return string
 
+    def show_memory_usage(self):
+        l = []
+        l.extend(self.memory_usage)
+        for ifd in self.IFD:
+            l.extend(ifd.memory_usage)
+        l.sort()
+        last_end = None
+        for start, end, resource in l:
+            if last_end:
+                if last_end!=start:
+                    print '--- unknown %s bytes' % (start-last_end)
+                assert start >= last_end,`last_end, start, resource`
+            print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
+            last_end = end
 class IFD:
     """ Image File Directory data structure.
     """
     def __init__(self):
         self.entries = []
+
     def append(self, entry):
         self.entries.append (entry)
+
+    @property
+    def memory_usage(self):
+        l = []
+        for entry in self.entries:
+            l.extend(entry.memory_usage)
+        return l
 
     def __str__(self):
         l = []
         for entry in self.entries:
             l.append(str (entry))
         return '\n'.join(l)
-        
+
+    def get(self, tag_name):
+        for entry in self.entries:
+            if entry.tag_name==tag_name:
+                return entry
+
+    def finalize(self):
+        for entry in self.entries:
+            for hook in IFDEntry_finalize_hooks:
+                hook(entry)
+
+
+
 
 class IFDEntry:
     """ Entry for Image File Directory data structure.
     """
-    def __init__(self, tiff, offset):
+    def __init__(self, ifd, tiff, offset):
+        self.ifd = ifd
         self.tiff = tiff
         self.offset = offset
 
@@ -252,8 +296,9 @@ class IFDEntry:
         for hook in IFDEntry_init_hooks:
             hook(self)
         
-        bytes = type2bytes.get(self.type,0)
+        self.bytes = bytes = type2bytes.get(self.type,0)
         if self.count==1 and 1<=bytes<=4:
+            self.offset = None
             value = tiff.get_value(offset+8, self.type)
         else:
             self.offset = tiff.get_int32(offset+8)
@@ -262,6 +307,10 @@ class IFDEntry:
             self.value = value
         self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
         self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type,))
+
+        self.memory_usage = []
+        if self.offset is not None:
+            self.memory_usage.append((self.offset, self.offset + self.bytes*self.count, self.tag_name))
         
     def __str__(self):
         if hasattr(self, 'str_hook'):
@@ -276,17 +325,39 @@ class IFDEntry:
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.tiff, self.offset)
 
+    def get_memory_usage(self):
+        if self.offset is None:
+            return []
+        return [(self.offset, self.offset + self.bytes*self.count, self.tag_name)]
+
+def StripOffsets_hook(ifdentry):
+    if ifdentry.tag_name=='StripOffsets':
+        ifd = ifdentry.ifd
+        counts = ifd.get('StripByteCounts')
+        if ifdentry.offset is not None:
+            for i, (count, offset) in enumerate(zip(counts.value, ifdentry.value)):
+                ifdentry.memory_usage.append((offset, offset+count, 'strip %s' % (i)))
+        else:
+            offset = ifdentry.value
+            ifdentry.memory_usage.append((offset, offset+counts.value, 'strip'))
+
+IFDEntry_finalize_hooks.append(StripOffsets_hook)
+
 def main ():
     filename = sys.argv[1]
     if not os.path.isfile(filename):
         raise ValueError('File %r does not exists' % (filename))
 
     t = TIFFfile(filename)
+
+    t.show_memory_usage()
+
     e = t.IFD[0].entries[-1]
     assert e.is_lsm
-    print e
+    print lsm.lsmblock(e)
+    #print lsm.filestructure(e)
     #print lsm.timestamps(e)
-    print lsm.channelwavelength(e)
+    #print lsm.channelwavelength(e)
 
 if __name__ == '__main__':
     main()

@@ -4,16 +4,18 @@ lsm - implements TIFF CZ_LSM support.
 # Author: Pearu Peterson
 # Created: April 2010
 
-__all__ = ['scaninfo', 'timestamps', 'eventlist','channelcolors']
+__all__ = ['scaninfo', 'timestamps', 'eventlist','channelcolors',
+           'channelwavelength','inputlut','outputlut',
+           'vectoroverlay','roi','bleachroi','meanofroisoverlay',
+           'topoisolineoverlay','topoprofileoverlay','linescanoverlay',
+           'channelfactors', 'channeldatatypes',
+           'lsmblock'
+           ]
 
 import sys
 import numpy
 
 CZ_LSMInfo_tag = 0x866C
-#CZ_LSMInfo_type_name = 'CZ_LSMInfo'
-#CZ_LSMInfo_type_size = 500
-#CZ_LSMInfo_type = -CZ_LSMInfo_tag
-
 tiff_module_dict = None
 
 def IFDEntry_lsm_str_hook(entry):
@@ -51,17 +53,55 @@ def IFDEntry_lsm_init_hook(ifdentry):
     else:
         ifdentry.is_lsm = False
 
+def IFDEntry_lsm_finalize_hook(ifdentry):
+    if ifdentry.tag==CZ_LSMInfo_tag:
+        blockstart, blockend = None, None
+        for name in ifdentry.value.dtype.names:
+            func = CZ_LSMOffsetField_readers.get(name)
+            if func is not None:
+                s = func(ifdentry)
+                if s is not None:
+                    start = s.offset
+                    end = start + s.get_size()
+                    if blockstart is None:
+                        blockstart, blockend = start, end
+                    else:
+                        blockstart, blockend = min(blockstart,start), max(blockend,end)
+                    ifdentry.memory_usage.append((start, end,
+                                                  ifdentry.tag_name+' '+name[6:]))
+        for offset in ifdentry.value['Reserved'][0]:
+            if offset:
+                ifdentry.memory_usage.append((offset, offset, 'start of a unknown reserved field'))
+        ifdentry.block_range = (blockstart, blockend)
+
 def register(tiff_dict):
     """Register CZ_LSM support in tiff module.
     """
     global tiff_module_dict
     tiff_module_dict = tiff_dict
     tiff_dict['IFDEntry_init_hooks'].append(IFDEntry_lsm_init_hook)
+    tiff_dict['IFDEntry_finalize_hooks'].append(IFDEntry_lsm_finalize_hook)
+
+class LSMBlock:
+    
+    def __init__(self, ifdentry):
+        self.ifdentry = ifdentry
+        raise NotImplementedError()
+
+    def get_data(self, new_offset):
+        raise NotImplementedError(`new_offset`)
+
+def lsmblock(ifdentry):
+    if not ifdentry.is_lsm:
+        return
+    (blockstart, blockend) = ifdentry.block_range
+    return blockstart, ifdentry.tiff.data[blockstart:blockend]
 
 class ScanInfoEntry:
     """ Holds scan information entry data structure.
     """
     def __init__(self, entry, type_name, label, data):
+        self._offset = None
         self.record = (entry, type_name, label, data)
         self.footer = None
         if type_name == 'ASCII':
@@ -78,6 +118,12 @@ class ScanInfoEntry:
             self.header = numpy.array([entry, 0, 0], dtype=numpy.uint32).view(dtype=numpy.ubyte)
         else:
             raise NotImplementedError (`self.record`)
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetScanInformation'][0]
+        return self._offset
 
     def get_size(self):
         """ Return total memory size in bytes needed to fit the entry to memory.
@@ -215,6 +261,8 @@ def scaninfo(ifdentry, debug=True):
         arr2 = ifdentry.tiff.data[n1:n1+size]
         assert (arr==arr2).all()
 
+    record.offset = n1
+
     return record
 
 class TimeStamps:
@@ -222,14 +270,20 @@ class TimeStamps:
     """
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
+        self._offset = None
         self._header = None
         self._stamps = None
 
     @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetTimeStamps'][0]            
+        return self._offset
+
+    @property
     def header(self):
         if self._header is None:
-            offset = self.ifdentry.value['OffsetTimeStamps'][0]
-            self._offset = offset
+            offset = self.offset
             self._header = self.ifdentry.tiff.get_value(offset, CZ_LSMTimeStamps_header_dtype)            
         return self._header
 
@@ -237,7 +291,7 @@ class TimeStamps:
     def stamps(self):
         if self._stamps is None:
             n = self.header['NumberTimeStamps']
-            self._stamps = self.ifdentry.tiff.get_values(self._offset + self.header.dtype.itemsize, numpy.float64, int(n))
+            self._stamps = self.ifdentry.tiff.get_values(self.offset + self.header.dtype.itemsize, numpy.float64, int(n))
         return self._stamps
 
     def __str__(self):
@@ -317,22 +371,27 @@ class EventList:
     """
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
+        self._offset = None
         self._header = None
         self._events = None
 
     @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetEventList'][0]
+        return self._offset
+
+    @property
     def header(self):
         if self._header is None:
-            offset = self.ifdentry.value['OffsetEventList'][0]
-            self._offset = offset
-            self._header = self.ifdentry.tiff.get_value(offset, CZ_LSMEventList_header_dtype)
+            self._header = self.ifdentry.tiff.get_value(self.offset, CZ_LSMEventList_header_dtype)
         return self._header
 
     @property
     def events(self):
         if self._events is None:
             n = self.header['NumberEvents']
-            offset = self._offset + self.header.nbytes
+            offset = self.offset + self.header.nbytes
             self._events = []
             for i in range(n):
                 entry_size = self.ifdentry.tiff.get_value (offset, numpy.uint32)
@@ -386,13 +445,20 @@ class ChannelWavelength:
     """
     def __init__ (self, ifdentry):
         self.ifdentry = ifdentry
+        self._offset = None
         self._ranges = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetChannelWavelength'][0]            
+        return self._offset
 
     @property
     def ranges (self):
         if self._ranges is None:
             self._ranges = []
-            offset = self.ifdentry.value['OffsetChannelWavelength'][0]
+            offset = self.offset
             n = self.ifdentry.tiff.get_value (offset, numpy.int32)
             for i in range(n):
                 start, end = self.ifdentry.tiff.get_values(offset + 4 + i*(8+8), numpy.float64, 2)
@@ -435,10 +501,17 @@ class ChannelColors:
     """
     def __init__ (self, ifdentry):
         self.ifdentry = ifdentry
+        self._offset = None
         self._header = None
         self._names = None
         self._colors = None
         self._mono = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetChannelColors'][0]            
+        return self._offset
 
     @property
     def mono (self):
@@ -449,24 +522,19 @@ class ChannelColors:
     @property
     def header (self):
         if self._header is None:
-            self._offset = offset = self.ifdentry.value['OffsetChannelColors'][0]
-            self._header = self.ifdentry.tiff.get_values(offset, numpy.int32, 10)
+            self._header = self.ifdentry.tiff.get_values(self.offset, numpy.int32, 10)
             sz = self._header[0]
-            print self.ifdentry.tiff.get_values(offset, numpy.uint8, sz)
         return self._header
 
-    
     @property
     def names(self):
         if self._names is None:
             header = self.header
             n = header[2]
-            offset = self._offset + header[4] + 4
-            print header[4]
+            offset = self.offset + header[4] + 4
             self._names = []
             for i in range(n):
                 name = self.ifdentry.tiff.get_string(offset)
-                print offset-self._offset, `name`
                 offset += len(name) + 1 + 4
                 self._names.append(name)
         return self._names
@@ -476,7 +544,7 @@ class ChannelColors:
         if self._colors is None:
             header = self.header
             n = header[1]
-            offset = self._offset + header[3]
+            offset = self.offset + header[3]
             self._colors = []
             for i in range(n):
                 color = self.ifdentry.tiff.get_values(offset, numpy.uint8, 4)
@@ -531,11 +599,279 @@ def channelcolors(ifdentry, debug=True):
         assert (arr==arr2).all()
     return r
 
+class ChannelFactors:
+
+    def __init__(self, ifdentry):
+        self.ifdentry = ifdentry
+        self._offset = None
+        self._data = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetChannelFactors'][0]            
+        return self._offset
+
+    @property
+    def data(self):
+        if self._data is None:
+            n = self.ifdentry.tiff.get_value(self.offset, numpy.int32)
+            sz = 4 + n # n should be equal to 32*nofchannels
+            self._data = self.ifdentry.tiff.get_values(self.offset, numpy.ubyte, sz)
+        return self._data
+
+    def __str__(self):
+        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+
+    def get_size(self):
+        return self.data.nbytes
+
+    def toarray(self, target=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        target[:self.data.nbytes] = self.data.view(dtype=dtype)
+        return target
+
+def channelfactors(ifdentry, debug=True):
+    assert ifdentry.is_lsm
+    offset = ifdentry.value['OffsetChannelFactors'][0]
+    if not offset:
+        return
+    r = ChannelFactors(ifdentry)
+    if debug:
+        arr = r.toarray()
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()        
+    return r
+
+class ChannelDataTypes:
+
+    def __init__(self, ifdentry):
+        self.ifdentry = ifdentry
+        self._offset = None
+        self._data = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value['OffsetChannelDataTypes'][0]            
+        return self._offset
+
+    @property
+    def data(self):
+        if self._data is None:
+            channels = self.ifdentry.value['DimensionChannels']
+            sz = channels * 4
+            self._data = self.ifdentry.tiff.get_values(self.offset, numpy.ubyte, sz)
+        return self._data
+
+    def __str__(self):
+        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+
+    def get_size(self):
+        return self.data.nbytes
+
+    def toarray(self, target=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        target[:self.data.nbytes] = self.data.view(dtype=dtype)
+        return target
+
+def channeldatatypes(ifdentry, debug=True):
+    assert ifdentry.is_lsm
+    offset = ifdentry.value['OffsetChannelDataTypes'][0]
+    if not offset:
+        return
+    r = ChannelDataTypes(ifdentry)
+    if debug:
+        arr = r.toarray()
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()        
+    return r
+
+class OffsetData:
+
+    def __init__(self, ifdentry, offset_name):
+        self.ifdentry = ifdentry
+        self.offset_name = offset_name
+        self._offset = None
+        self._data = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value[self.offset_name][0]            
+        return self._offset
+
+    @property
+    def data(self):
+        if self._data is None:
+            sz = self.ifdentry.tiff.get_value(self.offset, numpy.uint32)
+            self._data = self.ifdentry.tiff.get_values(self.offset, numpy.ubyte, sz)
+        return self._data
+
+    def __str__(self):
+        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+
+    def get_size(self):
+        return self.data.nbytes
+
+    def toarray(self, target=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        target[:self.data.nbytes] = self.data.view(dtype=dtype)
+        return target
+        
+
+def offsetdata(ifdentry, offset_name, debug=True):
+    assert ifdentry.is_lsm
+    offset = ifdentry.value[offset_name][0]
+    if not offset:
+        return
+    r = OffsetData(ifdentry, offset_name)
+    if debug:
+        arr = r.toarray()
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()        
+    return r
+
+class DrawingElement:
+
+    def __init__(self, ifdentry, offset_name):
+        self.ifdentry = ifdentry
+        self.offset_name = offset_name
+        self._offset = None
+        self._data = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value[self.offset_name][0]            
+        return self._offset
+
+    @property
+    def data(self):
+        if self._data is None:
+            n = self.ifdentry.tiff.get_value(self.offset, numpy.int32)
+            sz = self.ifdentry.tiff.get_value(self.offset+4, numpy.int32)
+            self._data = self.ifdentry.tiff.get_values(self.offset, numpy.ubyte, sz)
+        return self._data
+
+    def __str__(self):
+        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+
+    def get_size(self):
+        return self.data.nbytes
+
+    def toarray(self, target=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        target[:self.data.nbytes] = self.data.view(dtype=dtype)
+        return target
+
+def drawingelement(ifdentry, offset_name, debug=True):
+    assert ifdentry.is_lsm
+    offset = ifdentry.value[offset_name][0]
+    if not offset:
+        return
+    r = DrawingElement(ifdentry, offset_name)
+    if debug:
+        arr = r.toarray()
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()        
+    return r
+
+class LookupTable:
+
+    def __init__(self, ifdentry, offset_name):
+        self.ifdentry = ifdentry
+        self.offset_name = offset_name
+        self._offset = None
+        self._data = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.value[self.offset_name][0]            
+        return self._offset
+
+    @property
+    def data(self):
+        if self._data is None:
+            sz = self.ifdentry.tiff.get_value(self.offset, numpy.uint32)
+            self._data = self.ifdentry.tiff.get_values(self.offset, numpy.ubyte, sz)
+        return self._data
+
+    def __str__(self):
+        nsubblocks = self.ifdentry.tiff.get_value(self._offset+4, numpy.uint32)
+        nchannels = self.ifdentry.tiff.get_value(self._offset+8, numpy.uint32)
+        return '%s(name=%r, size=%r, subblocks=%r, channels=%r, offset=%r)' \
+               % (self.__class__.__name__, self.offset_name, self.get_size(),
+                  nsubblocks, nchannels, self.offset)
+
+    def get_size(self):
+        return self.data.nbytes
+
+    def toarray(self, target=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        target[:self.data.nbytes] = self.data.view(dtype=dtype)
+        return target
+        
+
+def lookuptable(ifdentry, offset_name, debug=True):
+    assert ifdentry.is_lsm
+    offset = ifdentry.value[offset_name][0]
+    if not offset:
+        return
+    r = LookupTable(ifdentry, offset_name)
+    if debug:
+        arr = r.toarray()
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()        
+    return r
+
+inputlut = lambda ifdentry: lookuptable(ifdentry, 'OffsetInputLut')
+outputlut = lambda ifdentry: lookuptable(ifdentry, 'OffsetOutputLut')
+vectoroverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetVectorOverlay')
+roi = lambda ifdentry: drawingelement(ifdentry, 'OffsetRoi')
+bleachroi = lambda ifdentry: drawingelement(ifdentry, 'OffsetBleachRoi')
+meanofroisoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetMeanOfRoisOverlay')
+topoisolineoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetTopoIsolineOverlay')
+topoprofileoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetTopoProfileOverlay')
+linescanoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetLinescanOverlay')
+
 CZ_LSMOffsetField_readers = dict(
     OffsetChannelWavelength = channelwavelength,
     OffsetTimeStamps=timestamps,
     OffsetEventList=eventlist,
     OffsetChannelColors = channelcolors,
+    OffsetScanInformation = scaninfo,
+    OffsetInputLut = inputlut,
+    OffsetOutputLut = outputlut,
+    OffsetChannelFactors = channelfactors,
+    OffsetChannelDataTypes = channeldatatypes,
+    OffsetUnmixParameters = lambda ifdentry: offsetdata(ifdentry, 'OffsetUnmixParameters'),
+    OffsetNextRecording = lambda ifdentry: offsetdata(ifdentry, 'OffsetNextRecording'),
+    OffsetKsData = lambda ifdentry: offsetdata(ifdentry, 'OffsetKsData'),
+
+    OffsetVectorOverlay = vectoroverlay,
+    OffsetRoi = roi,
+    OffsetBleachRoi = bleachroi,
+    OffsetMeanOfRoisOverlay = meanofroisoverlay,
+    OffsetTopoIsolineOverlay = topoisolineoverlay,
+    OffsetTopoProfileOverlay = topoprofileoverlay,
+    OffsetLinescanOverlay = linescanoverlay,
     )
 
 CZ_LSMInfo_dtype_fields = [
