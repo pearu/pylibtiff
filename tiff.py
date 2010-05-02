@@ -1,6 +1,8 @@
 """
-tiff - implements numpy.memmap based TIFF reader
+tiff - implements numpy.memmap based TIFF file reader
 """
+# Author: Pearu Peterson
+# Created: April 2010
 
 __all__ = ['TIFFfile']
 
@@ -139,8 +141,19 @@ IFDEntry_finalize_hooks = []
 import lsm
 lsm.register(locals())
 
+class TIFFarray:
+
+    def __init__(self):
+        self.IFD = []
+
 class TIFFfile:
     """ Holds a numpy.memmap of a TIFF file.
+
+    Attributes
+    ----------
+    filename : str
+    data : memmap
+    IFD : IFD-list
     """
 
     def __init__(self, filename, mode='r', first_byte = 0):
@@ -149,9 +162,9 @@ class TIFFfile:
         self.filename = filename
         self.first_byte = first_byte
         self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
-        self.init()
+        self.init_reader()
 
-    def init(self):
+    def init_reader(self):
 
         first_byte = self.first_byte
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
@@ -246,14 +259,20 @@ class TIFFfile:
                 assert start >= last_end,`last_end, start, resource`
             print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
             last_end = end
+
+
 class IFD:
     """ Image File Directory data structure.
+
+    Attributes
+    ----------
+    entries : IFDEntry-list
     """
     def __init__(self):
         self.entries = []
 
     def append(self, entry):
-        self.entries.append (entry)
+        self.entries.append(entry)
 
     @property
     def memory_usage(self):
@@ -269,6 +288,8 @@ class IFD:
         return '\n'.join(l)
 
     def get(self, tag_name):
+        """Return IFD entry with given tag name.
+        """
         for entry in self.entries:
             if entry.tag_name==tag_name:
                 return entry
@@ -279,10 +300,31 @@ class IFD:
                 hook(entry)
 
 
-
-
 class IFDEntry:
     """ Entry for Image File Directory data structure.
+
+    Attributes
+    ----------
+    ifd : IFD
+    tiff : TIFFfile
+    tag : uint16
+      data tag constant
+    tag_name : str
+      data tag name
+    type : uint16
+      data type constant
+    type_name : str
+      data type name
+    count : uint32
+      number of data points
+    offset : {None, int}
+      offset of a tag entry in tiff data array
+    value : array
+      data array
+    bytes : int
+      number of bytes in data array
+    memory_usage : list of 3-tuples
+      (start byte, end byte, name of tag)
     """
     def __init__(self, ifd, tiff, offset):
         self.ifd = ifd
@@ -325,11 +367,6 @@ class IFDEntry:
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.tiff, self.offset)
 
-    def get_memory_usage(self):
-        if self.offset is None:
-            return []
-        return [(self.offset, self.offset + self.bytes*self.count, self.tag_name)]
-
 def StripOffsets_hook(ifdentry):
     if ifdentry.tag_name=='StripOffsets':
         ifd = ifdentry.ifd
@@ -340,6 +377,8 @@ def StripOffsets_hook(ifdentry):
         else:
             offset = ifdentry.value
             ifdentry.memory_usage.append((offset, offset+counts.value, 'strip'))
+
+# todo: TileOffsets_hook
 
 IFDEntry_finalize_hooks.append(StripOffsets_hook)
 
@@ -355,6 +394,7 @@ def main ():
     e = t.IFD[0].entries[-1]
     assert e.is_lsm
     print lsm.lsmblock(e)
+    print lsm.lsminfo(e, 0)
     #print lsm.filestructure(e)
     #print lsm.timestamps(e)
     #print lsm.channelwavelength(e)
