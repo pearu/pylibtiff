@@ -9,7 +9,7 @@ __all__ = ['scaninfo', 'timestamps', 'eventlist','channelcolors',
            'vectoroverlay','roi','bleachroi','meanofroisoverlay',
            'topoisolineoverlay','topoprofileoverlay','linescanoverlay',
            'channelfactors', 'channeldatatypes',
-           'lsmblock'
+           'lsmblock', 'lsminfo'
            ]
 
 import sys
@@ -82,20 +82,89 @@ def register(tiff_dict):
     tiff_dict['IFDEntry_init_hooks'].append(IFDEntry_lsm_init_hook)
     tiff_dict['IFDEntry_finalize_hooks'].append(IFDEntry_lsm_finalize_hook)
 
+def lsminfo(ifdentry, new_lsmblock_start=None):
+    assert ifdentry.is_lsm
+    target = ifdentry.value.copy()
+    old_lsmblock_start = ifdentry.block_range[0]
+    if new_lsmblock_start is None:
+        new_lsmblock_start = old_lsmblock_start
+    offset_diff = new_lsmblock_start - old_lsmblock_start
+    print offset_diff
+    i = 0
+    for name in ifdentry.value.dtype.names:
+        dt = ifdentry.value.dtype[name]
+        value_ref = target[name]
+        value = value_ref[0]
+        if name.startswith('Offset') and value!=0:
+            #print 'changing',name,'from',value,'to',
+            value_ref += offset_diff
+            #print value_ref[0]
+        elif name=='Reserved':
+            # assuming that unknown values in Reserved field are offsets:
+            for i in range(len(value)):
+                if value[i]!=0:
+                    if value[i]>=ifdentry.block_range[0] and value[i]<=ifdentry.block_range[1]:
+                        #print 'chaning Reserved[%s] from %s to' % (i, value[i]),
+                        value[i] += offset_diff
+                        #print value[i]
+                    else:
+                        sys.stderr.write('Reserved[%s]=%s is out of block range %s. lsminfo might not be correct.' % (i,value[i], ifdentry.block_range))
+        i += dt.itemsize    
+
+    return target
+
 class LSMBlock:
     
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
-        raise NotImplementedError()
+        self._offset = None
+
+    @property
+    def offset(self):
+        if self._offset is None:
+            self._offset = self.ifdentry.block_range[0]
+        return self._offset
+
+    def get_size(self):
+        return self.ifdentry.block_range[1] - self.offset
+
+    def __str__(self):
+        return '%s(offset=%s, size=%s, end=%s)' % (self.__class__.__name__, self.offset, self.get_size(), self.offset+self.get_size())
 
     def get_data(self, new_offset):
         raise NotImplementedError(`new_offset`)
 
-def lsmblock(ifdentry):
+    def toarray(self, target=None, new_offset=None):
+        sz = self.get_size()
+        if target is None:
+            target = numpy.zeros((sz,), dtype = numpy.ubyte)
+        if new_offset is None:
+            new_offset = self.offset
+        offset_diff = new_offset - self.offset
+        dtype = target.dtype
+        target[:sz] = self.ifdentry.tiff.data[self.offset:self.offset + sz]
+        #i = 0
+        #print sz, self.ifdentry.block_range,self.ifdentry.value.nbytes
+        #for name in self.ifdentry.value.dtype.names:
+        #    dt = self.ifdentry.value.dtype[name]
+        #    if name.startswith('Offset'):
+        #        print 'changing',name,'from',target[i:i+4].view(dtype=dt)[0],'to',
+        #        target[i:i+dt.itemsize].view(dtype=dt)[0] += offset_diff
+        #        print target[i:i+dt.itemsize].view(dtype=dt)[0]
+        #    i += dt.itemsize
+        return target
+
+
+def lsmblock(ifdentry, debug=True):
     if not ifdentry.is_lsm:
         return
-    (blockstart, blockend) = ifdentry.block_range
-    return blockstart, ifdentry.tiff.data[blockstart:blockend]
+    r = LSMBlock(ifdentry)
+    if debug:
+        arr = r.toarray()
+        offset = r.offset
+        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        assert (arr==arr2).all()
+    return r
 
 class ScanInfoEntry:
     """ Holds scan information entry data structure.
