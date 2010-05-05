@@ -9,7 +9,7 @@ Homepage:  http://pylibtiff.googlecode.com/
 __author__ = 'Pearu Peterson'
 __date__ = 'April 2009'
 __license__ = 'BSD'
-__version__ = '0.2-svn'
+__version__ = '0.3-svn'
 __all__ = ['libtiff', 'TIFF']
 
 import os
@@ -437,6 +437,7 @@ class TIFF(ctypes.c_void_p):
                     self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
                 for n in range(depth):
                     WriteStrip(n, arr[n, :, :].ctypes.data, size)
+                self.WriteDirectory()
             else:
                 for n in range(depth):
                     self.SetField(TIFFTAG_IMAGEWIDTH, width)
@@ -452,7 +453,7 @@ class TIFF(ctypes.c_void_p):
                         self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
 
                     WriteStrip(0, arr[n].ctypes.data, size)
-            self.WriteDirectory()
+                    self.WriteDirectory()
         else:
             raise NotImplementedError (`shape`)
 

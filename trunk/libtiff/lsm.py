@@ -17,6 +17,7 @@ import numpy
 
 CZ_LSMInfo_tag = 0x866C
 tiff_module_dict = None
+verbose_lsm_memory_usage = False
 
 def IFDEntry_lsm_str_hook(entry):
     l = []
@@ -48,10 +49,11 @@ def IFDEntry_lsm_init_hook(ifdentry):
         #assert ifdentry.count==CZ_LSMInfo_type_size,`ifdentry.count,CZ_LSMInfo_type_size`
         ifdentry.type = CZ_LSMInfo_type
         ifdentry.count = 1
-        ifdentry.is_lsm = True
-        ifdentry.str_hook = IFDEntry_lsm_str_hook
+        ifdentry.tiff.is_lsm = True
+        ifdentry.tiff.str_hook = IFDEntry_lsm_str_hook
     else:
-        ifdentry.is_lsm = False
+        if not hasattr(ifdentry.tiff, 'is_lsm'):
+            ifdentry.tiff.is_lsm = False
 
 def IFDEntry_lsm_finalize_hook(ifdentry):
     if ifdentry.tag==CZ_LSMInfo_tag:
@@ -67,12 +69,18 @@ def IFDEntry_lsm_finalize_hook(ifdentry):
                         blockstart, blockend = start, end
                     else:
                         blockstart, blockend = min(blockstart,start), max(blockend,end)
-                    ifdentry.memory_usage.append((start, end,
-                                                  ifdentry.tag_name+' '+name[6:]))
-        for offset in ifdentry.value['Reserved'][0]:
-            if offset:
-                ifdentry.memory_usage.append((offset, offset, 'start of a unknown reserved field'))
+                    if verbose_lsm_memory_usage:
+                        ifdentry.memory_usage.append((start, end,
+                                                      ifdentry.tag_name+' '+name[6:]))
+        if verbose_lsm_memory_usage:
+            for offset in ifdentry.value['Reserved'][0]:
+                if offset:
+                    ifdentry.memory_usage.append((offset, offset, 'start of a unknown reserved field'))
+        else:
+            ifdentry.memory_usage.append((blockstart, blockend, 'lsmblock'))
         ifdentry.block_range = (blockstart, blockend)
+        ifdentry.tiff.lsminfo = scaninfo(ifdentry)
+        ifdentry.tiff.lsmblock = lsmblock(ifdentry)
 
 def register(tiff_dict):
     """Register CZ_LSM support in tiff module.
@@ -83,13 +91,13 @@ def register(tiff_dict):
     tiff_dict['IFDEntry_finalize_hooks'].append(IFDEntry_lsm_finalize_hook)
 
 def lsminfo(ifdentry, new_lsmblock_start=None):
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
     target = ifdentry.value.copy()
     old_lsmblock_start = ifdentry.block_range[0]
     if new_lsmblock_start is None:
         new_lsmblock_start = old_lsmblock_start
     offset_diff = new_lsmblock_start - old_lsmblock_start
-    print offset_diff
     i = 0
     for name in ifdentry.value.dtype.names:
         dt = ifdentry.value.dtype[name]
@@ -143,21 +151,14 @@ class LSMBlock:
         offset_diff = new_offset - self.offset
         dtype = target.dtype
         target[:sz] = self.ifdentry.tiff.data[self.offset:self.offset + sz]
-        #i = 0
-        #print sz, self.ifdentry.block_range,self.ifdentry.value.nbytes
-        #for name in self.ifdentry.value.dtype.names:
-        #    dt = self.ifdentry.value.dtype[name]
-        #    if name.startswith('Offset'):
-        #        print 'changing',name,'from',target[i:i+4].view(dtype=dt)[0],'to',
-        #        target[i:i+dt.itemsize].view(dtype=dt)[0] += offset_diff
-        #        print target[i:i+dt.itemsize].view(dtype=dt)[0]
-        #    i += dt.itemsize
         return target
 
 
 def lsmblock(ifdentry, debug=True):
-    if not ifdentry.is_lsm:
+    if ifdentry.tag!=CZ_LSMInfo_tag:
         return
+    #if not ifdentry.is_lsm:
+    #    return
     r = LSMBlock(ifdentry)
     if debug:
         arr = r.toarray()
@@ -188,6 +189,35 @@ class ScanInfoEntry:
         else:
             raise NotImplementedError (`self.record`)
 
+    def __repr__ (self):
+        return '%s%r' % (self.__class__.__name__, self.record)
+
+    @property
+    def is_subblock(self):
+        return self.record[1]=='SUBBLOCK'
+    @property
+    def label(self):
+        return self.record[2]
+    @property
+    def data(self):
+        return self.record[3]
+
+    def get(self, label):
+        if self.label == label:
+            if self.is_subblock:
+                return self
+            return self.data
+        if self.is_subblock and self.data is not None:
+            l = []
+            for entry in self.data:
+                r = entry.get(label)
+                if isinstance(r, list):
+                    l.extend(r)
+                elif r is not None:
+                    l.append(r)
+            if not l:
+                return
+            return l
     @property
     def offset(self):
         if self._offset is None:
@@ -272,7 +302,9 @@ def scaninfo(ifdentry, debug=True):
     -------
     record : ScanInfoEntry
     """
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     n = n1 = ifdentry.value['OffsetScanInformation'][0]
     if not n:
         return
@@ -289,8 +321,8 @@ def scaninfo(ifdentry, debug=True):
             label = 'ENTRY%s' % (hex(entry))
             #scaninfo_map[entry] = label, type_name
             if debug:
-                sys.stderr.write('scaninfo: undefined %s entry %s in subblock %r\n'\
-                                 % (type_name, hex(entry), record.record[2]))
+                sys.stderr.write('lsm.scaninfo: undefined %s entry %s in subblock %r\n'\
+                                     % (type_name, hex(entry), record.record[2]))
         if type_name=='SUBBLOCK':
             assert type==0,`hex (entry), type, size`
             if label == 'end':
@@ -385,7 +417,9 @@ def timestamps(ifdentry, debug=True):
     """
     Return LSM time stamp information.
     """
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetTimeStamps'][0]
     if not offset:
         return None
@@ -498,7 +532,9 @@ def eventlist(ifdentry, debug=True):
     """
     Return LSM event list information.
     """
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetEventList'][0]
     if not offset:
         return None
@@ -554,7 +590,9 @@ def channelwavelength(ifdentry, debug=True):
     """
     Return LSM wavelength range information.
     """
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetChannelWavelength'][0]
     if not offset:
         return None
@@ -657,7 +695,9 @@ def channelcolors(ifdentry, debug=True):
     """
     Return LSM channel name and color information.
     """
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetChannelColors'][0]
     if not offset:
         return None
@@ -690,7 +730,7 @@ class ChannelFactors:
         return self._data
 
     def __str__(self):
-        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+        return '%s(size=%r, offset=%r)' % (self.__class__.__name__, self.get_size(), self.offset)
 
     def get_size(self):
         return self.data.nbytes
@@ -704,7 +744,9 @@ class ChannelFactors:
         return target
 
 def channelfactors(ifdentry, debug=True):
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetChannelFactors'][0]
     if not offset:
         return
@@ -737,7 +779,7 @@ class ChannelDataTypes:
         return self._data
 
     def __str__(self):
-        return '%s(name=%r, size=%r, offset=%r)' % (self.__class__.__name__, self.offset_name, self.get_size(), self.offset)
+        return '%s(size=%r, offset=%r)' % (self.__class__.__name__, self.get_size(), self.offset)
 
     def get_size(self):
         return self.data.nbytes
@@ -751,7 +793,9 @@ class ChannelDataTypes:
         return target
 
 def channeldatatypes(ifdentry, debug=True):
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value['OffsetChannelDataTypes'][0]
     if not offset:
         return
@@ -799,7 +843,9 @@ class OffsetData:
         
 
 def offsetdata(ifdentry, offset_name, debug=True):
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value[offset_name][0]
     if not offset:
         return
@@ -847,7 +893,9 @@ class DrawingElement:
         return target
 
 def drawingelement(ifdentry, offset_name, debug=True):
-    assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
+    #assert ifdentry.is_lsm
     offset = ifdentry.value[offset_name][0]
     if not offset:
         return
@@ -899,7 +947,9 @@ class LookupTable:
         
 
 def lookuptable(ifdentry, offset_name, debug=True):
-    assert ifdentry.is_lsm
+    #assert ifdentry.is_lsm
+    if ifdentry.tag!=CZ_LSMInfo_tag:
+        return
     offset = ifdentry.value[offset_name][0]
     if not offset:
         return
@@ -1186,7 +1236,7 @@ scaninfo_map = {
     0x07000000b: ( 'detection channel acquire','LONG'),
     0x07000000c: ( 'detection channel detector name','ASCII'),
     0x07000000d: ( 'detection channel amplifier name','ASCII'),
-    0x07000000e: ( 'detection channel pinholw name','ASCII'),
+    0x07000000e: ( 'detection channel pinhole name','ASCII'),
     0x07000000f: ( 'detection channel filter set name','ASCII'),
     0x070000010: ( 'detection channel filter name','ASCII'),
     0x070000013: ( 'detection channel integrator name','ASCII'),
