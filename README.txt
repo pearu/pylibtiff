@@ -1,7 +1,7 @@
 
-===============================================
-PyLibTiff - a Python wrapper to libtiff library
-===============================================
+=================================
+PyLibTiff - a Python tiff library
+=================================
 
 :Authors:
 
@@ -18,6 +18,7 @@ PyLibTiff - a Python wrapper to libtiff library
 History
 =======
 
+ * Started numpy.memmap wrapper of tiff files in April 2010.
  * Project published on April 22, 2009.
 
 Download
@@ -51,7 +52,7 @@ Testing
 
 To test pure Python pylibtiff from source directory, run::
 
-  nosetests tests/
+  nosetests libtiff/tests/
 
 Basic usage
 ===========
@@ -64,6 +65,8 @@ that will provide a class TIFF to hold a tiff file:
 
 >>> tiff = TIFF.open('filename')
 >>> image = tiff.read_image()
+
+The TIFF class provides ctypes based wrapper to the C libtiff library.
 
 Additional documentation is available online in Pylibtiff website.
 

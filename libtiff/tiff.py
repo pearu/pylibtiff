@@ -141,10 +141,11 @@ IFDEntry_finalize_hooks = []
 import lsm
 lsm.register(locals())
 
-class TIFFarray:
+class TIFFimage:
 
-    def __init__(self):
-        self.IFD = []
+    def __init__(self, data):
+        self.data = data
+        self.width, self.length = data.shape
 
 class TIFFfile:
     """ Holds a numpy.memmap of a TIFF file.
@@ -185,14 +186,14 @@ class TIFFfile:
         IFD_offset = IFD0
         while IFD_offset:
             n = self.get_uint16(IFD_offset)
-            ifd = IFD()
+            ifd = IFD(self)
             for i in range(n):
                 entry = IFDEntry(ifd, self, IFD_offset + 2 + i*12)
                 ifd.append(entry)
             #print ifd
             ifd.finalize()
             IFD_list.append(ifd)
-            self.memory_usage.append((IFD_offset, IFD_offset + 2 + n*12 + 4, 'IFD %s entries' % (len(IFD_list))))
+            self.memory_usage.append((IFD_offset, IFD_offset + 2 + n*12 + 4, 'IFD%s entries (%s)' % (len(IFD_list), len(ifd))))
             IFD_offset = self.get_uint32(IFD_offset + 2 + n*12)
         self.IFD = IFD_list
 
@@ -246,20 +247,29 @@ class TIFFfile:
         return string
 
     def show_memory_usage(self):
+        ''' Print memory usage of TIFF fields and blocks.
+
+        Returns
+        -------
+        ok : bool
+          Return False if unknown memory areas have been detected.
+        '''
         l = []
         l.extend(self.memory_usage)
         for ifd in self.IFD:
             l.extend(ifd.memory_usage)
         l.sort()
         last_end = None
+        ok = True
         for start, end, resource in l:
             if last_end:
                 if last_end!=start:
                     print '--- unknown %s bytes' % (start-last_end)
+                    ok = False
                 assert start >= last_end,`last_end, start, resource`
             print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
             last_end = end
-
+        return ok
 
 class IFD:
     """ Image File Directory data structure.
@@ -268,8 +278,12 @@ class IFD:
     ----------
     entries : IFDEntry-list
     """
-    def __init__(self):
+    def __init__(self, tiff):
+        self.tiff = tiff
         self.entries = []
+
+    def __len__ (self):
+        return len (self.entries)
 
     def append(self, entry):
         self.entries.append(entry)
@@ -299,6 +313,48 @@ class IFD:
             for hook in IFDEntry_finalize_hooks:
                 hook(entry)
 
+    def get_contiguous(self):
+        """ Return memmap of an image.
+
+        This operation is succesful only when image data strips are
+        contiguous in memory. Return None when unsuccesful.
+        """
+        width = self.get ('ImageWidth').value
+        length = self.get ('ImageLength').value
+        strip_offsets = self.get('StripOffsets').value
+        strip_nbytes = self.get('StripByteCounts').value
+        bits_per_sample = self.get('BitsPerSample').value
+        photo_interp = self.get('PhotometricInterpretation').value
+        planar_config = self.get('PlanarConfiguration').value
+        compression = self.get('Compression').value
+        subfile_type = self.get('NewSubfileType').value
+        if compression != 1:
+            return
+        for i in range (len(strip_offsets)-1):
+            if strip_offsets[i] + strip_nbytes[i] != strip_offsets[i+1]:
+                return
+
+        if self.tiff.is_lsm:
+            lsminfo = self.tiff.lsminfo
+            #print lsminfo
+            if subfile_type==0:
+                channel_names = lsminfo.get('data channel name')
+            elif subfile_type==1: # thumbnails
+                if photo_interp==2:
+                    channel_names = 'rgb'
+                else:
+                    raise NotImplementedError (`photo_interp`)
+            else:
+                raise NotImplementedError (`subfile_type`)
+            assert planar_config==2,`planar_config`
+            assert len(channel_names)==len(strip_offsets),`channel_names, strip_offsets`
+            r = {}
+            for i in range (len (channel_names)):
+                dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
+                r[channel_names[i]] = self.tiff.data[strip_offsets[i]:strip_offsets[i]+strip_nbytes[i]].view (dtype=dtype).reshape((width, length))
+            return r
+        else:
+            raise NotImplementedError (`self.tiff`)
 
 class IFDEntry:
     """ Entry for Image File Directory data structure.
