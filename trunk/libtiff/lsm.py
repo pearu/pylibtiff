@@ -24,7 +24,7 @@ def IFDEntry_lsm_str_hook(entry):
     for name in entry.value.dtype.names:
         func = CZ_LSMOffsetField_readers.get(name)
         if func is not None:
-            l.append('\n  %s->%s' % (name, func(entry)))
+            l.append('\n  %s->%s' % (name, func(entry, debug=False)))
         else:
             v = entry.value[name]
             l.append('\n%s=%s' % (name, v))
@@ -61,7 +61,7 @@ def IFDEntry_lsm_finalize_hook(ifdentry):
         for name in ifdentry.value.dtype.names:
             func = CZ_LSMOffsetField_readers.get(name)
             if func is not None:
-                s = func(ifdentry)
+                s = func(ifdentry, debug=False)
                 if s is not None:
                     start = s.offset
                     end = start + s.get_size()
@@ -79,8 +79,9 @@ def IFDEntry_lsm_finalize_hook(ifdentry):
         else:
             ifdentry.memory_usage.append((blockstart, blockend, 'lsmblock'))
         ifdentry.block_range = (blockstart, blockend)
-        ifdentry.tiff.lsminfo = scaninfo(ifdentry)
-        ifdentry.tiff.lsmblock = lsmblock(ifdentry)
+        ifdentry.tiff.lsminfo = scaninfo(ifdentry, debug=False)
+        ifdentry.tiff.lsmblock = lsmblock(ifdentry, debug=False)
+        ifdentry.tiff.lsmentry = ifdentry.value
 
 def register(tiff_dict):
     """Register CZ_LSM support in tiff module.
@@ -265,7 +266,7 @@ class ScanInfoEntry:
             raise NotImplementedError (`self.record`)
         return target
 
-    def tostr(self, tab=''):
+    def tostr(self, tab='', short=False):
         (entry, type_name, label, data) = self.record
         if hasattr(self, 'parent') and self.parent is not None:
             parent_label = self.parent.record[2]
@@ -276,7 +277,8 @@ class ScanInfoEntry:
                 return '%s%s %s' % (tab[:-2], label, parent_label)
             l = ['%s%s[size=%s]' % (tab, label, self.get_size ())]
             for item in data:
-                l.append(item.tostr(tab=tab+'  '))
+                if not short or item.data:
+                    l.append(item.tostr(tab=tab+'  ', short=short))
             return '\n'.join (l)
         if label.startswith(parent_label):
             label = label[len(parent_label):]
@@ -323,6 +325,7 @@ def scaninfo(ifdentry, debug=True):
             if debug:
                 sys.stderr.write('lsm.scaninfo: undefined %s entry %s in subblock %r\n'\
                                      % (type_name, hex(entry), record.record[2]))
+                pass
         if type_name=='SUBBLOCK':
             assert type==0,`hex (entry), type, size`
             if label == 'end':
@@ -960,15 +963,15 @@ def lookuptable(ifdentry, offset_name, debug=True):
         assert (arr==arr2).all()        
     return r
 
-inputlut = lambda ifdentry: lookuptable(ifdentry, 'OffsetInputLut')
-outputlut = lambda ifdentry: lookuptable(ifdentry, 'OffsetOutputLut')
-vectoroverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetVectorOverlay')
-roi = lambda ifdentry: drawingelement(ifdentry, 'OffsetRoi')
-bleachroi = lambda ifdentry: drawingelement(ifdentry, 'OffsetBleachRoi')
-meanofroisoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetMeanOfRoisOverlay')
-topoisolineoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetTopoIsolineOverlay')
-topoprofileoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetTopoProfileOverlay')
-linescanoverlay = lambda ifdentry: drawingelement(ifdentry, 'OffsetLinescanOverlay')
+inputlut = lambda ifdentry, debug=True: lookuptable(ifdentry, 'OffsetInputLut', debug=debug)
+outputlut = lambda ifdentry, debug=True: lookuptable(ifdentry, 'OffsetOutputLut', debug=debug)
+vectoroverlay = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetVectorOverlay', debug=debug)
+roi = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetRoi', debug=debug)
+bleachroi = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetBleachRoi', debug=debug)
+meanofroisoverlay = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetMeanOfRoisOverlay', debug=debug)
+topoisolineoverlay = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetTopoIsolineOverlay', debug=debug)
+topoprofileoverlay = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetTopoProfileOverlay', debug=debug)
+linescanoverlay = lambda ifdentry, debug=True: drawingelement(ifdentry, 'OffsetLinescanOverlay', debug=debug)
 
 CZ_LSMOffsetField_readers = dict(
     OffsetChannelWavelength = channelwavelength,
@@ -980,9 +983,9 @@ CZ_LSMOffsetField_readers = dict(
     OffsetOutputLut = outputlut,
     OffsetChannelFactors = channelfactors,
     OffsetChannelDataTypes = channeldatatypes,
-    OffsetUnmixParameters = lambda ifdentry: offsetdata(ifdentry, 'OffsetUnmixParameters'),
-    OffsetNextRecording = lambda ifdentry: offsetdata(ifdentry, 'OffsetNextRecording'),
-    OffsetKsData = lambda ifdentry: offsetdata(ifdentry, 'OffsetKsData'),
+    OffsetUnmixParameters = lambda ifdentry, debug=True: offsetdata(ifdentry, 'OffsetUnmixParameters', debug=debug),
+    OffsetNextRecording = lambda ifdentry, debug=True: offsetdata(ifdentry, 'OffsetNextRecording', debug=debug),
+    OffsetKsData = lambda ifdentry, debug=True: offsetdata(ifdentry, 'OffsetKsData', debug=debug),
 
     OffsetVectorOverlay = vectoroverlay,
     OffsetRoi = roi,
