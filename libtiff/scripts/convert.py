@@ -11,6 +11,25 @@ import os
 
 import numpy
 
+description_template = '''
+DimensionX: %(DimensionX)s
+DimensionY: %(DimensionY)s
+DimensionZ: %(DimensionZ)s
+VoxelSizeX: %(VoxelSizeX)s
+VoxelSizeY: %(VoxelSizeY)s
+VoxelSizeZ: %(VoxelSizeZ)s
+NofStacks: 1
+RotationAngle: %(RotationAngle)s
+PixelTime: %(PixelTime)s
+ENTRY_OBJECTIVE: %(Objective)s
+Objective: %(Objective)s
+ExcitationWavelength: %(ExcitationWavelength)s
+MicroscopeType: %(MicroscopeType)s
+ChannelName: %(ChannelName)s
+OriginalFile: %(OriginalFile)s
+'''
+
+
 def runner (parser, options, args):
     
     if not hasattr(parser, 'runner'):
@@ -31,11 +50,14 @@ def runner (parser, options, args):
         output_path = b + '_%(channel_name)s_%(index)s.tif'
 
     from libtiff import TIFF
-    from libtiff.tiff import TIFFfile
+    from libtiff.tiff import TIFFfile, TIFFimage
     tiff = TIFFfile (input_path)
     #tiff.show_memory_usage()
     Ch3i = 0
     Ch3_images = []
+
+    description = []
+
     for i,ifd in enumerate(tiff.IFD):
         assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
         images = ifd.get_contiguous()
@@ -48,14 +70,39 @@ def runner (parser, options, args):
                     Ch3i += 1
         else:
             raise NotImplementedError (`type (images)`)
+        s = ifd.get('ImageDescription')
+        if s:
+            description.append(s)
 
+    description = '\n'.join (description)
+    if tiff.is_lsm:
+        dimensions = [tiff.lsmentry['Dimension'+x][0] for x in 'XYZ'] # px
+        voxel_sizes = [tiff.lsmentry['VoxelSize'+x][0] for x in 'XYZ'] # m
+        pixel_time = tiff.lsminfo.get('track pixel time')[0] # us, integration is >=70% of the pixel time
+        rotation =  tiff.lsminfo.get('recording rotation')[0] # deg
+        objective = tiff.lsminfo.get('recording objective')[0] # objective description
+        excitation_wavelength = tiff.lsminfo.get ('illumination channel wavelength')[0] # nm
+        description = description_template % (dict(
+                DimensionX=dimensions[0],
+                DimensionY=dimensions[1],
+                DimensionZ=len(Ch3_images),
+                VoxelSizeX=voxel_sizes[0], 
+                VoxelSizeY=voxel_sizes[1],
+                VoxelSizeZ=voxel_sizes[2],
+                RotationAngle=rotation,
+                PixelTime = pixel_time,
+                Objective = objective,
+                MicroscopeType = 'confocal',
+                OriginalFile = os.path.abspath(input_path),
+                ExcitationWavelength = excitation_wavelength,
+                ChannelName = 'Ch3',
+                )) + description
+        description += '\n'+tiff.lsminfo.tostr (short=True)
+        #print description
     fn = output_path % dict(channel_name='Ch3', index='all')
-    print 'Saving',len (Ch3_images),'slices to',fn,'...',
     sys.stdout.flush ()
-    tif = TIFF.open(fn, mode='w')
-    tif.write_image(numpy.array(Ch3_images,dtype=numpy.uint8))
-    tif.close()
-    print 'done'
+    tif = TIFFimage(Ch3_images, description=description)
+    tif.write_file (fn)
 
 def main ():
     from libtiff.optparse_gui import OptionParser

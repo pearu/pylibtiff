@@ -45,6 +45,14 @@ Make 10F ASCII
 Model 110 ASCII
 StripOffsets 111 SHORT|LONG StripsPerImage
 Orientation 112 SHORT 1
+  TopLeft 1
+  TopRight 2
+  BottomRight 3
+  BottomLeft 4
+  LeftTop 5
+  RightTop 6
+  RightBottom 7
+  LeftBottom 8
 SamplesPerPixel 115 SHORT 1
 RowsPerStrip 116 SHORT|LONG 1
 StripByteCounts 117 LONG|SHORT StripsPerImage
@@ -53,9 +61,11 @@ MaxSampleValue 119 SHORT SamplesPerPixel
 XResolution 11A RATIONAL 1
 YResolution 11B RATIONAL 1
 PlanarConfiguration 11C SHORT 1
+  Chunky 1
+  Planar 2
 PageName 11D ASCII
-XPosition 11E RATIONAL
-YPosition 11F RATIONAL
+XPosition 11E DOUBLE
+YPosition 11F DOUBLE
 FreeOffsets 120 LONG
 FreeByteCounts 121 LONG
 GrayResponseUnit 122 SHORT 1
@@ -115,6 +125,8 @@ type2name = {1:'BYTE', 2:'ASCII', 3:'SHORT', 4:'LONG', 5:'RATIONAL', # two longs
              11:'FLOAT', 12:'DOUBLE',
              }
 name2type = dict((v,k) for k,v in type2name.items())
+name2type['SHORT|LONG'] = name2type['LONG']
+name2type['LONG|SHORT'] = name2type['LONG']
 type2bytes = {1:1, 2:1, 3:2, 4:4, 5:8, 6:1, 7:1, 8:2, 9:4, 10:8, 11:4, 12:8}
 type2dtype = {1:numpy.uint8, 2:numpy.uint8, 3:numpy.uint16, 4:numpy.uint32, 5:rational,
               6:numpy.int8, 8:numpy.int16, 9:numpy.int32,10:srational,
@@ -141,11 +153,222 @@ IFDEntry_finalize_hooks = []
 import lsm
 lsm.register(locals())
 
+class TIFFentry:
+    
+    def __init__ (self, tag):
+        if isinstance(tag, str):
+            tag = tag_name2value[tag]
+        assert isinstance (tag, int), `tag`
+        self.tag = tag
+        self.type_name = tag_value2type[tag]
+        self.type = name2type[self.type_name]
+        self.type_nbytes = type2bytes[self.type]
+        self.type_dtype = type2dtype[self.type]
+        self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
+
+
+        self.record = numpy.zeros((12,), dtype=numpy.ubyte)
+        self.record[:2].view(dtype=numpy.uint16)[0] = self.tag
+        self.record[2:4].view(dtype=numpy.uint16)[0] = self.type
+        self.values = []
+
+    def __str__(self):
+        return '%s(entry=(%s,%s,%s,%s))' % (self.__class__.__name__, self.tag_name, self.type_name, self.count, self.offset)
+    __repr__ = __str__
+
+    @property
+    def count(self):
+        return self.record[4:8].view(dtype=numpy.uint32)
+
+    @property
+    def offset(self):
+        return self.record[8:12].view(dtype=numpy.uint32)
+
+    @property
+    def nbytes(self):
+        if self.offset_is_value:
+            return 0
+        return self.count[0] * self.type_nbytes
+
+    @property
+    def offset_is_value (self):
+        return not self.values and self.count[0]==1 and self.type_nbytes<=4 and self.type_name!='ASCII'
+
+    def add_value(self, value):
+        if self.type_name=='ASCII':
+            value = str(value)
+            if self.count[0]==0:
+                self.values.append(value)
+            else:
+                self.values[0] += value
+            self.count[0] = len(self.values[0]) + 1
+        elif self.type_nbytes<=4:
+            self.count[0] += 1
+            if self.count[0]==1:
+                self.offset[0] = value
+            elif self.count[0]==2:
+                self.values.append(self.offset[0])
+                self.values.append(value)
+                self.offset[0] = 0
+            else:
+                self.values.append(value)
+        else:
+            self.count[0] += 1
+            self.values.append(value)
+
+    def set_value (self, value):
+        assert self.type_name!='ASCII',`self`
+        if self.count[0]:
+            self.count[0] -= 1
+            if self.values:
+                del self.values[-1]
+        self.add_value (value)
+
+    def set_offset(self, offset):
+        self.offset[0] = offset
+
+    def toarray(self, target = None):
+        if self.offset_is_value:
+            return
+        if target is None:
+            target = numpy.zeros((self.nbytes,), dtype=numpy.ubyte)
+        dtype = target.dtype
+        offset = 0
+        if self.type_name=='ASCII':
+            data = numpy.array([self.values[0] + '\0']).view(dtype=numpy.ubyte)
+            target[offset:offset+self.nbytes] = data
+        else:
+            for value in self.values:
+                dtype = self.type_dtype
+                if self.type_name=='RATIONAL' and isinstance(value, (int, long, float)):
+                    dtype = numpy.float64
+                target[offset:offset + self.type_nbytes].view(dtype=dtype)[0] = value
+                offset += self.type_nbytes
+        return target
+
 class TIFFimage:
 
-    def __init__(self, data):
+    def __init__(self, data, description=''):
+        """
+        data : {list, numpy.ndarray}
+        """
+        dtype = None
+        if isinstance(data, list):
+            image = data[0]
+            self.width, self.length = image.shape
+            self.depth = len(data)
+            dtype = image.dtype
+        elif isinstance(data, numpy.ndarray):
+            shape = data.shape
+            dtype = data.dtype
+            if len (shape)==1:
+                self.length, = shape
+                self.width = 1
+                self.depth = 1
+                data = [[data]]
+            elif len (shape)==2:
+                self.width, self.length = shape
+                self.depth = 1
+                data = [data]
+            elif len (shape)==3:
+                self.depth, self.width, self.length = shape
+            else:
+                raise NotImplementedError (`shape`)
+        else:
+            raise NotImplementedError (`type (data)`)
         self.data = data
-        self.width, self.length = data.shape
+        self.dtype = dtype
+        self.description = description
+
+    def write_file(self, filename):
+        sys.stdout.write('Writing TIFF records to %s\n' % (filename))
+        sys.stdout.flush ()
+        image_directories = []
+        total_size = 8
+        data_size = 0
+        sys.stdout.write('  creating records...')
+        sys.stdout.flush ()
+        for i,image in enumerate(self.data):
+            entries = []
+            sample_format = dict (u=1,i=2,f=3).get(image.dtype.kind, 4)
+            d = dict(ImageWidth=self.width,
+                     ImageLength=self.length,
+                     Compression=1,
+                     PhotometricInterpretation=1,
+                     PlanarConfiguration=1,
+                     Orientation=1,
+                     ResolutionUnit = 1,
+                     XResolution = self.length,
+                     YResolution = self.width,
+                     SamplesPerPixel = 1,
+                     StripByteCounts = image.nbytes, #assuming one strip per image
+                     BitsPerSample = image.dtype.itemsize * 8,
+                     SampleFormat = sample_format,
+                     )
+            if i==0:
+                d.update(dict(
+                        ImageDescription = self.description,
+                        Software = 'http://code.google.com/p/pylibtiff/'))
+
+            for tagname, value in d.items ():
+                entry = TIFFentry(tagname)
+                entry.add_value(value)
+                entries.append(entry)
+                total_size += 12 + entry.nbytes
+                data_size += entry.nbytes
+
+            
+            strip_offsets = TIFFentry('StripOffsets')
+            strip_offsets.add_value(0)
+            entries.append(strip_offsets)
+            total_size += 12 + strip_offsets.nbytes #assuming one strip per image
+            data_size += strip_offsets.nbytes
+
+            #image data:
+            total_size += image.nbytes
+            data_size += image.nbytes
+
+            entries.sort(cmp=lambda x,y: cmp(x.tag, y.tag))
+            image_directories.append((entries, strip_offsets, image))
+            total_size += 2 + 4
+
+        if os.path.splitext (filename)[1].lower () not in ['.tif', '.tiff']:
+            filename = filename + '.tif'
+        tif = numpy.memmap(filename, dtype=numpy.ubyte, mode='w+', shape=(total_size,))
+        tif[:2].view(dtype=numpy.uint16)[0] = 0x4949
+        tif[2:4].view (dtype=numpy.uint16)[0] = 42
+        tif[4:8].view (dtype=numpy.uint32)[0] = 8
+        offset = 8
+        data_offset = total_size - data_size
+        for i, (entries, strip_offsets, image) in enumerate(image_directories):
+            sys.stdout.write('\r  filling records: %5s%% done' % (int(100.0*i/len (image_directories))))
+            sys.stdout.flush ()
+            tif[offset:offset+2].view(dtype=numpy.uint16)[0] = len(entries)
+            offset += 2
+
+            data = image.view(dtype=numpy.ubyte).reshape((image.nbytes,))
+            data_size = data.size
+            assert data_offset+data_size <= total_size, `data_offset+data_size,total_size`
+            tif[data_offset:data_offset + data_size] = data
+            strip_offsets.set_value(data_offset)
+            data_offset += data_size
+
+            for entry in entries:
+                data_size = entry.nbytes
+                if data_size:
+                    entry.set_offset(data_offset)
+                    assert data_offset+data_size <= total_size, `data_offset+data_size,total_size`
+                    entry.toarray(tif[data_offset:data_offset + data_size])
+                    data_offset += data_size
+                tif[offset:offset+12] = entry.record
+                offset += 12
+            tif[offset:offset+4].view(dtype=numpy.uint32)[0] = offset + 4
+            offset += 4
+        tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
+        sys.stdout.write ('\r  flushing records (%s Mbytes) to disk...      ' % (total_size//(1024*1024))); sys.stdout.flush ()
+        del tif
+        sys.stdout.write ('done\n'); sys.stdout.flush ()        
+
 
 class TIFFfile:
     """ Holds a numpy.memmap of a TIFF file.
@@ -347,9 +570,11 @@ class IFD:
             else:
                 raise NotImplementedError (`subfile_type`)
             assert planar_config==2,`planar_config`
-            assert len(channel_names)==len(strip_offsets),`channel_names, strip_offsets`
+            nof_channels = self.tiff.lsmentry['DimensionChannels'][0]
+            scantype = self.tiff.lsmentry['ScanType'][0]
+            assert scantype==0,`scantype` # xyz-scan
             r = {}
-            for i in range (len (channel_names)):
+            for i in range (nof_channels):
                 dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
                 r[channel_names[i]] = self.tiff.data[strip_offsets[i]:strip_offsets[i]+strip_nbytes[i]].view (dtype=dtype).reshape((width, length))
             return r
