@@ -1,10 +1,12 @@
 """
-tiff - implements numpy.memmap based TIFF file reader
+tiff - implements a numpy.memmap based TIFF file reader.
+
+
 """
 # Author: Pearu Peterson
 # Created: April 2010
-
-__all__ = ['TIFFfile']
+from __future__ import division
+__all__ = ['TIFFfile', 'TIFFimage']
 
 import os
 import sys
@@ -154,6 +156,8 @@ import lsm
 lsm.register(locals())
 
 class TIFFentry:
+    """ Hold a IFD entry used by TIFFimage.
+    """
     
     def __init__ (self, tag):
         if isinstance(tag, str):
@@ -165,7 +169,6 @@ class TIFFentry:
         self.type_nbytes = type2bytes[self.type]
         self.type_dtype = type2dtype[self.type]
         self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
-
 
         self.record = numpy.zeros((12,), dtype=numpy.ubyte)
         self.record[:2].view(dtype=numpy.uint16)[0] = self.tag
@@ -193,6 +196,13 @@ class TIFFentry:
     @property
     def offset_is_value (self):
         return not self.values and self.count[0]==1 and self.type_nbytes<=4 and self.type_name!='ASCII'
+
+    def __getitem__ (self, index):
+        if self.offset_is_value:
+            if index>0:
+                raise IndexError(`index`)
+            return self.offset[0]
+        return self.values[index]
 
     def add_value(self, value):
         if self.type_name=='ASCII':
@@ -247,31 +257,35 @@ class TIFFentry:
         return target
 
 class TIFFimage:
+    """
+    Hold an image stack that can be written to TIFF file.
+    """
 
     def __init__(self, data, description=''):
         """
         data : {list, numpy.ndarray}
+          Specify image data as a list of images or as an array with rank<=3.
         """
         dtype = None
         if isinstance(data, list):
             image = data[0]
-            self.width, self.length = image.shape
+            self.length, self.width = image.shape
             self.depth = len(data)
             dtype = image.dtype
         elif isinstance(data, numpy.ndarray):
             shape = data.shape
             dtype = data.dtype
             if len (shape)==1:
-                self.length, = shape
-                self.width = 1
+                self.width, = shape
+                self.length = 1
                 self.depth = 1
                 data = [[data]]
             elif len (shape)==2:
-                self.width, self.length = shape
+                self.length, self.width = shape
                 self.depth = 1
                 data = [data]
             elif len (shape)==3:
-                self.depth, self.width, self.length = shape
+                self.depth, self.length, self.width = shape
             else:
                 raise NotImplementedError (`shape`)
         else:
@@ -280,28 +294,52 @@ class TIFFimage:
         self.dtype = dtype
         self.description = description
 
-    def write_file(self, filename):
+    def write_file(self, filename, strip_size = 2**13):
+        """
+        Write image data to TIFF file.
+
+        Parameters
+        ----------
+        filename : str
+        strip_size : int
+          Specify the size of uncompressed strip.
+        """
+        if os.path.splitext (filename)[1].lower () not in ['.tif', '.tiff']:
+            filename = filename + '.tif'
+
         sys.stdout.write('Writing TIFF records to %s\n' % (filename))
         sys.stdout.flush ()
+
+
+        def compress (data): # TODO
+            return data
+
+        # compute tif file size and create image file directories data
         image_directories = []
         total_size = 8
         data_size = 0
-        sys.stdout.write('  creating records...')
-        sys.stdout.flush ()
         for i,image in enumerate(self.data):
-            entries = []
+            sys.stdout.write('\r  creating records: %5s%% done  ' % (int(100.0*i/len(self.data))))
+            sys.stdout.flush ()
+
             sample_format = dict (u=1,i=2,f=3).get(image.dtype.kind, 4)
-            d = dict(ImageWidth=self.width,
-                     ImageLength=self.length,
+            length, width = image.shape
+            bytes_per_row = width * image.dtype.itemsize
+            rows_per_strip = int(numpy.ceil(strip_size / bytes_per_row))
+            strips_per_image = int(numpy.floor((length + rows_per_strip - 1) / rows_per_strip))
+            assert bytes_per_row * rows_per_strip * strips_per_image >= image.nbytes
+
+            d = dict(ImageWidth=width,
+                     ImageLength=length,
                      Compression=1,
                      PhotometricInterpretation=1,
                      PlanarConfiguration=1,
                      Orientation=1,
                      ResolutionUnit = 1,
-                     XResolution = self.length,
-                     YResolution = self.width,
+                     XResolution = 0,
+                     YResolution = 0,
                      SamplesPerPixel = 1,
-                     StripByteCounts = image.nbytes, #assuming one strip per image
+                     RowsPerStrip = rows_per_strip,
                      BitsPerSample = image.dtype.itemsize * 8,
                      SampleFormat = sample_format,
                      )
@@ -310,6 +348,7 @@ class TIFFimage:
                         ImageDescription = self.description,
                         Software = 'http://code.google.com/p/pylibtiff/'))
 
+            entries = []
             for tagname, value in d.items ():
                 entry = TIFFentry(tagname)
                 entry.add_value(value)
@@ -317,42 +356,62 @@ class TIFFimage:
                 total_size += 12 + entry.nbytes
                 data_size += entry.nbytes
 
-            
+            strip_byte_counts = TIFFentry('StripByteCounts')
             strip_offsets = TIFFentry('StripOffsets')
-            strip_offsets.add_value(0)
+            entries.append(strip_byte_counts)
             entries.append(strip_offsets)
-            total_size += 12 + strip_offsets.nbytes #assuming one strip per image
-            data_size += strip_offsets.nbytes
-
-            #image data:
+            # strip_offsets and strip_byte_counts will be filled in the next loop
+            if strips_per_image==1:
+                assert strip_byte_counts.type_nbytes <= 4
+                assert strip_offsets.type_nbytes <= 4
+                total_size += 2*12
+            else:
+                total_size += 12 + strips_per_image * (strip_byte_counts.type_nbytes + strip_offsets.type_nbytes)
+                data_size += strips_per_image * (strip_byte_counts.type_nbytes + strip_offsets.type_nbytes)
+            
+            # image data:
             total_size += image.nbytes
             data_size += image.nbytes
 
-            entries.sort(cmp=lambda x,y: cmp(x.tag, y.tag))
-            image_directories.append((entries, strip_offsets, image))
+            # records for nof IFD entries and offset to the next IFD:
             total_size += 2 + 4
 
-        if os.path.splitext (filename)[1].lower () not in ['.tif', '.tiff']:
-            filename = filename + '.tif'
+            # entries must be sorted by tag number
+            entries.sort(cmp=lambda x,y: cmp(x.tag, y.tag))
+
+            strip_info = strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row
+            image_directories.append((entries, strip_info, image))
+
         tif = numpy.memmap(filename, dtype=numpy.ubyte, mode='w+', shape=(total_size,))
-        tif[:2].view(dtype=numpy.uint16)[0] = 0x4949
-        tif[2:4].view (dtype=numpy.uint16)[0] = 42
-        tif[4:8].view (dtype=numpy.uint32)[0] = 8
+        # write TIFF header
+        tif[:2].view(dtype=numpy.uint16)[0] = 0x4949 # low-endian
+        tif[2:4].view (dtype=numpy.uint16)[0] = 42   # magic number
+        tif[4:8].view (dtype=numpy.uint32)[0] = 8    # offset to the first IFD
+
         offset = 8
         data_offset = total_size - data_size
-        for i, (entries, strip_offsets, image) in enumerate(image_directories):
-            sys.stdout.write('\r  filling records: %5s%% done' % (int(100.0*i/len (image_directories))))
+        for i, (entries, strip_info, image) in enumerate(image_directories):
+            strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
+            sys.stdout.write('\r  filling records: %5s%% done  ' % (int(100.0*i/len (image_directories))))
             sys.stdout.flush ()
+
+            # write the nof IFD entries
             tif[offset:offset+2].view(dtype=numpy.uint16)[0] = len(entries)
             offset += 2
 
+            # write image data
             data = image.view(dtype=numpy.ubyte).reshape((image.nbytes,))
-            data_size = data.size
-            assert data_offset+data_size <= total_size, `data_offset+data_size,total_size`
-            tif[data_offset:data_offset + data_size] = data
-            strip_offsets.set_value(data_offset)
-            data_offset += data_size
+            for j in range(strips_per_image):
+                c = rows_per_strip * bytes_per_row
+                k = j * c
+                c -= max((j+1) * c - image.nbytes, 0)
+                strip = compress(data[k:k+c])
+                strip_offsets.add_value(data_offset)
+                strip_byte_counts.add_value(strip.nbytes)
+                tif[data_offset:data_offset+strip.nbytes] = strip
+                data_offset += strip.nbytes
 
+            # write IFD entries
             for entry in entries:
                 data_size = entry.nbytes
                 if data_size:
@@ -362,16 +421,22 @@ class TIFFimage:
                     data_offset += data_size
                 tif[offset:offset+12] = entry.record
                 offset += 12
+
+            # write offset to the next IFD
             tif[offset:offset+4].view(dtype=numpy.uint32)[0] = offset + 4
             offset += 4
+        # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
-        sys.stdout.write ('\r  flushing records (%s Mbytes) to disk...      ' % (total_size//(1024*1024))); sys.stdout.flush ()
+
+        sys.stdout.write ('\r'+40*' ')
+        sys.stdout.write ('\r  flushing records (%s Mbytes) to disk... ' % (round(total_size/(1024*1024)))); sys.stdout.flush ()
         del tif
         sys.stdout.write ('done\n'); sys.stdout.flush ()        
 
 
 class TIFFfile:
-    """ Holds a numpy.memmap of a TIFF file.
+    """
+    Hold a TIFF file image stack that is accessed via memmap.
 
     Attributes
     ----------
