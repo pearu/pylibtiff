@@ -1,0 +1,4 @@
+
+* Write special tests for really large bitarrays, for which the length
+  exceeds 2**31 bits
+

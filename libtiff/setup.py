@@ -12,11 +12,14 @@ def configuration(parent_package='',top_path=None):
     package_name = 'libtiff'
     config = Configuration(package_name,parent_package,top_path)
 
+    bitarray_path = 'bitarray-0.3.5-numpy/bitarray'
+
     # Add subpackages here:
-    #config.add_subpackage('<subpackage name>')
+    config.add_subpackage('bitarray', bitarray_path)
     # eof add.
 
     # Add extensions here:
+    config.add_extension('bitarray._bitarray', join(bitarray_path,'_bitarray.c'))
     #config.add_extension('<extmodule>', join('src','<extmodule>.c'))
     # eof add.
 

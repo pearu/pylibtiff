@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.5: http://docutils.sourceforge.net/" />
+<title>Bitarray module</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 5196 2007-06-03 20:25:28Z wiemann $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+
+See http://docutils.sf.net/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left {
+  clear: left }
+
+img.align-right {
+  clear: right }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font-family: serif ;
+  font-size: 100% }
+
+pre.literal-block, pre.doctest-block {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="bitarray-module">
+<h1 class="title">Bitarray module</h1>
+
+<p>This module provides an object type which efficiently represents an array
+of booleans.  Bitarrays are sequence types and behave very much like usual
+lists.  Eight bits are represented by one byte in contiguous block of
+memory.  The user can select between two representations; little-endian
+and big-endian.  Most of the functionality is implemented in C.
+Methods for accessing the machine representation are provided.
+This can be useful when bit level access to binary files is required,
+such as portable bitmap image files (.pbm).  Also, when dealing with
+compressed data which uses variable bit length encoding, you may find
+this module useful.</p>
+<p>Requires Python 2.5 or greater,
+see <a class="reference external" href="http://www.python.org/dev/peps/pep-0353/">PEP 353</a>.</p>
+<div class="section" id="key-features">
+<h1>Key features</h1>
+<blockquote>
+<ul class="simple">
+<li>On 32bit machines, a bitarray object can contain up to 2^34 elements,
+that is 16 Gbits (on 64bit machines up to 2^63 elements in theory).</li>
+<li>All functionality implemented in C.</li>
+<li>Bitarray objects behave very much like a list object, in particular
+slicing (including slice assignment and deletion) is supported.</li>
+<li>The bit endianness can be specified for each bitarray object, see below.</li>
+<li>Packing and unpacking to other binary data formats,
+e.g. <a class="reference external" href="http://www.scipy.org/Tentative_NumPy_Tutorial">numpy.ndarray</a>,
+is possible.</li>
+<li>Fast methods for encoding and decoding variable bit length prefix codes</li>
+<li>Sequential search</li>
+<li>Bitwise operations: <tt class="docutils literal"><span class="pre">&amp;,</span> <span class="pre">|,</span> <span class="pre">^,</span> <span class="pre">&amp;=,</span> <span class="pre">|=,</span> <span class="pre">^=,</span> <span class="pre">~</span></tt></li>
+<li>Pickling and unpickling of bitarray objects possible.</li>
+</ul>
+</blockquote>
+</div>
+<div class="section" id="installation">
+<h1>Installation</h1>
+<p>bitarray can be installed from source:</p>
+<pre class="literal-block">
+$ tar xzf bitarray-0.3.5.tar.gz
+$ cd bitarray-0.3.5
+$ python setup.py install
+</pre>
+<p>On Unix systems, the latter command may have to be executed with root
+privileges.
+If you have <a class="reference external" href="http://pypi.python.org/pypi/setuptools/">setuptools</a>
+installed, you can easy_install bitarray.
+Once you have installed the package, you may want to test it:</p>
+<pre class="literal-block">
+$ python -c 'import bitarray; bitarray.test()'
+bitarray is installed in: /usr/local/lib/python2.5/site-packages/bitarray
+bitarray version: 0.3.5
+2.5.2 (r252:60911, Jul 17 2008, 10:38:24)
+[GCC 4.2.1 (SUSE Linux)]
+.........................................................................
+..........
+----------------------------------------------------------------------
+Ran 90 tests in 2.420s
+
+OK
+</pre>
+<p>You can always import the function test,
+and <tt class="docutils literal"><span class="pre">test().wasSuccessful()</span></tt> will return True when the test went OK.</p>
+</div>
+<div class="section" id="using-the-module">
+<h1>Using the module</h1>
+<p>As mentioned above, bitarray objects behave very much like lists, so
+there is not too new to learn.  The biggest difference to list objects
+is the ability to access the machine representation of the object.
+When doing so, the bit endianness is of importance, this issue is
+explained in detail in the section below.  Here, we demonstrate the
+basic usage of bitarray objects:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; from bitarray import bitarray
+&gt;&gt;&gt; a = bitarray()            # create empty bitarray
+&gt;&gt;&gt; a.append(True)
+&gt;&gt;&gt; a.extend([False, True, True])
+&gt;&gt;&gt; a
+bitarray('1011')
+</pre>
+</blockquote>
+<p>Bitarray objects can be instantiated in different ways:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray(2**20)       # bitarray of length 1048576 (uninitialized)
+&gt;&gt;&gt; bitarray('1001011')       # from a string
+bitarray('1001011')
+&gt;&gt;&gt; lst = [True, False, False, True, False, True, True]
+&gt;&gt;&gt; bitarray(lst)             # from list, tuple, iterable
+bitarray('1001011')
+</pre>
+</blockquote>
+<p>Bits can be assigned from any Python object, if the value can be interpreted
+as a truth value.  You can think of this as Python's built-in function bool()
+being applied, whenever casting an object:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray([42, '', True, {}, 'foo', None])
+&gt;&gt;&gt; a
+bitarray('101010')
+&gt;&gt;&gt; a.append(a)      # note that bool(a) is True
+&gt;&gt;&gt; a.count(42)      # counts occurrences of True (not 42)
+4L
+&gt;&gt;&gt; a.remove('')     # removes first occurrence of False
+&gt;&gt;&gt; a
+bitarray('110101')
+</pre>
+</blockquote>
+<p>Like lists, bitarray objects support slice assignment and deletion:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray(50)
+&gt;&gt;&gt; a.setall(False)
+&gt;&gt;&gt; a[11:37:3] = 9 * bitarray([True])
+&gt;&gt;&gt; a
+bitarray('00000000000100100100100100100100100100000000000000')
+&gt;&gt;&gt; del a[12::3]
+&gt;&gt;&gt; a
+bitarray('0000000000010101010101010101000000000')
+&gt;&gt;&gt; a[-6:] = bitarray('10011')
+&gt;&gt;&gt; a
+bitarray('000000000001010101010101010100010011')
+&gt;&gt;&gt; a += bitarray('000111')
+&gt;&gt;&gt; a[9:]
+bitarray('001010101010101010100010011000111')
+</pre>
+</blockquote>
+<p>In addition, slices can be assigned to booleans, which is easier (and
+faster) than assigning to a bitarray in which all values are the same:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = 20 * bitarray('0')
+&gt;&gt;&gt; a[1:15:3] = True
+&gt;&gt;&gt; a
+bitarray('01001001001001000000')
+</pre>
+</blockquote>
+<p>This is easier and faster than:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = 20 * bitarray('0')
+&gt;&gt;&gt; a[1:15:3] = 5 * bitarray('1')
+&gt;&gt;&gt; a
+bitarray('01001001001001000000')
+</pre>
+</blockquote>
+<p>Note that in the latter we have to create a temporary bitarray whose length
+must be known or calculated.</p>
+</div>
+<div class="section" id="bit-endianness">
+<h1>Bit endianness</h1>
+<p>Since a bitarray allows addressing of individual bits, where the machine
+represents 8 bits in one byte, there two obvious choices for this mapping;
+little- and big-endian.
+When creating a new bitarray object, the endianness can always be
+specified explicitly:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray(endian='little')
+&gt;&gt;&gt; a.fromstring('A')
+&gt;&gt;&gt; a
+bitarray('10000010')
+&gt;&gt;&gt; b = bitarray('11000010', endian='little')
+&gt;&gt;&gt; b.tostring()
+'C'
+</pre>
+</blockquote>
+<p>Here the low-bit comes first because little-endian means that increasing
+numeric significance corresponds to an increasing address (or index).
+So a[0] is the lowest and least significant bit, and a[7] is the highest
+and most significant bit.</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray(endian='big')
+&gt;&gt;&gt; a.fromstring('A')
+&gt;&gt;&gt; a
+bitarray('01000001')
+&gt;&gt;&gt; a[6] = 1
+&gt;&gt;&gt; a.tostring()
+'C'
+</pre>
+</blockquote>
+<p>Here the high-bit comes first because big-endian
+means &quot;most-significant first&quot;.
+So a[0] is now the lowest and most significant bit, and a[7] is the highest
+and least significant bit.</p>
+<p>The bit endianness is a property attached to each bitarray object.
+When comparing bitarray objects, the endianness (and hence the machine
+representation) is irrelevant; what matters is the mapping from indices
+to bits:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; bitarray('11001', endian='big') == bitarray('11001', endian='little')
+True
+</pre>
+</blockquote>
+<p>Bitwise operations (<tt class="docutils literal"><span class="pre">&amp;,</span> <span class="pre">|,</span> <span class="pre">^,</span> <span class="pre">&amp;=,</span> <span class="pre">|=,</span> <span class="pre">^=,</span> <span class="pre">~</span></tt>) are implemented efficiently
+using the corresponding byte operations in C, i.e. the operators act on the
+machine representation of the bitarray objects.  Therefore, one has to be
+cautious when applying the operation to bitarrays with different endianness.</p>
+<p>When converting to and from machine representation, using
+the <tt class="docutils literal"><span class="pre">tostring</span></tt>, <tt class="docutils literal"><span class="pre">fromstring</span></tt>, <tt class="docutils literal"><span class="pre">tofile</span></tt> and <tt class="docutils literal"><span class="pre">fromfile</span></tt> methods,
+the endianness matters:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray(endian='little')
+&gt;&gt;&gt; a.fromstring('\x01')
+&gt;&gt;&gt; a
+bitarray('10000000')
+&gt;&gt;&gt; b = bitarray(endian='big')
+&gt;&gt;&gt; b.fromstring('\x80')
+&gt;&gt;&gt; b
+bitarray('10000000')
+&gt;&gt;&gt; a == b
+True
+&gt;&gt;&gt; a.tostring() == b.tostring()
+False
+</pre>
+</blockquote>
+<p>The endianness can not be changed once an object is created.
+However, since creating a bitarray from another bitarray just copies the
+memory representing the data, you can create a new bitarray with different
+endianness:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a = bitarray('11100000', endian='little')
+&gt;&gt;&gt; a
+bitarray('11100000')
+&gt;&gt;&gt; b = bitarray(a, endian='big')
+&gt;&gt;&gt; b
+bitarray('00000111')
+&gt;&gt;&gt; a == b
+False
+&gt;&gt;&gt; a.tostring() == b.tostring()
+True
+</pre>
+</blockquote>
+<p>The default bit endianness is currently big-endian, however this may change
+in the future, and when dealing with the machine representation of bitarray
+objects, it is recommended to always explicitly specify the endianness.</p>
+<p>Unless, explicitly converting to machine representation, using
+the <tt class="docutils literal"><span class="pre">tostring</span></tt>, <tt class="docutils literal"><span class="pre">fromstring</span></tt>, <tt class="docutils literal"><span class="pre">tofile</span></tt> and <tt class="docutils literal"><span class="pre">fromfile</span></tt> methods,
+the bit endianness will have no effect on any computation, and you
+can safely ignore setting the endianness, and other details of this section.</p>
+</div>
+<div class="section" id="variable-bit-length-prefix-codes">
+<h1>Variable bit length prefix codes</h1>
+<p>The method <tt class="docutils literal"><span class="pre">encode</span></tt> takes a dictionary mapping symbols to bitarrays
+and an iterable, and extends the bitarray object with the encoded symbols
+found while iterating.  For example:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; d = {'H':bitarray('111'), 'e':bitarray('0'),
+...      'l':bitarray('110'), 'o':bitarray('10')}
+...
+&gt;&gt;&gt; a = bitarray()
+&gt;&gt;&gt; a.encode(d, 'Hello')
+&gt;&gt;&gt; a
+bitarray('111011011010')
+</pre>
+</blockquote>
+<p>Note that the string <tt class="docutils literal"><span class="pre">'Hello'</span></tt> is an iterable, but the symbols are not
+limited to characters, any hashable Python object can be a symbol.
+Taking the same dictionary, we can apply the <tt class="docutils literal"><span class="pre">decode</span></tt> method which will
+return a list of the symbols:</p>
+<blockquote>
+<pre class="doctest-block">
+&gt;&gt;&gt; a.decode(d)
+['H', 'e', 'l', 'l', 'o']
+&gt;&gt;&gt; ''.join(a.decode(d))
+'Hello'
+</pre>
+</blockquote>
+<p>Since symbols are not limited to being characters, it is necessary to return
+them as elements of a list, rather than simply returning the joined string.</p>
+</div>
+<div class="section" id="reference">
+<h1>Reference</h1>
+<p><strong>The bitarray class:</strong></p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">bitarray([initial][endian=string])</span></tt></dt>
+<dd><p class="first">Return a new bitarray object whose items are bits initialized from
+the optional initial, and endianness.
+If no object is provided, the bitarray is initialized to have length zero.
+The initial object may be of the following types:</p>
+<dl class="docutils">
+<dt>int, long</dt>
+<dd>Create bitarray of length given by the integer.  The initial values
+in the array are random, because only the memory allocated.</dd>
+<dt>string</dt>
+<dd>Create bitarray from a string of '0's and '1's.</dd>
+<dt>list, tuple, iterable</dt>
+<dd>Create bitarray from a sequence, each element in the sequence is
+converted to a bit using truth value value.</dd>
+<dt>bitarray</dt>
+<dd>Create bitarray from another bitarray.  This is done by copying the
+memory holding the bitarray data, and is hence very fast.</dd>
+</dl>
+<p>The optional keyword arguments 'endian' specifies the bit endianness of the
+created bitarray object.
+Allowed values are 'big' and 'little' (default is 'big').</p>
+<p class="last">Note that setting the bit endianness only has an effect when accessing the
+machine representation of the bitarray, i.e. when using the methods: tofile,
+fromfile, tostring, fromstring.</p>
+</dd>
+</dl>
+<p><strong>A bitarray object supports the following methods:</strong></p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">all()</span></tt></dt>
+<dd>Returns True when all bits in the array are True.</dd>
+<dt><tt class="docutils literal"><span class="pre">any()</span></tt></dt>
+<dd>Returns True when any bit in the array is True.</dd>
+<dt><tt class="docutils literal"><span class="pre">append(x)</span></tt></dt>
+<dd>Append the value bool(x) to the end of the bitarray.</dd>
+<dt><tt class="docutils literal"><span class="pre">buffer_info()</span></tt></dt>
+<dd>Return a tuple (address, size, endianness, unused, allocated) giving the
+current memory address, the size (in bytes) used to hold the bitarray's
+contents, the bit endianness as a string, the number of unused bits
+(e.g. a bitarray of length 11 will have a buffer size of 2 bytes and
+5 unused bits), and the size (in bytes) of the allocated memory.</dd>
+<dt><tt class="docutils literal"><span class="pre">bytereverse()</span></tt></dt>
+<dd>For all bytes representing the bitarray, reverse the bit order (in-place).
+Note: This method changes the actual machine values representing the
+bitarray; it does not change the endianness of the bitarray object.</dd>
+<dt><tt class="docutils literal"><span class="pre">copy()</span></tt></dt>
+<dd>Return a copy of the bitarray.</dd>
+<dt><tt class="docutils literal"><span class="pre">count([x])</span></tt></dt>
+<dd>Return number of occurrences of x in the bitarray.  x defaults to True.</dd>
+<dt><tt class="docutils literal"><span class="pre">decode(code)</span></tt></dt>
+<dd>Given a prefix code (a dict mapping symbols to bitarrays),
+decode the content of the bitarray and return the list of symbols.</dd>
+<dt><tt class="docutils literal"><span class="pre">encode(code,</span> <span class="pre">iterable)</span></tt></dt>
+<dd>Given a prefix code (a dict mapping symbols to bitarrays),
+iterates over iterable object with symbols, and extends the bitarray
+with the corresponding bitarray for each symbols.</dd>
+<dt><tt class="docutils literal"><span class="pre">endian()</span></tt></dt>
+<dd>Return the bit endianness as a string (either 'little' or 'big').</dd>
+<dt><tt class="docutils literal"><span class="pre">extend(object)</span></tt></dt>
+<dd>Append bits to the end of the bitarray.  The objects which can be passed
+to this method are the same iterable objects which can given to a bitarray
+object upon initialization.</dd>
+<dt><tt class="docutils literal"><span class="pre">fill()</span></tt></dt>
+<dd>Returns the number of bits added (0..7) at the end of the array.
+When the length of the bitarray is not a multiple of 8, increase the length
+slightly such that the new length is a multiple of 8, and set the few new
+bits to False.</dd>
+<dt><tt class="docutils literal"><span class="pre">fromfile(f</span> <span class="pre">[,</span> <span class="pre">n])</span></tt></dt>
+<dd>Read n bytes from the file object f and append them to the bitarray
+interpreted as machine values.  When n is omitted, as many bytes are
+read until EOF is reached.</dd>
+<dt><tt class="docutils literal"><span class="pre">fromstring(string)</span></tt></dt>
+<dd>Append from a string, interpreting the string as machine values.</dd>
+<dt><tt class="docutils literal"><span class="pre">index(x)</span></tt></dt>
+<dd>Return index of the first occurrence of x in the bitarray.
+It is an error when x does not occur in the bitarray</dd>
+<dt><tt class="docutils literal"><span class="pre">insert(i,</span> <span class="pre">x)</span></tt></dt>
+<dd>Insert a new item x into the bitarray before position i.</dd>
+<dt><tt class="docutils literal"><span class="pre">invert(x)</span></tt></dt>
+<dd>Invert all bits in the array (in-place),
+i.e. convert each 1-bit into a 0-bit and vice versa.</dd>
+<dt><tt class="docutils literal"><span class="pre">length()</span></tt></dt>
+<dd>Return the length, i.e. number of bits stored in the bitarray.
+This method is preferred over __len__, [used when typing <tt class="docutils literal"><span class="pre">len(a)</span></tt>],
+since __len__ will fail for a bitarray object with 2^31 or more elements
+on a 32bit machine, whereas this method will return the correct value,
+on 32bit and 64bit machines.</dd>
+<dt><tt class="docutils literal"><span class="pre">pack(string)</span></tt></dt>
+<dd>Extend the bitarray from a string, where each characters corresponds to
+a single bit.  The character 'x00' maps to bit 0 and all other characters
+map to bit 1.
+This method, as well as the unpack method, are meant for efficient
+transfer of data between bitarray objects to other python objects
+(for example NumPy's ndarray object) which have a different view of memory.</dd>
+<dt><tt class="docutils literal"><span class="pre">pop([i])</span></tt></dt>
+<dd>Return the i-th element and delete it from the bitarray. i defaults to -1.</dd>
+<dt><tt class="docutils literal"><span class="pre">remove(x)</span></tt></dt>
+<dd>Remove the first occurrence of x in the bitarray.</dd>
+<dt><tt class="docutils literal"><span class="pre">reverse()</span></tt></dt>
+<dd>Reverse the order of bits in the array (in-place).</dd>
+<dt><tt class="docutils literal"><span class="pre">search(x[,</span> <span class="pre">limit])</span></tt></dt>
+<dd>Given a bitarray x (or an object which can be converted to a bitarray),
+returns the start positions of x matching self as a list.
+The optional argument limits the number of search results to the integer
+specified.  By default, all search results are returned.</dd>
+<dt><tt class="docutils literal"><span class="pre">setall(x)</span></tt></dt>
+<dd>Set all bits in the bitarray to bool(x).</dd>
+<dt><tt class="docutils literal"><span class="pre">sort(reverse=False)</span></tt></dt>
+<dd>Sort the bits in the array (in-place).</dd>
+<dt><tt class="docutils literal"><span class="pre">to01()</span></tt></dt>
+<dd>Return a string containing '0's and '1's, representing the bits in the
+bitarray object.
+Note: To extend a bitarray from a string containing '0's and '1's,
+use the extend method.</dd>
+<dt><tt class="docutils literal"><span class="pre">tofile(f)</span></tt></dt>
+<dd>Write all bits (as machine values) to the file object f.
+When the length of the bitarray is not a multiple of 8,
+the remaining bits (1..7) are set to 0.</dd>
+<dt><tt class="docutils literal"><span class="pre">tolist()</span></tt></dt>
+<dd>Return an ordinary list with the items in the bitarray.
+Note: To extend a bitarray with elements from a list,
+use the extend method.</dd>
+<dt><tt class="docutils literal"><span class="pre">tostring()</span></tt></dt>
+<dd>Return the string representing (machine values) of the bitarray.
+When the length of the bitarray is not a multiple of 8, the few remaining
+bits (1..7) are set to 0.</dd>
+<dt><tt class="docutils literal"><span class="pre">unpack(zero='\x00',</span> <span class="pre">one='\xff')</span></tt></dt>
+<dd>Return a string containing one character for each bit in the bitarray,
+using the specified mapping.
+Note that unpack('0', '1') has the same effect as to01().
+See also the pack method.</dd>
+</dl>
+<p><strong>Functions defined in the module:</strong></p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">test(verbosity=1)</span></tt></dt>
+<dd>Run self-test.</dd>
+<dt><tt class="docutils literal"><span class="pre">bits2bytes(n)</span></tt></dt>
+<dd>Return the number of bytes necessary to store n bits.</dd>
+</dl>
+</div>
+</div>
+</body>
+</html>
