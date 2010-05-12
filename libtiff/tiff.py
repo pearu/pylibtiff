@@ -12,6 +12,8 @@ import os
 import sys
 import numpy
 
+import lzw
+
 #<TagName> <Hex> <Type> <Number of values>
 tag_info = '''
 # standard tags:
@@ -294,13 +296,15 @@ class TIFFimage:
         self.dtype = dtype
         self.description = description
 
-    def write_file(self, filename, strip_size = 2**13):
+    def write_file(self, filename, compression='none',
+                   strip_size = 2**13):
         """
         Write image data to TIFF file.
 
         Parameters
         ----------
         filename : str
+        compression : {'none', 'lzw'}
         strip_size : int
           Specify the size of uncompressed strip.
         """
@@ -310,9 +314,14 @@ class TIFFimage:
         sys.stdout.write('Writing TIFF records to %s\n' % (filename))
         sys.stdout.flush ()
 
-
-        def compress (data): # TODO
-            return data
+        compression_map = dict(packbits=32773, none=1, lzw=5, jpeg=6, ccitt1d=2,
+                               group3fax = 3, group4fax = 4
+                               )
+        compress_map = dict(none=lambda data: data,
+                            lzw = lzw.encode)
+        compress = compress_map.get(compression, None)
+        if compress is None:
+            raise NotImplementedError (`compression`)
 
         # compute tif file size and create image file directories data
         image_directories = []
@@ -331,7 +340,7 @@ class TIFFimage:
 
             d = dict(ImageWidth=width,
                      ImageLength=length,
-                     Compression=1,
+                     Compression=compression_map.get (compression, 1)
                      PhotometricInterpretation=1,
                      PlanarConfiguration=1,
                      Orientation=1,
