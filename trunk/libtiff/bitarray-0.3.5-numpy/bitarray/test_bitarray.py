@@ -1316,6 +1316,16 @@ class MethodTests(unittest.TestCase, Util):
             self.assert_(a is b)
             self.check_obj(b)
 
+    def test_fromtoword(self):
+        for bits in range (17):
+            for word in range(5,(1<<bits)):
+                init = '1'
+                r = bitarray(init, endian='little')
+                r.fromword (word, bits=bits)
+                self.assertEqual(len(r), len(init)+bits)
+                self.assertEqual(len(r.to01()), len(init)+bits)
+                word2 = r.toword(len(init), bits=bits)
+                self.assertEqual (word, word2)
 
 tests.append(MethodTests)
 

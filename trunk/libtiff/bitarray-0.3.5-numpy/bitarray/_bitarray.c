@@ -1397,6 +1397,46 @@ PyDoc_STRVAR(toword_doc,
 Return an integer word starting at bitarray index and having given number of bits<=32.");
 
 static PyObject *
+bitarray_fromword(bitarrayobject *self, PyObject* args, PyObject *kwds)
+{
+  unsigned char bits = 8;
+  npy_uint64 word;
+  idx_t t, p;
+  static char* kwlist[] = {"word", "bits", NULL};
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "I|b:unpack", kwlist,
+				   &word, &bits))
+    return NULL;
+  if (bits>64)
+    {
+      PyErr_SetString(PyExc_ValueError, "bits must be less or equal to 64");
+      return NULL;
+    }
+  if (self->endian==1)
+    {
+      PyErr_SetString(PyExc_NotImplementedError, "big endian");
+      return NULL;
+    }
+  t = self->nbits;
+  p = setunused(self);
+  self->nbits += p;
+
+  if (resize(self, self->nbits + bits) < 0)
+    return NULL;
+
+  memcpy(self->ob_item + (Py_SIZE(self) - BYTES(bits)), (char*)(&word), BYTES(bits));
+
+  delete_n(self, t, p);
+
+  Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(fromword_doc,
+"fromword(word, bits=0)\n\
+\n\
+Append bits from word.");
+
+static PyObject *
 bitarray_unpack(bitarrayobject *self, PyObject *args, PyObject *kwds)
 {
     char zero = 0x00, one = 0xff;
@@ -2000,7 +2040,9 @@ bitarray_methods[] = {
     {"toword",       (PyCFunction) bitarray_toword,      METH_VARARGS |
                                                          METH_KEYWORDS,
      toword_doc},
-
+    {"fromword",       (PyCFunction) bitarray_fromword,      METH_VARARGS |
+                                                         METH_KEYWORDS,
+     fromword_doc},
     {"unpack",       (PyCFunction) bitarray_unpack,      METH_VARARGS |
                                                          METH_KEYWORDS,
      unpack_doc},
