@@ -102,7 +102,7 @@ def runner (parser, options, args):
     fn = output_path % dict(channel_name='Ch3', index='all')
     sys.stdout.flush ()
     tif = TIFFimage(Ch3_images, description=description)
-    tif.write_file (fn)
+    tif.write_file (fn, compression=options.compression)
 
 def main ():
     from libtiff.optparse_gui import OptionParser

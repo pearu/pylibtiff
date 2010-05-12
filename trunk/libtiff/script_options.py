@@ -61,4 +61,8 @@ def set_convert_options(parser):
                        type = 'file', metavar='OUTPUTPATH',
                        help = 'Specify OUTPUTPATH.'
                        )
-
+    parser.add_option ('--compression',
+                       type = 'choice',
+                       choices = ['none', 'lzw'],
+                       help = 'Specify compression.'
+                       )
