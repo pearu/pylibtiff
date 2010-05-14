@@ -46,21 +46,24 @@ static PyObject *getbit(PyObject *self, PyObject *args, PyObject *kwds)
 static PyObject *setbit(PyObject *self, PyObject *args, PyObject *kwds)
 {
   PyObject* arr = NULL;
-  char bit = 0;
+  char bit = 0, opt=0;
   Py_ssize_t index = 0;
-  static char* kwlist[] = {"array", "index", "bit", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Onb:setbit", 
-				   kwlist, &arr, &index, &bit))
+  static char* kwlist[] = {"array", "index", "bit", "opt", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Onbb:setbit", 
+				   kwlist, &arr, &index, &bit, &opt))
     return NULL;
-  if (!PyArray_Check(arr))
+  if (!opt)
     {
-      PyErr_SetString(PyExc_TypeError,"first argument must be array object");
-      return NULL;
-    }
-  if (NBYTES(index) >= PyArray_NBYTES(arr))
-    {
-      PyErr_SetString(PyExc_IndexError,"bit index out of range");
-      return NULL;
+      if (!PyArray_Check(arr))
+	{
+	  PyErr_SetString(PyExc_TypeError,"first argument must be array object");
+	  return NULL;
+	}
+      if (NBYTES(index) >= PyArray_NBYTES(arr))
+	{
+	  PyErr_SetString(PyExc_IndexError,"bit index out of range");
+	  return NULL;
+	}
     }
   if (bit)
     DATA(PyArray_DATA(arr), index) |= BITMASK(index, CHAR_BITS);
@@ -94,7 +97,7 @@ static PyObject *getword(PyObject *self, PyObject *args, PyObject *kwds)
   if (width<=32)
     {
       npy_uint32 x = *((npy_uint64*)DATAPTR(PyArray_DATA(arr), index)) >> (index % CHAR_BITS);
-      return Py_BuildValue("k",x & (NPY_MAX_UINT32>>(32-width)));
+      return Py_BuildValue("kn",x & (NPY_MAX_UINT32>>(32-width)), index+width);
     }
   // generic code
   if (width<=64)
@@ -106,7 +109,7 @@ static PyObject *getword(PyObject *self, PyObject *args, PyObject *kwds)
 	else
 	    word &= ~BITMASK(i, width);
 
-      return Py_BuildValue("k",word);
+      return Py_BuildValue("kn",word,index+width);
     }
   PyErr_SetString(PyExc_ValueError,"bit width must not be larger than 64");
   return NULL;
@@ -118,34 +121,41 @@ static PyObject *setword(PyObject *self, PyObject *args, PyObject *kwds)
   Py_ssize_t index = 0;
   Py_ssize_t width = 0, i, value_width=sizeof(npy_uint64)*CHAR_BITS;
   npy_uint64 value = 0;
-  static char* kwlist[] = {"array", "index", "width", "value", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Onnk:setword", 
-				   kwlist, &arr, &index, &width, &value))
+  char opt = 0;
+  static char* kwlist[] = {"array", "index", "width", "value", "opt", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Onnkb:setword", 
+				   kwlist, &arr, &index, &width, &value, &opt))
     return NULL;
-  if (!PyArray_Check(arr))
+  if (!opt)
     {
-      PyErr_SetString(PyExc_TypeError,"first argument must be array object");
-      return NULL;
+      if (!PyArray_Check(arr))
+	{
+	  PyErr_SetString(PyExc_TypeError,"first argument must be array object");
+	  return NULL;
+	}
+      if ((index+width-1) >= BITS(PyArray_NBYTES(arr)) || width<0)
+	{
+	  printf("index,width,nbits=%d,%d,%d\n", index, width, BITS(PyArray_NBYTES(arr)));
+	  PyErr_SetString(PyExc_IndexError,"bit index out of range");
+	  return NULL;
+	}
+      if (width>64)
+	{
+	  PyErr_SetString(PyExc_ValueError,"bit width must not be larger than 64");
+	  return NULL;
+	}
     }
-  if ((index+width-1) >= BITS(PyArray_NBYTES(arr)) || width<0)
-    {
-      PyErr_SetString(PyExc_IndexError,"bit index out of range");
-      return NULL;
-    }
-  if (width>64)
-    {
-      PyErr_SetString(PyExc_ValueError,"bit width must not be larger than 64");
-      return NULL;
-    }
-
   for (i=0; i<width; ++i)
     if ((i<value_width) && (GETBIT(value, i, value_width)))
       DATA(PyArray_DATA(arr), index+i) |= BITMASK(index+i, CHAR_BITS);
     else
       DATA(PyArray_DATA(arr), index+i) &= ~BITMASK(index+i, CHAR_BITS);
 
+  return Py_BuildValue("n",index + width);
+  /*
   Py_INCREF(Py_None);
   return Py_None;
+  */
 }
 
 static PyMethodDef module_methods[] = {
