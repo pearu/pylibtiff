@@ -65,7 +65,7 @@ def set_convert_options(parser):
                        help = 'Specify OUTPUTPATH.'
                        )
     parser.add_option ('--compression',
-                       type = 'choice',
+                       type = 'choice', default='none',
                        choices = ['none', 'lzw'],
                        help = 'Specify compression.'
                        )
@@ -93,7 +93,14 @@ def set_info_options(parser):
                        action = 'store_true', default=False,
                        help = 'Show TIFF file memory usage.'
                        )
+    parser.add_option ('--no-memory-usage', dest='memory_usage',
+                       action = 'store_false',
+                       help = 'See --memory-usage.'
+                       )
     parser.add_option ('--ifd',
                        action = 'store_true', default=False,
                        help = 'Show all TIFF file image file directory. By default, only the first IFD is shown.'
                        )
+    parser.add_option ('--no-ifd', dest='ifd',
+                       action = 'store_false', help='See --ifd.')
+ 

@@ -32,7 +32,8 @@ def runner (parser, options, args):
     if options.memory_usage:
         print 'Memory usage:'
         print '-------------'
-        tiff.show_memory_usage()
+        tiff.check_memory_usage()
+
 
     ifd0 = tiff.IFD[0]
     if options.ifd:
@@ -44,6 +45,9 @@ def runner (parser, options, args):
         print ifd0
         if len (tiff.IFD)>1:
             print 'Use --ifd to see the rest of %s IFD entries' % (len (tiff.IFD)-1)
+
+    print 'data is contiguous:', tiff.is_contiguous ()
+    print 'memory usage is ok:', tiff.check_memory_usage(verbose=False)
 
 def main ():
     try:
