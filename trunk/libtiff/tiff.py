@@ -1,7 +1,6 @@
 """
 tiff - implements a numpy.memmap based TIFF file reader.
 
-
 """
 # Author: Pearu Peterson
 # Created: April 2010
@@ -318,7 +317,7 @@ class TIFFimage:
                                group3fax = 3, group4fax = 4
                                )
         compress_map = dict(none=lambda data: data,
-                            lzw = lzw.encode)
+                            lzw = lzw.encode_array)
         compress = compress_map.get(compression, None)
         if compress is None:
             raise NotImplementedError (`compression`)
@@ -340,13 +339,13 @@ class TIFFimage:
 
             d = dict(ImageWidth=width,
                      ImageLength=length,
-                     Compression=compression_map.get (compression, 1)
+                     Compression=compression_map.get (compression, 1),
                      PhotometricInterpretation=1,
                      PlanarConfiguration=1,
                      Orientation=1,
                      ResolutionUnit = 1,
-                     XResolution = 0,
-                     YResolution = 0,
+                     XResolution = 1,
+                     YResolution = 1,
                      SamplesPerPixel = 1,
                      RowsPerStrip = rows_per_strip,
                      BitsPerSample = image.dtype.itemsize * 8,
@@ -627,9 +626,11 @@ class IFD:
         subfile_type = self.get('NewSubfileType').value
         if compression != 1:
             return
-        for i in range (len(strip_offsets)-1):
-            if strip_offsets[i] + strip_nbytes[i] != strip_offsets[i+1]:
-                return
+        if isinstance(strip_offsets, numpy.ndarray):
+            for i in range (len(strip_offsets)-1):
+                if strip_offsets[i] + strip_nbytes[i] != strip_offsets[i+1]:
+                    print 'non-contiguous image', strip_offsets, strip_nbytes
+                    return
 
         if self.tiff.is_lsm:
             lsminfo = self.tiff.lsminfo
@@ -649,8 +650,12 @@ class IFD:
             assert scantype==0,`scantype` # xyz-scan
             r = {}
             for i in range (nof_channels):
-                dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
-                r[channel_names[i]] = self.tiff.data[strip_offsets[i]:strip_offsets[i]+strip_nbytes[i]].view (dtype=dtype).reshape((width, length))
+                if isinstance (bits_per_sample, numpy.ndarray):
+                    dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
+                    r[channel_names[i]] = self.tiff.data[strip_offsets[i]:strip_offsets[i]+strip_nbytes[i]].view (dtype=dtype).reshape((width, length))
+                else:
+                    dtype = getattr (numpy, 'uint%s' % (bits_per_sample))
+                    r[channel_names[i]] = self.tiff.data[strip_offsets:strip_offsets+strip_nbytes].view (dtype=dtype).reshape((width, length))
             return r
         else:
             raise NotImplementedError (`self.tiff`)

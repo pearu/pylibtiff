@@ -23,7 +23,10 @@ import signal
 import sys
 import re
 import optparse
-import wx
+try:
+    import wx
+except ImportError, msg:
+    raise ImportError ('%s (may be need to run "sudo apt-get install python-wxgtk2.8")' % (msg))
 import subprocess as std_subprocess
 if os.name=='nt':
     from . import killableprocess as subprocess

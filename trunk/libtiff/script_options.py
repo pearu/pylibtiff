@@ -1,6 +1,6 @@
 
 
-__all__ = ['set_formatter']
+__all__ = ['set_formatter', 'set_info_options', 'set_convert_options']
 
 import os
 from optparse import OptionGroup, NO_DEFAULT
@@ -48,9 +48,12 @@ def set_formatter(parser):
 def set_convert_options(parser):
     set_formatter(parser)
     if os.name == 'posix':
-        import matplotlib
-        matplotlib.use('GTkAgg')
-        parser.run_methods = ['subcommand']
+        try:
+            import matplotlib
+            matplotlib.use('GTkAgg')
+            parser.run_methods = ['subcommand']
+        except ImportError:
+            pass
     parser.set_usage ('%prog [options] -i INPUTPATH [-o OUTPUTPATH]')
     parser.set_description('Convert INPUTPATH to OUTPUTPATH.')
     parser.add_option ('--input-path', '-i',
@@ -65,4 +68,32 @@ def set_convert_options(parser):
                        type = 'choice',
                        choices = ['none', 'lzw'],
                        help = 'Specify compression.'
+                       )
+    parser.add_option ('--channel-name',
+                       type = 'string',
+                       help = 'Specify channel name.'
+                       )
+
+def set_info_options(parser):
+    set_formatter(parser)
+    if os.name == 'posix':
+        try:
+            import matplotlib
+            matplotlib.use('GTkAgg')
+            parser.run_methods = ['subcommand']
+        except ImportError:
+            pass
+    parser.set_usage ('%prog [options] -i INPUTPATH')
+    parser.set_description('Show INPUTPATHs information.')
+    parser.add_option ('--input-path', '-i',
+                       type = 'file', metavar='INPUTPATH',
+                       help = 'Specify INPUTPATH.'
+                       )
+    parser.add_option ('--memory-usage',
+                       action = 'store_true', default=False,
+                       help = 'Show TIFF file memory usage.'
+                       )
+    parser.add_option ('--ifd',
+                       action = 'store_true', default=False,
+                       help = 'Show all TIFF file image file directory. By default, only the first IFD is shown.'
                        )

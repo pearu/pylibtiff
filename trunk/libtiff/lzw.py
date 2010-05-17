@@ -272,8 +272,10 @@ print 'backend:', default_backend
 if default_backend=='bitarray':
     encode = encode_bitarray
     decode = decode_bitarray
+    def encode_array(arr):
+        return encode_bitarray(arr).toarray ()
 if default_backend=='bittools':
-    encode = encode_bittools
+    encode = encode_array = encode_bittools
     decode = decode_bittools
 
 
