@@ -27,7 +27,7 @@ def IFDEntry_lsm_str_hook(entry):
             l.append('\n  %s->%s' % (name, func(entry, debug=False)))
         else:
             v = entry.value[name]
-            l.append('\n%s=%s' % (name, v))
+            l.append('\n  %s=%s' % (name, v))
     return 'IFDEntry(tag=%s, value=%s(%s))' % (entry.tag_name, entry.type_name, ', '.join (l))
 
 def IFDEntry_lsm_init_hook(ifdentry):
@@ -50,7 +50,7 @@ def IFDEntry_lsm_init_hook(ifdentry):
         ifdentry.type = CZ_LSMInfo_type
         ifdentry.count = 1
         ifdentry.tiff.is_lsm = True
-        ifdentry.tiff.str_hook = IFDEntry_lsm_str_hook
+        ifdentry.str_hook = IFDEntry_lsm_str_hook
     else:
         if not hasattr(ifdentry.tiff, 'is_lsm'):
             ifdentry.tiff.is_lsm = False
@@ -158,8 +158,6 @@ class LSMBlock:
 def lsmblock(ifdentry, debug=True):
     if ifdentry.tag!=CZ_LSMInfo_tag:
         return
-    #if not ifdentry.is_lsm:
-    #    return
     r = LSMBlock(ifdentry)
     if debug:
         arr = r.toarray()
@@ -931,8 +929,8 @@ class LookupTable:
         return self._data
 
     def __str__(self):
-        nsubblocks = self.ifdentry.tiff.get_value(self._offset+4, numpy.uint32)
-        nchannels = self.ifdentry.tiff.get_value(self._offset+8, numpy.uint32)
+        nsubblocks = self.ifdentry.tiff.get_value(self.offset+4, numpy.uint32)
+        nchannels = self.ifdentry.tiff.get_value(self.offset+8, numpy.uint32)
         return '%s(name=%r, size=%r, subblocks=%r, channels=%r, offset=%r)' \
                % (self.__class__.__name__, self.offset_name, self.get_size(),
                   nsubblocks, nchannels, self.offset)
@@ -950,7 +948,6 @@ class LookupTable:
         
 
 def lookuptable(ifdentry, offset_name, debug=True):
-    #assert ifdentry.is_lsm
     if ifdentry.tag!=CZ_LSMInfo_tag:
         return
     offset = ifdentry.value[offset_name][0]

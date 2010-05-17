@@ -53,21 +53,25 @@ def runner (parser, options, args):
     from libtiff.tiff import TIFFfile, TIFFimage
     tiff = TIFFfile (input_path)
     #tiff.show_memory_usage()
-    Ch3i = 0
-    Ch3_images = []
+
+    channel_images = []
 
     description = []
+
+    output_channel_name = options.channel_name
 
     for i,ifd in enumerate(tiff.IFD):
         assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
         images = ifd.get_contiguous()
         if isinstance (images, dict):
+            if not output_channel_name:
+                print 'Channel names:', sorted (images.keys())
+                output_channel_name = sorted (images.keys())[0]
             for channel_name, image in images.items():
-                if channel_name=='Ch3':
+                if channel_name==output_channel_name:
                     if not image[0].max():
                         break
-                    Ch3_images.append (image)
-                    Ch3i += 1
+                    channel_images.append(image)
         else:
             raise NotImplementedError (`type (images)`)
         s = ifd.get('ImageDescription')
@@ -85,7 +89,7 @@ def runner (parser, options, args):
         description = description_template % (dict(
                 DimensionX=dimensions[0],
                 DimensionY=dimensions[1],
-                DimensionZ=len(Ch3_images),
+                DimensionZ=len(channel_images),
                 VoxelSizeX=voxel_sizes[0], 
                 VoxelSizeY=voxel_sizes[1],
                 VoxelSizeZ=voxel_sizes[2],
@@ -95,13 +99,13 @@ def runner (parser, options, args):
                 MicroscopeType = 'confocal',
                 OriginalFile = os.path.abspath(input_path),
                 ExcitationWavelength = excitation_wavelength,
-                ChannelName = 'Ch3',
+                ChannelName = output_channel_name,
                 )) + description
         description += '\n'+tiff.lsminfo.tostr (short=True)
         #print description
-    fn = output_path % dict(channel_name='Ch3', index='all')
+    fn = output_path % dict(channel_name=output_channel_name, index='all')
     sys.stdout.flush ()
-    tif = TIFFimage(Ch3_images, description=description)
+    tif = TIFFimage(channel_images, description=description)
     tif.write_file (fn, compression=options.compression)
 
 def main ():
