@@ -326,6 +326,7 @@ class TIFFimage:
         image_directories = []
         total_size = 8
         data_size = 0
+        image_data_size = 0
         for i,image in enumerate(self.data):
             sys.stdout.write('\r  creating records: %5s%% done  ' % (int(100.0*i/len(self.data))))
             sys.stdout.flush ()
@@ -374,12 +375,13 @@ class TIFFimage:
                 assert strip_offsets.type_nbytes <= 4
                 total_size += 2*12
             else:
-                total_size += 12 + strips_per_image * (strip_byte_counts.type_nbytes + strip_offsets.type_nbytes)
+                total_size += 2*12 + strips_per_image*(strip_byte_counts.type_nbytes + strip_offsets.type_nbytes)
                 data_size += strips_per_image * (strip_byte_counts.type_nbytes + strip_offsets.type_nbytes)
             
             # image data:
             total_size += image.nbytes
             data_size += image.nbytes
+            image_data_size += image.nbytes
 
             # records for nof IFD entries and offset to the next IFD:
             total_size += 2 + 4
@@ -398,6 +400,9 @@ class TIFFimage:
 
         offset = 8
         data_offset = total_size - data_size
+        image_data_offset = total_size - image_data_size
+        first_data_offset = data_offset
+        first_image_data_offset = image_data_offset
         for i, (entries, strip_info, image) in enumerate(image_directories):
             strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
             sys.stdout.write('\r  filling records: %5s%% done  ' % (int(100.0*i/len (image_directories))))
@@ -406,18 +411,24 @@ class TIFFimage:
             # write the nof IFD entries
             tif[offset:offset+2].view(dtype=numpy.uint16)[0] = len(entries)
             offset += 2
+            assert offset <= first_data_offset,`offset, first_data_offset`
 
             # write image data
             data = image.view(dtype=numpy.ubyte).reshape((image.nbytes,))
+            
             for j in range(strips_per_image):
                 c = rows_per_strip * bytes_per_row
                 k = j * c
                 c -= max((j+1) * c - image.nbytes, 0)
+                assert c>0,`c`
                 strip = compress(data[k:k+c])
-                strip_offsets.add_value(data_offset)
+                strip_offsets.add_value(image_data_offset)
                 strip_byte_counts.add_value(strip.nbytes)
                 tif[data_offset:data_offset+strip.nbytes] = strip
-                data_offset += strip.nbytes
+                image_data_offset += strip.nbytes
+                if j==0:
+                    first = strip_offsets[0]
+                last = strip_offsets[-1] + strip_byte_counts[-1]
 
             # write IFD entries
             for entry in entries:
@@ -425,14 +436,20 @@ class TIFFimage:
                 if data_size:
                     entry.set_offset(data_offset)
                     assert data_offset+data_size <= total_size, `data_offset+data_size,total_size`
-                    entry.toarray(tif[data_offset:data_offset + data_size])
+                    r = entry.toarray(tif[data_offset:data_offset + data_size])
+                    assert r.nbytes==data_size
                     data_offset += data_size
+                    assert data_offset <= first_image_data_offset,`data_offset, first_image_data_offset, i`
                 tif[offset:offset+12] = entry.record
                 offset += 12
+                assert offset <= first_data_offset,`offset, first_data_offset, i`
 
             # write offset to the next IFD
             tif[offset:offset+4].view(dtype=numpy.uint32)[0] = offset + 4
             offset += 4
+            assert offset <= first_data_offset,`offset, first_data_offset`
+
+
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
 
@@ -542,13 +559,13 @@ class TIFFfile:
         string = self.get_values(offset, 'BYTE', length).tostring()
         return string
 
-    def show_memory_usage(self):
-        ''' Print memory usage of TIFF fields and blocks.
+    def check_memory_usage(self, verbose=True):
+        ''' Check memory usage of TIFF fields and blocks.
 
         Returns
         -------
         ok : bool
-          Return False if unknown memory areas have been detected.
+          Return False if unknown or overlapping memory areas have been detected.
         '''
         l = []
         l.extend(self.memory_usage)
@@ -560,12 +577,72 @@ class TIFFfile:
         for start, end, resource in l:
             if last_end:
                 if last_end!=start:
-                    print '--- unknown %s bytes' % (start-last_end)
+                    if verbose:
+                        print '--- unknown %s bytes' % (start-last_end)
                     ok = False
-                assert start >= last_end,`last_end, start, resource`
-            print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
+                    if start<last_end and verbose:
+                        print '--- overlapping memory area'
+            if verbose:
+                print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
             last_end = end
         return ok
+
+    def is_contiguous(self):
+        for i,ifd in enumerate(self.IFD):
+            strip_offsets = ifd.get('StripOffsets').value
+            strip_nbytes = ifd.get('StripByteCounts').value
+            if not ifd.is_contiguous():
+                return False
+            if i==0:
+                pass
+            else:
+                if isinstance(strip_offsets, numpy.ndarray):
+                    start = strip_offsets[0]
+                else:
+                    start = strip_offsets
+                if end!=start:
+                    return False
+            if isinstance(strip_offsets, numpy.ndarray):
+                end = strip_offsets[-1] + strip_nbytes[-1]
+            else:
+                end = strip_offsets + strip_nbytes
+        return True
+
+    def get_contiguous(self):
+        """ Return memmap of a stack of images.
+        """
+        if not self.is_contiguous ():
+            raise ValueError('Image stack data not contiguous')
+        ifd0 = self.IFD[0]
+        ifd1 = self.IFD[-1]
+        width = ifd0.get ('ImageWidth').value
+        length = ifd0.get ('ImageLength').value
+        assert width == ifd1.get ('ImageWidth').value
+        assert length == ifd1.get ('ImageLength').value
+        depth = len(self.IFD)
+        compression = ifd.get('Compression').value
+        if compression!=1:
+            raise ValueError('Unable to get contiguous image stack from compressed data')            
+        bits_per_sample = ifd0.get('BitsPerSample').value
+        photo_interp = ifd0.get('PhotometricInterpretation').value
+        planar_config = ifd0.get('PlanarConfiguration').value        
+        strip_offsets0 = ifd0.get('StripOffsets').value
+        strip_nbytes0 = ifd0.get('StripByteCounts').value
+        strip_offsets1 = ifd1.get('StripOffsets').value
+        strip_nbytes1 = ifd1.get('StripByteCounts').value
+
+        if isinstance (bits_per_sample, numpy.ndarray):
+            dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
+        else:
+            dtype = getattr (numpy, 'uint%s' % (bits_per_sample))
+
+        if isinstance(strip_offsets0, numpy.ndarray):
+            start = strip_offsets0[0]
+            end = strip_offsets1[-1] + strip_nbytes1[-1]
+        else:
+            start = strip_offsets0
+            end = strip_offsets1 + strip_nbytes1
+        return self.data[start:end].view (dtype=dtype).reshape ((depth, width, length))
 
 class IFD:
     """ Image File Directory data structure.
@@ -609,7 +686,16 @@ class IFD:
             for hook in IFDEntry_finalize_hooks:
                 hook(entry)
 
-    def get_contiguous(self):
+    def is_contiguous (self):
+        strip_offsets = self.get('StripOffsets').value
+        strip_nbytes = self.get('StripByteCounts').value
+        if isinstance(strip_offsets, numpy.ndarray):
+            for i in range (len(strip_offsets)-1):
+                if strip_offsets[i] + strip_nbytes[i] != strip_offsets[i+1]:
+                    return False
+        return True
+
+    def get_contiguous(self, channel_name=None):
         """ Return memmap of an image.
 
         This operation is succesful only when image data strips are
@@ -625,12 +711,9 @@ class IFD:
         compression = self.get('Compression').value
         subfile_type = self.get('NewSubfileType').value
         if compression != 1:
-            return
-        if isinstance(strip_offsets, numpy.ndarray):
-            for i in range (len(strip_offsets)-1):
-                if strip_offsets[i] + strip_nbytes[i] != strip_offsets[i+1]:
-                    print 'non-contiguous image', strip_offsets, strip_nbytes
-                    return
+            raise ValueError('Unable to get contiguous image from compressed data')
+        if not self.is_contiguous ():
+            raise ValueError('Image data not contiguous')
 
         if self.tiff.is_lsm:
             lsminfo = self.tiff.lsminfo
@@ -720,7 +803,7 @@ class IFDEntry:
             if isinstance (r, str):
                 return r
         if hasattr(self, 'value'):
-            return 'IFDEntry(tag=%(tag_name)s, value=%(value)r)' % (self.__dict__)
+            return 'IFDEntry(tag=%(tag_name)s, value=%(value)r, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
         else:
             return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
 

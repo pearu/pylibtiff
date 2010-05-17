@@ -61,6 +61,7 @@ def runner (parser, options, args):
     output_channel_name = options.channel_name
 
     for i,ifd in enumerate(tiff.IFD):
+
         assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
         images = ifd.get_contiguous()
         if isinstance (images, dict):
