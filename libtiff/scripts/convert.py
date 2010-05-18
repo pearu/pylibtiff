@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- python-mode -*-
+# -*- python -*-
 # Author: Pearu Peterson
 # Created: May 2010
 
@@ -47,7 +47,7 @@ def runner (parser, options, args):
     if output_path is None:
         b, e = os.path.splitext (input_path)
         b = os.path.basename (b)
-        output_path = b + '_%(channel_name)s_%(index)s.tif'
+        output_path = b + '_%(channel_name)s_%(slice)s.tif'
 
     from libtiff import TIFF
     from libtiff.tiff import TIFFfile, TIFFimage
@@ -58,12 +58,14 @@ def runner (parser, options, args):
     for ifd in tiff.IFD:
         assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
         s = ifd.get('ImageDescription')
-        if s:
-            description.append(s)
+        if s is not None:
+            description.append(s.value.tostring())
     init_description = '\n'.join (description)
     samples_list, names_list = tiff.get_samples()
     while samples_list:
         samples = samples_list.pop()
+        if options.slice is not None:
+            exec 'samples = samples[%s]' % (options.slice)
         name = names_list.pop()
         if tiff.is_lsm:
             dimensions = [tiff.lsmentry['Dimension'+x][0] for x in 'XYZ'] # px
@@ -73,9 +75,9 @@ def runner (parser, options, args):
             objective = tiff.lsminfo.get('recording objective')[0] # objective description
             excitation_wavelength = tiff.lsminfo.get ('illumination channel wavelength')[0] # nm
             description = description_template % (dict(
-                    DimensionX=dimensions[0],
-                    DimensionY=dimensions[1],
-                    DimensionZ=len(samples),
+                    DimensionX=samples.shape[2],
+                    DimensionY=samples.shape[1],
+                    DimensionZ=samples.shape[0],
                     VoxelSizeX=voxel_sizes[0], 
                     VoxelSizeY=voxel_sizes[1],
                     VoxelSizeZ=voxel_sizes[2],
@@ -91,7 +93,7 @@ def runner (parser, options, args):
         else:
             description = init_description
         tif = TIFFimage(samples, description=description)
-        fn = output_path % dict(channel_name=name, index='all')
+        fn = output_path % dict(channel_name=name, slice=options.slice)
         tif.write_file(fn, compression=getattr(options,'compression', 'none'))
     return
 

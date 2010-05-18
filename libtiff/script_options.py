@@ -69,6 +69,10 @@ def set_convert_options(parser):
                        choices = ['none', 'lzw'],
                        help = 'Specify compression.'
                        )
+    parser.add_option ('--slice',
+                       type = 'string',
+                       help = 'Specify slice using form "<zstart>:<zend>,<ystart>:<yend>,<xstart>:<xend>"'
+                       )
 
 def set_info_options(parser):
     set_formatter(parser)
