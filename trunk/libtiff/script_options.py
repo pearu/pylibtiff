@@ -69,10 +69,6 @@ def set_convert_options(parser):
                        choices = ['none', 'lzw'],
                        help = 'Specify compression.'
                        )
-    parser.add_option ('--channel-name',
-                       type = 'string',
-                       help = 'Specify channel name.'
-                       )
 
 def set_info_options(parser):
     set_formatter(parser)

@@ -49,6 +49,14 @@ def runner (parser, options, args):
     print 'data is contiguous:', tiff.is_contiguous ()
     print 'memory usage is ok:', tiff.check_memory_usage(verbose=False)
 
+    print 'sample data shapes and names:'
+    samples, sample_names = tiff.get_samples(0, verbose=True)
+    print [arr.shape for arr in samples], sample_names
+    if tiff.is_lsm:
+        samples, sample_names = tiff.get_samples(1)
+        print [arr.shape for arr in samples], sample_names
+
+
 def main ():
     try:
         from libtiff.optparse_gui import OptionParser

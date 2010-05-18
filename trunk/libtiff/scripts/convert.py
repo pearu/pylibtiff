@@ -52,62 +52,48 @@ def runner (parser, options, args):
     from libtiff import TIFF
     from libtiff.tiff import TIFFfile, TIFFimage
     tiff = TIFFfile (input_path)
-    #tiff.show_memory_usage()
-
-    channel_images = []
+    samples, sample_names = tiff.get_samples()
 
     description = []
-
-    output_channel_name = options.channel_name
-
-    for i,ifd in enumerate(tiff.IFD):
-
+    for ifd in tiff.IFD:
         assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
-        images = ifd.get_contiguous()
-        if isinstance (images, dict):
-            if not output_channel_name:
-                print 'Channel names:', sorted (images.keys())
-                output_channel_name = sorted (images.keys())[0]
-            for channel_name, image in images.items():
-                if channel_name==output_channel_name:
-                    if not image[0].max():
-                        break
-                    channel_images.append(image)
-        else:
-            raise NotImplementedError (`type (images)`)
         s = ifd.get('ImageDescription')
         if s:
             description.append(s)
-
-    description = '\n'.join (description)
-    if tiff.is_lsm:
-        dimensions = [tiff.lsmentry['Dimension'+x][0] for x in 'XYZ'] # px
-        voxel_sizes = [tiff.lsmentry['VoxelSize'+x][0] for x in 'XYZ'] # m
-        pixel_time = tiff.lsminfo.get('track pixel time')[0] # us, integration is >=70% of the pixel time
-        rotation =  tiff.lsminfo.get('recording rotation')[0] # deg
-        objective = tiff.lsminfo.get('recording objective')[0] # objective description
-        excitation_wavelength = tiff.lsminfo.get ('illumination channel wavelength')[0] # nm
-        description = description_template % (dict(
-                DimensionX=dimensions[0],
-                DimensionY=dimensions[1],
-                DimensionZ=len(channel_images),
-                VoxelSizeX=voxel_sizes[0], 
-                VoxelSizeY=voxel_sizes[1],
-                VoxelSizeZ=voxel_sizes[2],
-                RotationAngle=rotation,
-                PixelTime = pixel_time,
-                Objective = objective,
-                MicroscopeType = 'confocal',
-                OriginalFile = os.path.abspath(input_path),
-                ExcitationWavelength = excitation_wavelength,
-                ChannelName = output_channel_name,
-                )) + description
-        description += '\n'+tiff.lsminfo.tostr (short=True)
-        #print description
-    fn = output_path % dict(channel_name=output_channel_name, index='all')
-    sys.stdout.flush ()
-    tif = TIFFimage(channel_images, description=description)
-    tif.write_file (fn, compression=options.compression)
+    init_description = '\n'.join (description)
+    samples_list, names_list = tiff.get_samples()
+    while samples_list:
+        samples = samples_list.pop()
+        name = names_list.pop()
+        if tiff.is_lsm:
+            dimensions = [tiff.lsmentry['Dimension'+x][0] for x in 'XYZ'] # px
+            voxel_sizes = [tiff.lsmentry['VoxelSize'+x][0] for x in 'XYZ'] # m
+            pixel_time = tiff.lsminfo.get('track pixel time')[0] # us, integration is >=70% of the pixel time
+            rotation =  tiff.lsminfo.get('recording rotation')[0] # deg
+            objective = tiff.lsminfo.get('recording objective')[0] # objective description
+            excitation_wavelength = tiff.lsminfo.get ('illumination channel wavelength')[0] # nm
+            description = description_template % (dict(
+                    DimensionX=dimensions[0],
+                    DimensionY=dimensions[1],
+                    DimensionZ=len(samples),
+                    VoxelSizeX=voxel_sizes[0], 
+                    VoxelSizeY=voxel_sizes[1],
+                    VoxelSizeZ=voxel_sizes[2],
+                    RotationAngle=rotation,
+                    PixelTime = pixel_time,
+                    Objective = objective,
+                    MicroscopeType = 'confocal',
+                    OriginalFile = os.path.abspath(input_path),
+                    ExcitationWavelength = excitation_wavelength,
+                    ChannelName = name,
+                    )) + init_description
+            description += '\n'+tiff.lsminfo.tostr (short=True)
+        else:
+            description = init_description
+        tif = TIFFimage(samples, description=description)
+        fn = output_path % dict(channel_name=name, index='all')
+        tif.write_file(fn, compression=getattr(options,'compression', 'none'))
+    return
 
 def main ():
     from libtiff.optparse_gui import OptionParser
