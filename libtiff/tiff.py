@@ -1,6 +1,15 @@
 """
-tiff - implements a numpy.memmap based TIFF file reader.
+tiff - implements a numpy.memmap based TIFF file reader and writer
+allowing manipulating TIFF files that have sizes larger than
+available memory in computer.
 
+Usage:
+>>> tiff = TIFFfile('<filename.(tif|lsm)>')
+>>> samples, sample_name = tiff.get_samples()
+
+>>> tiff = TIFFimage(data, description=<str>)
+>>> tiff.write_file (<filename.tif>, compression='none'|'lzw')
+>>> del tiff # flush data to disk
 """
 # Author: Pearu Peterson
 # Created: April 2010
@@ -270,23 +279,23 @@ class TIFFimage:
         dtype = None
         if isinstance(data, list):
             image = data[0]
-            self.length, self.width = image.shape
+            self.width, self.length = image.shape
             self.depth = len(data)
             dtype = image.dtype
         elif isinstance(data, numpy.ndarray):
             shape = data.shape
             dtype = data.dtype
             if len (shape)==1:
-                self.width, = shape
-                self.length = 1
+                self.length, = shape
+                self.width = 1
                 self.depth = 1
                 data = [[data]]
             elif len (shape)==2:
-                self.length, self.width = shape
+                self.width, self.length = shape
                 self.depth = 1
                 data = [data]
             elif len (shape)==3:
-                self.depth, self.length, self.width = shape
+                self.depth, self.width, self.length = shape
             else:
                 raise NotImplementedError (`shape`)
         else:
@@ -424,7 +433,7 @@ class TIFFimage:
                 strip = compress(data[k:k+c])
                 strip_offsets.add_value(image_data_offset)
                 strip_byte_counts.add_value(strip.nbytes)
-                tif[data_offset:data_offset+strip.nbytes] = strip
+                tif[image_data_offset:image_data_offset+strip.nbytes] = strip
                 image_data_offset += strip.nbytes
                 if j==0:
                     first = strip_offsets[0]
@@ -449,10 +458,8 @@ class TIFFimage:
             offset += 4
             assert offset <= first_data_offset,`offset, first_data_offset`
 
-
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
-
         sys.stdout.write ('\r'+40*' ')
         sys.stdout.write ('\r  flushing records (%s Mbytes) to disk... ' % (round(total_size/(1024*1024)))); sys.stdout.flush ()
         del tif
@@ -630,6 +637,8 @@ class TIFFfile:
         strip_nbytes0 = ifd0.get('StripByteCounts').value
         strip_offsets1 = ifd1.get('StripOffsets').value
         strip_nbytes1 = ifd1.get('StripByteCounts').value
+        samples_per_pixel = ifd1.get('SamplesPerPixel').value
+        assert samples_per_pixel==1,`samples_per_pixel`
 
         if isinstance (bits_per_sample, numpy.ndarray):
             dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
@@ -643,6 +652,124 @@ class TIFFfile:
             start = strip_offsets0
             end = strip_offsets1 + strip_nbytes1
         return self.data[start:end].view (dtype=dtype).reshape ((depth, width, length))
+
+    def get_samples(self, subfile_type=0, verbose=False):
+        """
+        Return samples and sample names.
+
+        Parameters
+        ----------
+        subfile_type : {0, 1}
+          Specify subfile type. Subfile type 1 corresponds to reduced resolution image.
+        verbose : bool
+          When True the print out information about samples
+
+        Returns
+        -------
+        samples : list
+          List of numpy.memmap arrays of samples
+        sample_names : list
+          List of the corresponding sample names
+        """
+        l = []
+        i = 0
+        step = 0
+        for ifd in self.IFD:
+            sft = ifd.get('NewSubfileType')
+            if sft is not None and sft.value!=subfile_type:
+                continue
+            if not ifd.is_contiguous():
+                raise NotImplementedError('not contiguous strips')
+            compression = ifd.get('Compression').value
+            if compression!=1:
+                raise ValueError('Unable to get contiguous samples from compressed data')            
+            strip_offsets = ifd.get('StripOffsets').value
+            strip_nbytes = ifd.get('StripByteCounts').value
+            if isinstance(strip_offsets, numpy.ndarray):
+                l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
+            else:
+                l.append((strip_offsets, strip_offsets+strip_nbytes))
+            if i==0:
+                width = ifd.get ('ImageWidth').value
+                length = ifd.get ('ImageLength').value
+                samples_per_pixel = ifd.get('SamplesPerPixel').value
+                planar_config = ifd.get('PlanarConfiguration').value
+                bits_per_sample = ifd.get('BitsPerSample').value
+                if isinstance (bits_per_sample, numpy.ndarray):
+                    dtype_lst = [getattr (numpy, 'uint%s' % (bits_per_sample[j])) for j in range(len(bits_per_sample))]
+                else:
+                    dtype_lst = [getattr (numpy, 'uint%s' % (bits_per_sample))]
+                strip_length = l[-1][1] - l[-1][0]
+                if verbose:
+                    print '''
+width : %(width)s
+length : %(length)s
+samples_per_pixel : %(samples_per_pixel)s
+planar_config : %(planar_config)s
+bits_per_sample : %(bits_per_sample)s
+strip_length : %(strip_length)s
+''' % (locals ())
+
+            else:
+                assert width == ifd.get ('ImageWidth').value, `width, ifd.get ('ImageWidth').value`
+                assert length == ifd.get ('ImageLength').value,` length,  ifd.get ('ImageLength').value`
+                assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
+                assert planar_config == ifd.get('PlanarConfiguration').value
+                assert strip_length == l[-1][1] - l[-1][0]
+                if isinstance (bits_per_sample, numpy.ndarray):
+                    assert (bits_per_sample == ifd.get('BitsPerSample').value).all(),`bits_per_sample, ifd.get('BitsPerSample').value`
+                else:
+                    assert (bits_per_sample == ifd.get('BitsPerSample').value),`bits_per_sample, ifd.get('BitsPerSample').value`
+            if i>0:
+                if i==1:
+                    step = l[-1][0] - l[-2][1]
+                    assert step>=0,`step, l[-2], l[-1]`
+                else:
+                    assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1]`
+            i += 1
+        assert i>=0,`i`
+        depth = i
+        start = l[0][0]
+        end = l[-1][1]
+        sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
+
+        if start > step:
+            arr = self.data[start - step: end].reshape((depth, strip_length + step))
+            k = step
+        elif end <= self.data.size - step:
+            arr = self.data[start: end+step].reshape((depth, strip_length + step))
+            k = 0
+        else:
+            raise NotImplementedError (`start, end, step`)
+        if planar_config==2:
+            if self.is_lsm:
+                # LSM510: one strip per image plane channel
+                if subfile_type==0:
+                    sample_names = self.lsminfo.get('data channel name')
+                elif subfile_type==1:
+                    sample_names = ['red', 'green', 'blue']
+                    assert samples_per_pixel==3,`samples_per_pixel`
+                else:
+                    raise NotImplementedError (`subfile_type`)
+                samples = []
+                for j in range(samples_per_pixel):
+                    bytes = bits_per_sample[j] // 8 * width * length
+                    samples.append(arr[:,k:k+bytes].reshape((depth, width, length)))
+                    k += bytes
+                return samples, sample_names
+            raise NotImplementedError (`planar_config, self.is_lsm`)
+        elif planar_config==1:
+            samples = []
+            if isinstance(bits_per_sample, numpy.ndarray):
+                bytes = sum(bits_per_sample[:samples_per_pixel]) // 8 * width * length
+            else:
+                bytes = bits_per_sample // 8 * width * length
+            for j in range(samples_per_pixel):
+                samples.append(arr[:,k+j:k+j+bytes:samples_per_pixel].reshape((depth, width, length)))
+                k += bytes
+            return samples, sample_names
+        else:
+            raise NotImplementedError (`planar_config`)
 
 class IFD:
     """ Image File Directory data structure.
