@@ -18,6 +18,7 @@ __all__ = ['TIFFfile', 'TIFFimage']
 
 import os
 import sys
+import time
 import numpy
 
 import lzw
@@ -412,9 +413,11 @@ class TIFFimage:
         image_data_offset = total_size - image_data_size
         first_data_offset = data_offset
         first_image_data_offset = image_data_offset
+        start_time = time.time ()
         for i, (entries, strip_info, image) in enumerate(image_directories):
             strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
-            sys.stdout.write('\r  filling records: %5s%% done  ' % (int(100.0*i/len (image_directories))))
+            sys.stdout.write('\r  filling records: %5s%% done (%.2f Mbytes/s)' % (int(100.0*i/len (image_directories)), 
+                                                                                (image_data_offset-first_image_data_offset)/(time.time ()-start_time)/1024**2))
             sys.stdout.flush ()
 
             # write the nof IFD entries
@@ -460,7 +463,7 @@ class TIFFimage:
 
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
-        sys.stdout.write ('\r'+40*' ')
+        sys.stdout.write ('\r'+70*' ')
         sys.stdout.write ('\r  flushing records (%s Mbytes) to disk... ' % (round(total_size/(1024*1024)))); sys.stdout.flush ()
         del tif
         sys.stdout.write ('done\n'); sys.stdout.flush ()        
@@ -752,10 +755,15 @@ strip_length : %(strip_length)s
                 else:
                     raise NotImplementedError (`subfile_type`)
                 samples = []
-                for j in range(samples_per_pixel):
-                    bytes = bits_per_sample[j] // 8 * width * length
+                if isinstance(bits_per_sample, numpy.ndarray):
+                    for j in range(samples_per_pixel):
+                        bytes = bits_per_sample[j] // 8 * width * length
+                        samples.append(arr[:,k:k+bytes].reshape((depth, width, length)))
+                        k += bytes
+                else:
+                    assert samples_per_pixel==1,`samples_per_pixel, bits_per_sample`
+                    bytes = bits_per_sample // 8 * width * length
                     samples.append(arr[:,k:k+bytes].reshape((depth, width, length)))
-                    k += bytes
                 return samples, sample_names
             raise NotImplementedError (`planar_config, self.is_lsm`)
         elif planar_config==1:
