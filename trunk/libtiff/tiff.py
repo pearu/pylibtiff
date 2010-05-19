@@ -280,23 +280,23 @@ class TIFFimage:
         dtype = None
         if isinstance(data, list):
             image = data[0]
-            self.width, self.length = image.shape
+            self.length, self.width = image.shape
             self.depth = len(data)
             dtype = image.dtype
         elif isinstance(data, numpy.ndarray):
             shape = data.shape
             dtype = data.dtype
             if len (shape)==1:
-                self.length, = shape
-                self.width = 1
+                self.width, = shape
+                self.length = 1
                 self.depth = 1
                 data = [[data]]
             elif len (shape)==2:
-                self.width, self.length = shape
+                self.length, self.width = shape
                 self.depth = 1
                 data = [data]
             elif len (shape)==3:
-                self.depth, self.width, self.length = shape
+                self.depth, self.length, self.width = shape
             else:
                 raise NotImplementedError (`shape`)
         else:
@@ -758,12 +758,12 @@ strip_length : %(strip_length)s
                 if isinstance(bits_per_sample, numpy.ndarray):
                     for j in range(samples_per_pixel):
                         bytes = bits_per_sample[j] // 8 * width * length
-                        samples.append(arr[:,k:k+bytes].reshape((depth, width, length)))
+                        samples.append(arr[:,k:k+bytes].reshape((depth, length, width)))
                         k += bytes
                 else:
                     assert samples_per_pixel==1,`samples_per_pixel, bits_per_sample`
                     bytes = bits_per_sample // 8 * width * length
-                    samples.append(arr[:,k:k+bytes].reshape((depth, width, length)))
+                    samples.append(arr[:,k:k+bytes].reshape((depth, length, width)))
                 return samples, sample_names
             raise NotImplementedError (`planar_config, self.is_lsm`)
         elif planar_config==1:
@@ -773,7 +773,7 @@ strip_length : %(strip_length)s
             else:
                 bytes = bits_per_sample // 8 * width * length
             for j in range(samples_per_pixel):
-                samples.append(arr[:,k+j:k+j+bytes:samples_per_pixel].reshape((depth, width, length)))
+                samples.append(arr[:,k+j:k+j+bytes:samples_per_pixel].reshape((depth, length, width)))
                 k += bytes
             return samples, sample_names
         else:
