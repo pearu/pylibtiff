@@ -268,7 +268,7 @@ def decode_bittools(bseq):
     return ''.join(seq)
 
 
-print 'backend:', default_backend
+#print 'backend:', default_backend
 if default_backend=='bitarray':
     encode = encode_bitarray
     decode = decode_bitarray
