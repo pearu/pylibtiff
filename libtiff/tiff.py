@@ -677,12 +677,13 @@ class TIFFfile:
         l = []
         i = 0
         step = 0
+        can_return_memmap = True
         for ifd in self.IFD:
             sft = ifd.get('NewSubfileType')
             if sft is not None and sft.value!=subfile_type:
                 continue
             if not ifd.is_contiguous():
-                raise NotImplementedError('not contiguous strips')
+                raise NotImplementedError('none contiguous strips')
             compression = ifd.get('Compression').value
             if compression!=1:
                 raise ValueError('Unable to get contiguous samples from compressed data')            
@@ -695,7 +696,11 @@ class TIFFfile:
             if i==0:
                 width = ifd.get ('ImageWidth').value
                 length = ifd.get ('ImageLength').value
-                samples_per_pixel = ifd.get('SamplesPerPixel').value
+                v = ifd.get('SamplesPerPixel')
+                if v is None:
+                    samples_per_pixel = 1
+                else:
+                    samples_per_pixel = v.value
                 planar_config = ifd.get('PlanarConfiguration').value
                 bits_per_sample = ifd.get('BitsPerSample').value
                 if isinstance (bits_per_sample, numpy.ndarray):
@@ -716,7 +721,7 @@ strip_length : %(strip_length)s
             else:
                 assert width == ifd.get ('ImageWidth').value, `width, ifd.get ('ImageWidth').value`
                 assert length == ifd.get ('ImageLength').value,` length,  ifd.get ('ImageLength').value`
-                assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
+                #assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
                 assert planar_config == ifd.get('PlanarConfiguration').value
                 assert strip_length == l[-1][1] - l[-1][0]
                 if isinstance (bits_per_sample, numpy.ndarray):
@@ -728,13 +733,33 @@ strip_length : %(strip_length)s
                     step = l[-1][0] - l[-2][1]
                     assert step>=0,`step, l[-2], l[-1]`
                 else:
-                    assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1]`
+                    if step != l[-1][0] - l[-2][1]:
+                        can_return_memmap = False
+                        #assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1], (l[-1][0] - l[-2][1]), i`
             i += 1
         assert i>=0,`i`
+
+        sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
         depth = i
+
+        if not can_return_memmap:
+            if planar_config==1:
+                if samples_per_pixel==1:
+                    data = []
+                    for start, end in l:
+                        data.append(self.data[start:end].view (dtype=dtype_lst[0]))
+                    arr = numpy.array(data, dtype=dtype_lst[0])
+                    arr = arr.reshape((depth, length, width))
+                    return [arr], sample_names
+                else:
+                    raise NotImplementedError (`samples_per_pixel`)
+            else:
+                raise NotImplementedError (`planar_config`)
+
+
         start = l[0][0]
         end = l[-1][1]
-        sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
+
 
         if start > step:
             arr = self.data[start - step: end].reshape((depth, strip_length + step))
