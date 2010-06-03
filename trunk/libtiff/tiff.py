@@ -756,10 +756,8 @@ strip_length : %(strip_length)s
             else:
                 raise NotImplementedError (`planar_config`)
 
-
         start = l[0][0]
         end = l[-1][1]
-
 
         if start > step:
             arr = self.data[start - step: end].reshape((depth, strip_length + step))
@@ -783,12 +781,14 @@ strip_length : %(strip_length)s
                 if isinstance(bits_per_sample, numpy.ndarray):
                     for j in range(samples_per_pixel):
                         bytes = bits_per_sample[j] // 8 * width * length
-                        samples.append(arr[:,k:k+bytes].reshape((depth, length, width)))
+                        tmp = arr[:,k:k+bytes].ravel().view (dtype=dtype_lst[j])
+                        samples.append(tmp.reshape((depth, length, width)))
                         k += bytes
                 else:
                     assert samples_per_pixel==1,`samples_per_pixel, bits_per_sample`
                     bytes = bits_per_sample // 8 * width * length
-                    samples.append(arr[:,k:k+bytes].reshape((depth, length, width)))
+                    tmp = arr[:,k:k+bytes].ravel().view (dtype=dtype_lst[0])
+                    samples.append(tmp.reshape((depth, length, width)))
                 return samples, sample_names
             raise NotImplementedError (`planar_config, self.is_lsm`)
         elif planar_config==1:
@@ -798,7 +798,8 @@ strip_length : %(strip_length)s
             else:
                 bytes = bits_per_sample // 8 * width * length
             for j in range(samples_per_pixel):
-                samples.append(arr[:,k+j:k+j+bytes:samples_per_pixel].reshape((depth, length, width)))
+                tmp = arr[:,k+j:k+j+bytes:samples_per_pixel].ravel().view(dtype=dtype_lst[j])
+                samples.append(tmp.reshape((depth, length, width)))
                 k += bytes
             return samples, sample_names
         else:
