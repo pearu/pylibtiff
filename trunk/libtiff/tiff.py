@@ -679,34 +679,35 @@ class TIFFfile:
         step = 0
         can_return_memmap = True
         for ifd in self.IFD:
-            sft = ifd.get('NewSubfileType')
-            if sft is not None and sft.value!=subfile_type:
+            sft = ifd.get_value('NewSubfileType', subfile_type)
+            if sft!=subfile_type:
                 continue
             if not ifd.is_contiguous():
                 raise NotImplementedError('none contiguous strips')
-            compression = ifd.get('Compression').value
+            compression = ifd.get_value('Compression')
             if compression!=1:
                 raise ValueError('Unable to get contiguous samples from compressed data')            
-            strip_offsets = ifd.get('StripOffsets').value
-            strip_nbytes = ifd.get('StripByteCounts').value
+            strip_offsets = ifd.get_value('StripOffsets')
+            strip_nbytes = ifd.get_value('StripByteCounts')
             if isinstance(strip_offsets, numpy.ndarray):
                 l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
             else:
                 l.append((strip_offsets, strip_offsets+strip_nbytes))
             if i==0:
-                width = ifd.get ('ImageWidth').value
-                length = ifd.get ('ImageLength').value
-                v = ifd.get('SamplesPerPixel')
-                if v is None:
-                    samples_per_pixel = 1
-                else:
-                    samples_per_pixel = v.value
-                planar_config = ifd.get('PlanarConfiguration').value
-                bits_per_sample = ifd.get('BitsPerSample').value
+                width = ifd.get_value('ImageWidth')
+                length = ifd.get_value('ImageLength')
+                samples_per_pixel = ifd.get_value('SamplesPerPixel', 1)
+                planar_config = ifd.get_value('PlanarConfiguration')
+                bits_per_sample = ifd.get_value('BitsPerSample')
+                sample_format = ifd.get_value('SampleFormat')
+                format = {1:'uint', 2:'int', 3:'float', None:'uint'}.get(sample_format)
+                if format is None:
+                    print 'Warning: unsupported sample_format=%s is mapped to uint' % (sample_format)
+                    format = 'uint'
                 if isinstance (bits_per_sample, numpy.ndarray):
-                    dtype_lst = [getattr (numpy, 'uint%s' % (bits_per_sample[j])) for j in range(len(bits_per_sample))]
+                    dtype_lst = [getattr (numpy, '%s%s' % (format, bits_per_sample[j])) for j in range(len(bits_per_sample))]
                 else:
-                    dtype_lst = [getattr (numpy, 'uint%s' % (bits_per_sample))]
+                    dtype_lst = [getattr (numpy, '%s%s' % (format, bits_per_sample))]
                 strip_length = l[-1][1] - l[-1][0]
                 if verbose:
                     print '''
@@ -719,15 +720,15 @@ strip_length : %(strip_length)s
 ''' % (locals ())
 
             else:
-                assert width == ifd.get ('ImageWidth').value, `width, ifd.get ('ImageWidth').value`
-                assert length == ifd.get ('ImageLength').value,` length,  ifd.get ('ImageLength').value`
+                assert width == ifd.get_value('ImageWidth', width), `width, ifd.get_value('ImageWidth')`
+                assert length == ifd.get_value('ImageLength', length),` length,  ifd.get_value('ImageLength')`
                 #assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
-                assert planar_config == ifd.get('PlanarConfiguration').value
+                assert planar_config == ifd.get_value('PlanarConfiguration', planar_config)
                 assert strip_length == l[-1][1] - l[-1][0]
                 if isinstance (bits_per_sample, numpy.ndarray):
-                    assert (bits_per_sample == ifd.get('BitsPerSample').value).all(),`bits_per_sample, ifd.get('BitsPerSample').value`
+                    assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),`bits_per_sample, ifd.get_value('BitsPerSample')`
                 else:
-                    assert (bits_per_sample == ifd.get('BitsPerSample').value),`bits_per_sample, ifd.get('BitsPerSample').value`
+                    assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)),`bits_per_sample, ifd.get_value('BitsPerSample')`
             if i>0:
                 if i==1:
                     step = l[-1][0] - l[-2][1]
@@ -841,6 +842,15 @@ class IFD:
         for entry in self.entries:
             if entry.tag_name==tag_name:
                 return entry
+    def get_value(self, tag_name, default=None):
+        """ Return the value of IFD entry with given tag name.
+
+        When the entry does not exist, return default.
+        """
+        entry = self.get(tag_name)
+        if entry is not None:
+            return entry.value
+        return default
 
     def finalize(self):
         for entry in self.entries:

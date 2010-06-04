@@ -51,10 +51,10 @@ def runner (parser, options, args):
 
     print 'sample data shapes and names:'
     samples, sample_names = tiff.get_samples(0, verbose=True)
-    print [arr.shape for arr in samples], sample_names
+    print [(arr.shape, arr.dtype) for arr in samples], sample_names
     if tiff.is_lsm:
         samples, sample_names = tiff.get_samples(1)
-        print [arr.shape for arr in samples], sample_names
+        print [(arr.shape, arr.dtype) for arr in samples], sample_names
 
 
 def main ():
