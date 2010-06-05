@@ -27,6 +27,7 @@ def runner (parser, options, args):
     import libtiff
     from libtiff import TIFF
     from libtiff.tiff import TIFFfile, TIFFimage
+    from libtiff.utils import bytes2str
     tiff = libtiff.tiff.TIFFfile (input_path)
 
     if options.memory_usage:
@@ -49,12 +50,16 @@ def runner (parser, options, args):
     print 'data is contiguous:', tiff.is_contiguous ()
     print 'memory usage is ok:', tiff.check_memory_usage(verbose=False)
 
-    print 'sample data shapes and names:'
-    samples, sample_names = tiff.get_samples(0, verbose=True)
-    print [(arr.shape, arr.dtype) for arr in samples], sample_names
+    print 'reading samples...'
+    r = tiff.get_samples(0, verbose=True)
+    print 'samples:'
+    for arr, name in zip(*r):
+        print '  %s: class=%s, dtype=%s, shape=%s, size=%s' \
+              % (name, type(arr).__name__, arr.dtype, arr.shape, bytes2str(arr.size))
     if tiff.is_lsm:
-        samples, sample_names = tiff.get_samples(1)
-        print [(arr.shape, arr.dtype) for arr in samples], sample_names
+        for arr, name in zip(*tiff.get_samples(1)):
+            print '  %s: class=%s, dtype=%s, shape=%s, size=%s' \
+                  % (name, type(arr).__name__, arr.dtype, arr.shape, bytes2str(arr.size))
 
 
 def main ():
