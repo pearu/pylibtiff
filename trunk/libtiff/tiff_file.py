@@ -11,7 +11,7 @@ __all__ = ['TIFFfile']
 import sys
 import numpy
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
-
+from .utils import bytes2str
 import lsm
 
 IFDEntry_init_hooks = []
@@ -221,10 +221,10 @@ class TIFFfile:
         i = 0
         step = 0
         can_return_memmap = True
-        for ifd in self.IFD:
-            sft = ifd.get_value('NewSubfileType', subfile_type)
-            if sft!=subfile_type:
-                continue
+        ifd_lst = [ifd for ifd in self.IFD if ifd.get_value('NewSubfileType', subfile_type)==subfile_type]
+
+        depth = len(ifd_lst)
+        for ifd in ifd_lst:
             if not ifd.is_contiguous():
                 raise NotImplementedError('none contiguous strips')
             compression = ifd.get_value('Compression')
@@ -236,6 +236,7 @@ class TIFFfile:
                 l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
             else:
                 l.append((strip_offsets, strip_offsets+strip_nbytes))
+
             if i==0:
                 width = ifd.get_value('ImageWidth')
                 length = ifd.get_value('ImageLength')
@@ -243,27 +244,36 @@ class TIFFfile:
                 planar_config = ifd.get_value('PlanarConfiguration')
                 bits_per_sample = ifd.get_value('BitsPerSample')
                 sample_format = ifd.get_value('SampleFormat')
+                if self.is_lsm or not isinstance(strip_offsets, numpy.ndarray):
+                    strips_per_image = 1
+                else:
+                    strips_per_image = len(strip_offsets)
                 format = {1:'uint', 2:'int', 3:'float', None:'uint', 6:'complex'}.get(sample_format)
                 if format is None:
                     print 'Warning(TIFFfile.get_samples): unsupported sample_format=%s is mapped to uint' % (sample_format)
                     format = 'uint'
+
                 if isinstance (bits_per_sample, numpy.ndarray):
-                    dtype_lst = [getattr (numpy, '%s%s' % (format, bits_per_sample[j])) for j in range(len(bits_per_sample))]
+                    dtype_lst = []
+                    bits_per_pixel = 0
+                    for j in range(samples_per_pixel):
+                        bits = bits_per_sample[j]
+                        bits_per_pixel += bits
+                        dtype = getattr (numpy, '%s%s' % (format, bits))
+                        dtype_lst.append(dtype)
                 else:
-                    dtype_lst = [getattr (numpy, '%s%s' % (format, bits_per_sample))]
+                    bits_per_pixel = bits_per_sample
+                    dtype = getattr (numpy, '%s%s' % (format, bits_per_sample))
+                    dtype_lst = [dtype]
+                bytes_per_pixel = bits_per_pixel // 8
+                assert 8*bytes_per_pixel == bits_per_pixel,`bits_per_pixel`
+                bytes_per_row = width * bytes_per_pixel
                 strip_length = l[-1][1] - l[-1][0]
-                if verbose:
-                    print '''
-width : %(width)s
-length : %(length)s
-sample_format : %(format)s
-samples_per_pixel : %(samples_per_pixel)s
-bits_per_sample : %(bits_per_sample)s
-planar_config : %(planar_config)s
-strip_length : %(strip_length)s
-
-''' % (locals ())
-
+                strip_length_str = bytes2str(strip_length)
+                bytes_per_image = length * bytes_per_row
+                
+                rows_per_strip = bytes_per_image // (bytes_per_row * strips_per_image)
+                assert rows_per_strip == ifd.get_value('RowsPerStrip', rows_per_strip), `rows_per_strip, ifd.get_value('RowsPerStrip'), bytes_per_image, bytes_per_row, strips_per_image, self.filename`
             else:
                 assert width == ifd.get_value('ImageWidth', width), `width, ifd.get_value('ImageWidth')`
                 assert length == ifd.get_value('ImageLength', length),` length,  ifd.get_value('ImageLength')`
@@ -283,7 +293,27 @@ strip_length : %(strip_length)s
                         can_return_memmap = False
                         #assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1], (l[-1][0] - l[-2][1]), i`
             i += 1
-        assert i>=0,`i`
+
+        if verbose:
+            bytes_per_image_str = bytes2str(bytes_per_image)
+            print '''
+width : %(width)s
+length : %(length)s
+depth : %(depth)s
+sample_format : %(format)s
+samples_per_pixel : %(samples_per_pixel)s
+planar_config : %(planar_config)s
+bits_per_sample : %(bits_per_sample)s
+bits_per_pixel : %(bits_per_pixel)s
+
+bytes_per_pixel : %(bytes_per_pixel)s
+bytes_per_row : %(bytes_per_row)s
+bytes_per_image : %(bytes_per_image_str)s
+
+strips_per_image : %(strips_per_image)s
+rows_per_strip : %(rows_per_strip)s
+strip_length : %(strip_length_str)s
+''' % (locals ())
 
         sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
         depth = i
@@ -293,9 +323,8 @@ strip_length : %(strip_length)s
                 if samples_per_pixel==1:
                     data = []
                     for start, end in l:
-                        data.append(self.data[start:end].view (dtype=dtype_lst[0]))
-                    arr = numpy.array(data, dtype=dtype_lst[0])
-                    arr = arr.reshape((depth, length, width))
+                        data.append(self.data[start:end].view(dtype=dtype_lst[0]))
+                    arr = numpy.array(data, dtype=dtype_lst[0]).reshape((depth, length, width))
                     return [arr], sample_names
                 else:
                     raise NotImplementedError (`samples_per_pixel`)
@@ -327,13 +356,19 @@ strip_length : %(strip_length)s
                 if isinstance(bits_per_sample, numpy.ndarray):
                     for j in range(samples_per_pixel):
                         bytes = bits_per_sample[j] // 8 * width * length
-                        tmp = arr[:,k:k+bytes].view(dtype=dtype_lst[j]).reshape((depth, length, width))
+                        tmp = arr[:,k:k+bytes]
+                        #tmp = tmp.reshape((tmp.size,))
+                        tmp = tmp.view(dtype=dtype_lst[j])
+                        tmp = tmp.reshape((depth, length, width))
                         samples.append(tmp)
                         k += bytes
                 else:
                     assert samples_per_pixel==1,`samples_per_pixel, bits_per_sample`
                     bytes = bits_per_sample // 8 * width * length
-                    tmp = arr[:,k:k+bytes].view(dtype=dtype_lst[0]).reshape((depth, length, width))
+                    tmp = arr[:,k:k+bytes]
+                    #tmp = tmp.reshape((tmp.size,))
+                    tmp = tmp.view(dtype=dtype_lst[0])
+                    tmp = tmp.reshape((depth, length, width))
                     samples.append(tmp)
                 return samples, sample_names
             raise NotImplementedError (`planar_config, self.is_lsm`)
@@ -344,7 +379,9 @@ strip_length : %(strip_length)s
             else:
                 bytes = bits_per_sample // 8 * width * length
             for j in range(samples_per_pixel):
-                tmp = arr[:,k+j:k+j+bytes:samples_per_pixel].view(dtype=dtype_lst[j]).reshape((depth, length, width))
+                tmp = arr[:,k+j:k+j+bytes:samples_per_pixel]
+                tmp = tmp.reshape((tmp.size,)).view(dtype=dtype_lst[j])
+                tmp = tmp.reshape((depth, length, width))
                 samples.append(tmp)
                 k += bytes
             return samples, sample_names
