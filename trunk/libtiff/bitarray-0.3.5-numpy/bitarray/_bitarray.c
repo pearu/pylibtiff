@@ -1830,6 +1830,66 @@ bitarray_imul(bitarrayobject *self, PyObject *v)
 }
 
 static PyObject *
+bitarray_lshift(bitarrayobject *self, PyObject *v)
+{
+    PyObject *res;
+    idx_t i, vi = 0;
+
+    if (!ISINDEX(v)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "integer value expected for bitarray repetition");
+        return NULL;
+    }
+    getIndex(v, &vi);
+
+    res = newbitarrayobject(Py_TYPE(self), self->nbits, self->endian);
+    if (res == NULL)
+        return NULL;
+    if (vi<=self->nbits)
+      {
+	copy_n((bitarrayobject *)res, 0, self, vi, self->nbits-vi);
+	for (i=self->nbits-vi;i<self->nbits;++i)
+	  setbit((bitarrayobject*)res, i, 0);
+      }
+    else
+      {
+	for (i=0;i<self->nbits;++i)
+	  setbit((bitarrayobject*)res, i, 0);
+      }
+    return res;
+}
+
+static PyObject *
+bitarray_rshift(bitarrayobject *self, PyObject *v)
+{
+    PyObject *res;
+    idx_t i, vi = 0;
+
+    if (!ISINDEX(v)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "integer value expected for bitarray repetition");
+        return NULL;
+    }
+    getIndex(v, &vi);
+
+    res = newbitarrayobject(Py_TYPE(self), self->nbits, self->endian);
+    if (res == NULL)
+        return NULL;
+    if (vi<=self->nbits)
+      {
+	copy_n((bitarrayobject *)res, vi, self, 0, self->nbits-vi);
+	for (i=0;i<vi;i++)
+	  setbit((bitarrayobject*)res, i, 0);
+      }
+    else
+      {
+	for (i=0;i<self->nbits;++i)
+	  setbit((bitarrayobject*)res, i, 0);
+      }
+    return res;
+}
+
+static PyObject *
 bitarray_cpinvert(bitarrayobject *self)
 {
     PyObject *res;
@@ -2076,6 +2136,9 @@ bitarray_methods[] = {
     {"__ior__",      (PyCFunction) bitarray_ior,         METH_O,       0},
     {"__ixor__",     (PyCFunction) bitarray_ixor,        METH_O,       0},
     {"__invert__",   (PyCFunction) bitarray_cpinvert,    METH_NOARGS,  0},
+
+    {"__lshift__",      (PyCFunction) bitarray_lshift,         METH_O,       0},
+    {"__rshift__",      (PyCFunction) bitarray_rshift,         METH_O,       0},
 
     {NULL,           NULL}  /* sentinel */
 };
