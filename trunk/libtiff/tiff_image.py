@@ -10,6 +10,7 @@ import sys
 import time
 import numpy
 import lzw
+import tif_lzw
 
 from .utils import bytes2str, VERBOSE
 from .tiff_data import tag_name2value, tag_value2type, tag_value2name, name2type, type2bytes, type2dtype
@@ -176,8 +177,8 @@ class TIFFimage:
                                group3fax = 3, group4fax = 4
                                )
         compress_map = dict(none=lambda data: data,
-                            lzw = lzw.encode_array)
-        compress = compress_map.get(compression, None)
+                            lzw = tif_lzw.encode)
+        compress = compress_map.get(compression or 'none', None)
         if compress is None:
             raise NotImplementedError (`compression`)
 
