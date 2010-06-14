@@ -1,9 +1,9 @@
 
-2010-05-10   0.3.5-numpy:
+2010-06-14   0.3.5-numpy:
 -------------------------
 Pearu Peterson added numpy support: constructing bitarray from numpy
 ndarray object, added bitarray methods .toarray(), .toword(index=0,bits=8),
-and .fromword(word, bits=8).
+and .fromword(word, bits=8). Implemented left and right shift operations.
 
 2009-04-06   0.3.5:
 -------------------
