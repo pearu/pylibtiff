@@ -13,6 +13,7 @@ import numpy
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
 from .utils import bytes2str
 import lsm
+import tif_lzw
 
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []
@@ -227,9 +228,7 @@ class TIFFfile:
         for ifd in ifd_lst:
             if not ifd.is_contiguous():
                 raise NotImplementedError('none contiguous strips')
-            compression = ifd.get_value('Compression')
-            if compression!=1:
-                raise ValueError('Unable to get contiguous samples from compressed data')            
+
             strip_offsets = ifd.get_value('StripOffsets')
             strip_nbytes = ifd.get_value('StripByteCounts')
             if isinstance(strip_offsets, numpy.ndarray):
@@ -238,6 +237,10 @@ class TIFFfile:
                 l.append((strip_offsets, strip_offsets+strip_nbytes))
 
             if i==0:
+                compression = ifd.get_value('Compression')
+                if compression!=1:
+                    can_return_memmap = False
+                    #raise ValueError('Unable to get contiguous samples from compressed data (compression=%s)' % (compression))            
                 width = ifd.get_value('ImageWidth')
                 length = ifd.get_value('ImageLength')
                 samples_per_pixel = ifd.get_value('SamplesPerPixel', 1)
@@ -321,13 +324,20 @@ strip_length : %(strip_length_str)s
         if not can_return_memmap:
             if planar_config==1:
                 if samples_per_pixel==1:
-                    data = []
+                    i = 0
+                    arr = numpy.empty(bytes_per_image, dtype=numpy.uint8)
+                    assert len(l)==strips_per_image,`len(l), strips_per_image`
+                    bytes_per_strip = bytes_per_image // strips_per_image
                     for start, end in l:
-                        data.append(self.data[start:end].view(dtype=dtype_lst[0]))
-                    arr = numpy.array(data, dtype=dtype_lst[0]).reshape((depth, length, width))
+                        d = self.data[start:end]
+                        if compression==5: #lzw
+                            d = tif_lzw.decode(d, bytes_per_strip)
+                        arr[i:i+d.nbytes] = d
+                        i += d.nbytes
+                    arr = arr.view(dtype=dtype_lst[0]).reshape((depth, length, width))
                     return [arr], sample_names
                 else:
-                    raise NotImplementedError (`samples_per_pixel`)
+                    raise NotImplementedError(`samples_per_pixel`)
             else:
                 raise NotImplementedError (`planar_config`)
 
