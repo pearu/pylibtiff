@@ -30,7 +30,11 @@ if os.name=='nt':
         else:
             lib = None
 else:
-    lib = ctypes.util.find_library('tiff')
+    if hasattr(sys, 'frozen') and sys.platform == 'darwin' and os.path.exists('../Frameworks/libtiff.dylib'):
+        # py2app support, see Issue 8.
+        lib = '../Frameworks/libtiff.dylib'
+    else:
+        lib = ctypes.util.find_library('tiff')
 if lib is None:
     raise ImportError('Failed to find TIFF library. Make sure that libtiff is installed and its location is listed in PATH|LD_LIBRARY_PATH|..')
 
