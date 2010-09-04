@@ -297,6 +297,8 @@ class TIFFfile:
                         #assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1], (l[-1][0] - l[-2][1]), i`
             i += 1
 
+
+
         if verbose:
             bytes_per_image_str = bytes2str(bytes_per_image)
             print '''
@@ -325,8 +327,8 @@ strip_length : %(strip_length_str)s
             if planar_config==1:
                 if samples_per_pixel==1:
                     i = 0
-                    arr = numpy.empty(bytes_per_image, dtype=numpy.uint8)
-                    assert len(l)==strips_per_image,`len(l), strips_per_image`
+                    arr = numpy.empty(depth * bytes_per_image, dtype=numpy.uint8)
+                    assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth`
                     bytes_per_strip = bytes_per_image // strips_per_image
                     for start, end in l:
                         d = self.data[start:end]
