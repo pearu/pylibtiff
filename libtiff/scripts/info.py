@@ -35,15 +35,23 @@ def runner (parser, options, args):
         print '-------------'
         tiff.check_memory_usage()
 
+    human = options.get(human=False)
+    print human
 
     ifd0 = tiff.IFD[0]
     if options.ifd:
         for i,ifd in enumerate(tiff.IFD):
             print 'IFD%s:' % (i)
             print '------'
-            print ifd
+            if human:
+                print ifd.human()
+            else:
+                print ifd
     else:
-        print ifd0
+        if human:
+            print ifd0.human()
+        else:
+            print ifd0
         if len (tiff.IFD)>1:
             print 'Use --ifd to see the rest of %s IFD entries' % (len (tiff.IFD)-1)
 
@@ -69,13 +77,14 @@ def main ():
         from optparse import OptionParser
         raise
     from libtiff.script_options import set_info_options
+    from libtiff.utils import Options
     parser = OptionParser()
 
     set_info_options (parser)
     if hasattr(parser, 'runner'):
         parser.runner = runner
     options, args = parser.parse_args()
-    runner(parser, options, args)
+    runner(parser, Options(options), args)
     return
 
 if __name__ == '__main__':
