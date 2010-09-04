@@ -430,6 +430,12 @@ class IFD:
             l.append(str (entry))
         return '\n'.join(l)
 
+    def human (self):
+        l = []
+        for entry in self.entries:
+            l.append(entry.human ())
+        return '\n'.join(l)
+
     def get(self, tag_name):
         """Return IFD entry with given tag name.
         """
@@ -555,13 +561,22 @@ class IFDEntry:
             value = tiff.get_values(self.offset, self.type, self.count)
         if value is not None:
             self.value = value
-        self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
+        tag_name = self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
         self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type,))
 
         self.memory_usage = []
         if self.offset is not None:
             self.memory_usage.append((self.offset, self.offset + self.bytes*self.count, self.tag_name))
-        
+
+    @property
+    def _value_str(self):
+        tag_name = self.tag_name
+        value = self.value
+        if value is not None:
+            if tag_name == 'ImageDescription':
+                return ''.join(value.view(dtype='|S%s' % (value.nbytes//value.size)))
+        return value
+
     def __str__(self):
         if hasattr(self, 'str_hook'):
             r = self.str_hook(self)
@@ -569,6 +584,17 @@ class IFDEntry:
                 return r
         if hasattr(self, 'value'):
             return 'IFDEntry(tag=%(tag_name)s, value=%(value)r, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
+        else:
+            return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
+
+    def human(self):
+        if hasattr(self, 'str_hook'):
+            r = self.str_hook(self)
+            if isinstance (r, str):
+                return r
+        if hasattr(self, 'value'):
+            self.value_str = self._value_str
+            return 'IFDEntry(tag=%(tag_name)s, value=%(value_str)r, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
         else:
             return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
 

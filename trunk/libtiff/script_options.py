@@ -104,3 +104,9 @@ def set_info_options(parser):
     parser.add_option ('--no-ifd', dest='ifd',
                        action = 'store_false', help='See --ifd.')
  
+    parser.add_option ('--human',
+                       action = 'store_true', default=False,
+                       help = 'Show human readable values'
+                       )
+    parser.add_option ('--no-human', dest='human',
+                       action = 'store_false', help='See --human.')

@@ -22,11 +22,10 @@ import os
 import signal
 import sys
 import re
+import shutil
+import tempfile
 import optparse
-try:
-    import wx
-except ImportError, msg:
-    raise ImportError ('%s (may be need to run "sudo apt-get install python-wxgtk2.8")' % (msg))
+import wx
 import subprocess as std_subprocess
 if os.name=='nt':
     from . import killableprocess as subprocess
@@ -41,6 +40,8 @@ except ImportError:
 
 import traceback
 import Queue as queue
+
+from .utils import splitcommandline
 
 #try:
 #    import matplotlib
@@ -353,10 +354,14 @@ class OptparseFrame (wx.Frame):
         option_panel.SetHelpText (option_parser.description or 'Main options')
         nb.AddPage(option_panel, 'Main Options')
 
+        pages = []
         for group in option_parser.option_groups:
+            if group in pages:
+                continue
             option_panel = OptionPanel(nb, group.option_list, self)
             option_panel.SetHelpText (group.description or 'Group options')
             nb.AddPage(option_panel, group.title)
+            pages.append(group)
 
         sizer_a = wx.BoxSizer (wx.VERTICAL)
         self.args_ctrl = args_ctrl = wx.TextCtrl(p, -1, '', size = ( -1, 80 ), 
@@ -808,8 +813,8 @@ that contain spaces must be entered like so: "arg with space"\
                 option_values[option] = value
             elif value is not None:
                 option_values[option] = None
-        args_buff = self.args_ctrl.GetValue()
-        args = re.findall( r'(?:((?:(?:\w|\d)+)|".*?"))\s*', args_buff )
+        args_buff = str(self.args_ctrl.GetValue())
+        args =  splitcommandline(args_buff)
         self.option_parser.result = option_values, args
 
     def put_result(self):
@@ -915,7 +920,10 @@ class OptionParser( optparse.OptionParser ):
         dirname = os.path.dirname(script_history)
         if not os.path.isdir (dirname):
             os.makedirs(dirname)
-        f = open(script_history, 'w')
+
+        tmp_file = tempfile.mktemp()
+            
+        f = open(tmp_file, 'w')
         f.write ('#cwd:%r\n' % (cwd))
         f.write ('#args:%r\n' % (args,))
         for option in self._get_all_options():
@@ -925,6 +933,8 @@ class OptionParser( optparse.OptionParser ):
                     f.write('%s: %r\n' % (option.dest, value))
         f.close()        
 
+        shutil.move(tmp_file, script_history)
+        
     def load_options(self):
         script_history = self.get_history_file ()
         if debug>1:
@@ -935,8 +945,12 @@ class OptionParser( optparse.OptionParser ):
         if os.path.isfile(script_history):
             f = open (script_history)
             for line in f.readlines():
-                dest, value = line.split(':', 1)
-                value = eval(value)
+                try:
+                    dest, value = line.split(':', 1)
+                    value = eval(value)
+                except Exception, msg:
+                    print 'optparse_gui.load_options: failed parsing options file, line=%r: %s' % (line, msg)
+                    continue
                 if dest=='#args':
                     h_args = value
                 elif dest=='#cwd':
