@@ -18,6 +18,28 @@ import tif_lzw
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []
 
+class LittleEndianNumpyDTypes:
+    uint8 = numpy.dtype('<u1')
+    uint16 = numpy.dtype('<u2')
+    uint32 = numpy.dtype('<u4')
+    int16 = numpy.dtype('<i2')
+    int32 = numpy.dtype('<i4')
+    float32 = numpy.dtype('<f4')
+    float64 = numpy.dtype('<f8')
+
+    type2dt = dict((k,numpy.dtype(v).newbyteorder('<')) for k,v in type2dtype.items())
+
+class BigEndianNumpyDTypes:
+    uint8 = numpy.dtype('>u1')
+    uint16 = numpy.dtype('>u2')
+    uint32 = numpy.dtype('>u4')
+    int16 = numpy.dtype('>i2')
+    int32 = numpy.dtype('>i4')
+    float32 = numpy.dtype('>f4')
+    float64 = numpy.dtype('>f8')
+
+    type2dt = dict((k,numpy.dtype(v).newbyteorder('>')) for k,v in type2dtype.items())
+
 class TIFFfile:
     """
     Hold a TIFF file image stack that is accessed via memmap.
@@ -37,11 +59,13 @@ class TIFFfile:
         self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
 
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
-        byteorder = self.get_uint16(first_byte)
+        byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)
         if byteorder==0x4949:
             self.endian = 'little'
+            self.dtypes = LittleEndianNumpyDTypes
         elif byteorder==0x4d4d:
             self.endian = 'big'
+            self.dtypes = BigEndianNumpyDTypes
         else:
             raise ValueError('unrecognized byteorder: %s' % (hex(byteorder)))
         magic = self.get_uint16(first_byte+2)
@@ -68,17 +92,17 @@ class TIFFfile:
         return '%s(%r)' % (self.__class__.__name__, self.filename)
 
     def get_uint16(self, offset):
-        return self.data[offset:offset+2].view(dtype=numpy.uint16)[0]
+        return self.data[offset:offset+2].view(dtype=self.dtypes.uint16)[0]
     def get_uint32(self, offset):
-        return self.data[offset:offset+4].view(dtype=numpy.uint32)[0]
+        return self.data[offset:offset+4].view(dtype=self.dtypes.uint32)[0]
     def get_int16(self, offset):
-        return self.data[offset:offset+2].view(dtype=numpy.int16)[0]
+        return self.data[offset:offset+2].view(dtype=self.dtypes.int16)[0]
     def get_int32(self, offset):
-        return self.data[offset:offset+4].view(dtype=numpy.int32)[0]
+        return self.data[offset:offset+4].view(dtype=self.dtypes.int32)[0]
     def get_float32(self, offset):
-        return self.data[offset:offset+4].view(dtype=numpy.float32)[0]
+        return self.data[offset:offset+4].view(dtype=self.dtypes.float32)[0]
     def get_float64(self, offset):
-        return self.data[offset:offset+8].view(dtype=numpy.float64)[0]
+        return self.data[offset:offset+8].view(dtype=self.dtypes.float64)[0]
     get_short = get_uint16
     get_long = get_uint32
     get_double = get_float64
@@ -97,7 +121,7 @@ class TIFFfile:
         else:
             if isinstance(typ, str):
                 typ = name2type.get(typ)
-            dtype = type2dtype.get(typ)
+            dtype = self.dtypes.type2dt.get(typ)
             bytes = type2bytes.get(typ)
             if dtype is None or bytes is None:
                 sys.stderr.write('get_values: incomplete info for type=%r: dtype=%s, bytes=%s' % (typ, dtype, bytes))
@@ -188,9 +212,9 @@ class TIFFfile:
         assert samples_per_pixel==1,`samples_per_pixel`
 
         if isinstance (bits_per_sample, numpy.ndarray):
-            dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
+            dtype = getattr (self.dtypes, 'uint%s' % (bits_per_sample[i]))
         else:
-            dtype = getattr (numpy, 'uint%s' % (bits_per_sample))
+            dtype = getattr (self.dtypes, 'uint%s' % (bits_per_sample))
 
         if isinstance(strip_offsets0, numpy.ndarray):
             start = strip_offsets0[0]
@@ -262,11 +286,11 @@ class TIFFfile:
                     for j in range(samples_per_pixel):
                         bits = bits_per_sample[j]
                         bits_per_pixel += bits
-                        dtype = getattr (numpy, '%s%s' % (format, bits))
+                        dtype = getattr (self.dtypes, '%s%s' % (format, bits))
                         dtype_lst.append(dtype)
                 else:
                     bits_per_pixel = bits_per_sample
-                    dtype = getattr (numpy, '%s%s' % (format, bits_per_sample))
+                    dtype = getattr (self.dtypes, '%s%s' % (format, bits_per_sample))
                     dtype_lst = [dtype]
                 bytes_per_pixel = bits_per_pixel // 8
                 assert 8*bytes_per_pixel == bits_per_pixel,`bits_per_pixel`
@@ -327,7 +351,7 @@ strip_length : %(strip_length_str)s
             if planar_config==1:
                 if samples_per_pixel==1:
                     i = 0
-                    arr = numpy.empty(depth * bytes_per_image, dtype=numpy.uint8)
+                    arr = numpy.empty(depth * bytes_per_image, dtype=self.dtypes.uint8)
                     assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth`
                     bytes_per_strip = bytes_per_image // strips_per_image
                     for start, end in l:
@@ -505,10 +529,10 @@ class IFD:
             r = {}
             for i in range (nof_channels):
                 if isinstance (bits_per_sample, numpy.ndarray):
-                    dtype = getattr (numpy, 'uint%s' % (bits_per_sample[i]))
+                    dtype = getattr (self.dtypes, 'uint%s' % (bits_per_sample[i]))
                     r[channel_names[i]] = self.tiff.data[strip_offsets[i]:strip_offsets[i]+strip_nbytes[i]].view (dtype=dtype).reshape((width, length))
                 else:
-                    dtype = getattr (numpy, 'uint%s' % (bits_per_sample))
+                    dtype = getattr (self.dtypes, 'uint%s' % (bits_per_sample))
                     r[channel_names[i]] = self.tiff.data[strip_offsets:strip_offsets+strip_nbytes].view (dtype=dtype).reshape((width, length))
             return r
         else:
