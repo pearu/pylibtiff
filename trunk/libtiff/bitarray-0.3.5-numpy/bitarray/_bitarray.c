@@ -2187,7 +2187,17 @@ bitarray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	    else if (c=='<')
 	      endian = 0;
 	    else if (c=='=' || c=='|')
+	    {
+#if defined(NPY_BIG_ENDIAN) && !defined(NPY_LITTLE_ENDIAN)
+	      endian = 1;
+#elif defined(NPY_LITTLE_ENDIAN) && !defined(NPY_BIG_ENDIAN)
+	      endian = 0;
+#elif defined(NPY_BIG_ENDIAN) && defined(NPY_LITTLE_ENDIAN) && defined(NPY_BYTE_ORDER)
 	      endian = (NPY_BYTE_ORDER == NPY_BIG_ENDIAN); // numpy native
+#else
+#error Cannot detect byte-order of numpy!
+#endif
+	    }
 	  }
 	a = newbitarrayobject(type, bytes*NPY_BITSOF_CHAR, endian);
         if (a == NULL)
