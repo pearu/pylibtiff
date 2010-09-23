@@ -586,6 +586,8 @@ class TIFF(ctypes.c_void_p):
             print 'Warning: no tag %r defined' % (tag)
             return
         data_type, convert = t
+        if data_type == ctypes.c_float:
+            data_type = ctypes.c_double
         data = data_type(value)
         libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [data_type]
         r = libtiff.TIFFSetField(self, tag, data)
