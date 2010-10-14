@@ -1217,6 +1217,8 @@ static PyObject *py_decode(PyObject *self, PyObject *args, PyObject *kwds)
   LZWPreDecode(&tif);
   LZWDecode(&tif, PyArray_DATA(result), PyArray_NBYTES(result));
 
+  LZWCleanup(&tif);
+
   return result;
 }
 

@@ -15,6 +15,8 @@ import tif_lzw
 from .utils import bytes2str, VERBOSE
 from .tiff_data import tag_name2value, tag_value2type, tag_value2name, name2type, type2bytes, type2dtype
 
+VERBOSE=True
+
 class TIFFentry:
     """ Hold a IFD entry used by TIFFimage.
     """
@@ -279,11 +281,12 @@ class TIFFimage:
         first_data_offset = data_offset
         first_image_data_offset = image_data_offset
         start_time = time.time ()
+        compressed_data_size = 0
         for i, (entries, strip_info, image) in enumerate(image_directories):
             strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
             if VERBOSE:
                 sys.stdout.write('\r  filling records: %5s%% done (%s/s)' % (int(100.0*i/len(image_directories)), 
-                                                                             bytes2str((image_data_offset-first_image_data_offset)/(time.time ()-start_time))))
+                                                                             bytes2str(int((image_data_offset-first_image_data_offset)/(time.time ()-start_time)))))
                 sys.stdout.flush ()
 
             # write the nof IFD entries
@@ -299,7 +302,9 @@ class TIFFimage:
                 k = j * c
                 c -= max((j+1) * c - image.nbytes, 0)
                 assert c>0,`c`
-                strip = compress(data[k:k+c])
+                orig_strip = data[k:k+c]
+                strip = compress(orig_strip)
+                compressed_data_size += strip.nbytes
                 #print strip.size, strip.nbytes, strip.shape, tif[image_data_offset:image_data_offset+strip.nbytes].shape
                 strip_offsets.add_value(image_data_offset)
                 strip_byte_counts.add_value(strip.nbytes)
@@ -332,6 +337,13 @@ class TIFFimage:
 
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
+
+        if compressed_data_size < image_data_size:
+            sdiff = image_data_size - compressed_data_size
+            print
+            print '  resizing records: %s -> %s' % (bytes2str(total_size), bytes2str(total_size - sdiff))
+            total_size -= sdiff
+            tif._mmap.resize(total_size)
         if VERBOSE:
             sys.stdout.write ('\r'+70*' ')
             sys.stdout.write ('\r  flushing records (%s) to disk... ' % (bytes2str(total_size))); sys.stdout.flush ()
