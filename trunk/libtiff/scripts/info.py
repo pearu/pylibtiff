@@ -56,7 +56,13 @@ def runner (parser, options, args):
             print 'Use --ifd to see the rest of %s IFD entries' % (len (tiff.IFD)-1)
 
     print 'data is contiguous:', tiff.is_contiguous ()
-    print 'memory usage is ok:', tiff.check_memory_usage(verbose=False)
+    if tiff.check_memory_usage(verbose=False):
+        print 'memory usage is ok'
+    else:
+        print 'memory usage has inconsistencies:'
+        print '-----'
+        tiff.check_memory_usage(verbose=True)
+        print '-----'
 
     print 'reading samples...'
     r = tiff.get_samples(0, verbose=True)

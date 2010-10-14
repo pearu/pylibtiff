@@ -10,6 +10,7 @@ __all__ = ['TIFFfile']
 
 import sys
 import numpy
+from numpy.testing.utils import memusage
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
 from .utils import bytes2str
 import lsm
@@ -249,6 +250,7 @@ class TIFFfile:
         ifd_lst = [ifd for ifd in self.IFD if ifd.get_value('NewSubfileType', subfile_type)==subfile_type]
 
         depth = len(ifd_lst)
+        full_l = []
         for ifd in ifd_lst:
             if not ifd.is_contiguous():
                 raise NotImplementedError('none contiguous strips')
@@ -257,8 +259,11 @@ class TIFFfile:
             strip_nbytes = ifd.get_value('StripByteCounts')
             if isinstance(strip_offsets, numpy.ndarray):
                 l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
+                for off, nb in zip (strip_offsets, strip_nbytes):
+                    full_l.append ((off, off+nb))
             else:
                 l.append((strip_offsets, strip_offsets+strip_nbytes))
+                full_l.append (l[-1])
 
             if i==0:
                 compression = ifd.get_value('Compression')
@@ -298,15 +303,21 @@ class TIFFfile:
                 strip_length = l[-1][1] - l[-1][0]
                 strip_length_str = bytes2str(strip_length)
                 bytes_per_image = length * bytes_per_row
-                
+
                 rows_per_strip = bytes_per_image // (bytes_per_row * strips_per_image)
+                if bytes_per_image % (bytes_per_row * strips_per_image):
+                    rows_per_strip += 1
                 assert rows_per_strip == ifd.get_value('RowsPerStrip', rows_per_strip), `rows_per_strip, ifd.get_value('RowsPerStrip'), bytes_per_image, bytes_per_row, strips_per_image, self.filename`
             else:
                 assert width == ifd.get_value('ImageWidth', width), `width, ifd.get_value('ImageWidth')`
                 assert length == ifd.get_value('ImageLength', length),` length,  ifd.get_value('ImageLength')`
                 #assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
                 assert planar_config == ifd.get_value('PlanarConfiguration', planar_config)
-                assert strip_length == l[-1][1] - l[-1][0]
+                if can_return_memmap:
+                    assert strip_length == l[-1][1] - l[-1][0], `strip_length, l[-1][1] - l[-1][0]`
+                else:
+                    strip_length = max (strip_length, l[-1][1] - l[-1][0])
+                    strip_length_str = ' < ' + bytes2str(strip_length)
                 if isinstance (bits_per_sample, numpy.ndarray):
                     assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),`bits_per_sample, ifd.get_value('BitsPerSample')`
                 else:
@@ -352,12 +363,18 @@ strip_length : %(strip_length_str)s
                 if samples_per_pixel==1:
                     i = 0
                     arr = numpy.empty(depth * bytes_per_image, dtype=self.dtypes.uint8)
-                    assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth`
                     bytes_per_strip = bytes_per_image // strips_per_image
-                    for start, end in l:
-                        d = self.data[start:end]
-                        if compression==5: #lzw
+                    #assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth, bytes_per_strip`
+                    for start, end in full_l:
+                        #sys.stdout.write ("%s:%s," % (start, end)); sys.stdout.flush ()
+
+                        if compression==1: # none
+                            d = self.data[start:end]
+                        elif compression==5: # lzw
+                            d = self.data[start:end]
+                            #mu = memusage ()
                             d = tif_lzw.decode(d, bytes_per_strip)
+                            #sys.stdout.write ("%s " % (memusage ()-mu)); sys.stdout.flush ()
                         arr[i:i+d.nbytes] = d
                         i += d.nbytes
                     arr = arr.view(dtype=dtype_lst[0]).reshape((depth, length, width))
