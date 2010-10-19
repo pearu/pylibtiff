@@ -157,7 +157,8 @@ class TIFFimage:
         self.description = description
 
     def write_file(self, filename, compression='none',
-                   strip_size = 2**13):
+                   strip_size = 2**13,
+                   validate = False):
         """
         Write image data to TIFF file.
 
@@ -167,6 +168,8 @@ class TIFFimage:
         compression : {'none', 'lzw'}
         strip_size : int
           Specify the size of uncompressed strip.
+        validate : bool
+          When True then check compression by decompression.
         """
         if os.path.splitext (filename)[1].lower () not in ['.tif', '.tiff']:
             filename = filename + '.tif'
@@ -180,10 +183,12 @@ class TIFFimage:
                                )
         compress_map = dict(none=lambda data: data,
                             lzw = tif_lzw.encode)
+        decompress_map = dict(none=lambda data, bytes: data,
+                              lzw = tif_lzw.decode)
         compress = compress_map.get(compression or 'none', None)
         if compress is None:
             raise NotImplementedError (`compression`)
-
+        decompress = decompress_map.get(compression or 'none', None)
         # compute tif file size and create image file directories data
         image_directories = []
         total_size = 8
@@ -261,12 +266,16 @@ class TIFFimage:
         def tif_write(tif, offset, data, tifs=[]):
             end = offset + data.nbytes
             if end > tif.size:
-                print 'Resizing tif: %s -> %s' % (total_size, end)
+                size_incr = int((end - tif.size)/1024**2 + 1)*1024**2
+                new_size = tif.size + size_incr
+                assert end <= new_size, `end, tif.size, size_incr, new_size`
+                sys.stdout.write('resizing: %s -> %s\n' % (tif.size, new_size))
                 #tif.resize(end, refcheck=False)
-                tif._mmap.resize(end)
+                tif._mmap.resize(new_size)
                 new_tif = numpy.ndarray.__new__(numpy.memmap, (tif._mmap.size(), ),
                                                 dtype = tif.dtype, buffer=tif._mmap)
                 new_tif._parent = tif
+                new_tif.__array_finalize__(tif)
                 tif = new_tif
             tif[offset:end] = data
             return tif
@@ -285,8 +294,10 @@ class TIFFimage:
         for i, (entries, strip_info, image) in enumerate(image_directories):
             strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
             if VERBOSE:
-                sys.stdout.write('\r  filling records: %5s%% done (%s/s)' % (int(100.0*i/len(image_directories)), 
-                                                                             bytes2str(int((image_data_offset-first_image_data_offset)/(time.time ()-start_time)))))
+                sys.stdout.write('\r  filling records: %5s%% done (%s/s)%s' \
+                                     % (int(100.0*i/len(image_directories)), 
+                                        bytes2str(int((image_data_offset-first_image_data_offset)/(time.time ()-start_time))),
+                                        ' '*2))
                 sys.stdout.flush ()
 
             # write the nof IFD entries
@@ -304,6 +315,10 @@ class TIFFimage:
                 assert c>0,`c`
                 orig_strip = data[k:k+c]
                 strip = compress(orig_strip)
+                if validate:
+                    test_strip = decompress(strip, orig_strip.nbytes)
+                    if (orig_strip!=test_strip).any():
+                        raise RuntimeError('Compressed data is corrupted: cannot recover original data')
                 compressed_data_size += strip.nbytes
                 #print strip.size, strip.nbytes, strip.shape, tif[image_data_offset:image_data_offset+strip.nbytes].shape
                 strip_offsets.add_value(image_data_offset)
@@ -338,15 +353,16 @@ class TIFFimage:
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
 
-        if compressed_data_size < image_data_size:
+        if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
-            print
-            print '  resizing records: %s -> %s' % (bytes2str(total_size), bytes2str(total_size - sdiff))
+            sys.stdout.write('resizing records: %s -> %s (compression: %.2fx)\n' \
+                % (bytes2str(total_size), bytes2str(total_size - sdiff), 
+                   1/(compressed_data_size/image_data_size)))
             total_size -= sdiff
             tif._mmap.resize(total_size)
         if VERBOSE:
             sys.stdout.write ('\r'+70*' ')
-            sys.stdout.write ('\r  flushing records (%s) to disk... ' % (bytes2str(total_size))); sys.stdout.flush ()
+            sys.stdout.write ('\r  flushing records (%s) to disk...' % (bytes2str(total_size))); sys.stdout.flush ()
         del tif
         if VERBOSE:
             sys.stdout.write ('done\n'); sys.stdout.flush ()        

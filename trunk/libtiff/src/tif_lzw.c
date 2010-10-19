@@ -2,7 +2,7 @@
  * This Python extension module implements LZW encoder and decoder
  * functions that are derived by Pearu Peterson in June 2010 from TIFF
  * Library tif_lzw.c code. See copyright notices below for more
- * information about original authors of this software.
+ * information about the original authors of this software.
  */
 
 /*
@@ -576,19 +576,7 @@ LZWDecode(TIFF* tif, uint8* op0, tmsize_t occ0)
 	sp->dec_free_entp = free_entp;
 	sp->dec_maxcodep = maxcodep;
 
-	if (occ > 0) {
-#if defined(__WIN32__) && defined(_MSC_VER)
-		TIFFErrorExt(tif->tif_clientdata, module,
-			"Not enough data at scanline %d (short %I64d bytes)",
-			     tif->tif_row, (unsigned __int64) occ);
-#else
-		//TIFFErrorExt(tif->tif_clientdata, module,
-		//"Not enough data at scanline %d (short %llu bytes)",
-		//     tif->tif_row, (unsigned long long) occ);
-#endif
-		return (0);
-	}
-	return (1);
+	return (occ); // return extra bytes for resizing result array
 }
 
 #ifdef LZW_COMPAT
@@ -1192,7 +1180,9 @@ static PyObject *py_decode(PyObject *self, PyObject *args, PyObject *kwds)
   PyObject* result = NULL;
   TIFF tif;
   static char* kwlist[] = {"arr","size",NULL};
+  long occ;
   npy_intp dims[] = {0};
+  PyArray_Dims newshape;
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oi", 
 				   kwlist, &arr, dims))
     return NULL;
@@ -1215,10 +1205,16 @@ static PyObject *py_decode(PyObject *self, PyObject *args, PyObject *kwds)
   result = PyArray_EMPTY(1, dims, NPY_UBYTE, NPY_CARRAY);
 
   LZWPreDecode(&tif);
-  LZWDecode(&tif, PyArray_DATA(result), PyArray_NBYTES(result));
-
+  occ = LZWDecode(&tif, PyArray_DATA(result), PyArray_NBYTES(result));
   LZWCleanup(&tif);
-
+  if (occ>0)
+    {
+      dims[0] -= occ;
+      newshape.ptr = dims;
+      newshape.len = 1;
+      if (PyArray_Resize((PyArrayObject*)result, &newshape, 0, PyArray_CORDER)==NULL)
+	return NULL;
+    }
   return result;
 }
 
@@ -1293,7 +1289,7 @@ static PyObject *py_encode(PyObject *self, PyObject *args, PyObject *kwds)
 
 static PyMethodDef module_methods[] = {
   {"encode", (PyCFunction)py_encode, METH_VARARGS|METH_KEYWORDS, "encode(array) - return LZW encoded array"},
-  {"decode", (PyCFunction)py_decode, METH_VARARGS|METH_KEYWORDS, "decode(array, size) - return LZW decoded array of size"},
+  {"decode", (PyCFunction)py_decode, METH_VARARGS|METH_KEYWORDS, "decode(array, size) - return LZW decoded array of size (or less)"},
   {NULL}  /* Sentinel */
 };
 
