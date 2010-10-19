@@ -363,18 +363,16 @@ strip_length : %(strip_length_str)s
                 if samples_per_pixel==1:
                     i = 0
                     arr = numpy.empty(depth * bytes_per_image, dtype=self.dtypes.uint8)
-                    bytes_per_strip = bytes_per_image // strips_per_image
+                    #bytes_per_strip = bytes_per_image // strips_per_image
+                    bytes_per_strip = rows_per_strip * bytes_per_row
                     #assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth, bytes_per_strip`
                     for start, end in full_l:
                         #sys.stdout.write ("%s:%s," % (start, end)); sys.stdout.flush ()
-
                         if compression==1: # none
                             d = self.data[start:end]
                         elif compression==5: # lzw
                             d = self.data[start:end]
-                            #mu = memusage ()
                             d = tif_lzw.decode(d, bytes_per_strip)
-                            #sys.stdout.write ("%s " % (memusage ()-mu)); sys.stdout.flush ()
                         arr[i:i+d.nbytes] = d
                         i += d.nbytes
                     arr = arr.view(dtype=dtype_lst[0]).reshape((depth, length, width))
