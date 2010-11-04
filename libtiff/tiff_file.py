@@ -28,7 +28,11 @@ class LittleEndianNumpyDTypes:
     float32 = numpy.dtype('<f4')
     float64 = numpy.dtype('<f8')
 
-    type2dt = dict((k,numpy.dtype(v).newbyteorder('<')) for k,v in type2dtype.items())
+    @property
+    def type2dt(self):
+        return dict((k,numpy.dtype(v).newbyteorder('<')) for k,v in type2dtype.items())
+
+LittleEndianNumpyDTypes = LittleEndianNumpyDTypes()
 
 class BigEndianNumpyDTypes:
     uint8 = numpy.dtype('>u1')
@@ -39,7 +43,11 @@ class BigEndianNumpyDTypes:
     float32 = numpy.dtype('>f4')
     float64 = numpy.dtype('>f8')
 
-    type2dt = dict((k,numpy.dtype(v).newbyteorder('>')) for k,v in type2dtype.items())
+    @property
+    def type2dt(self):
+        return dict((k,numpy.dtype(v).newbyteorder('>')) for k,v in type2dtype.items())
+
+BigEndianNumpyDTypes = BigEndianNumpyDTypes()
 
 class TIFFfile:
     """
@@ -121,11 +129,14 @@ class TIFFfile:
             bytes = typ().itemsize
         else:
             if isinstance(typ, str):
+                ntyp = typ
                 typ = name2type.get(typ)
+            else:
+                ntyp = str (typ)
             dtype = self.dtypes.type2dt.get(typ)
             bytes = type2bytes.get(typ)
             if dtype is None or bytes is None:
-                sys.stderr.write('get_values: incomplete info for type=%r: dtype=%s, bytes=%s' % (typ, dtype, bytes))
+                sys.stderr.write('get_values: incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (typ,ntyp, dtype, bytes))
                 return
         return self.data[offset:offset+bytes*count].view(dtype=dtype)
 
@@ -613,7 +624,7 @@ class IFDEntry:
         value = self.value
         if value is not None:
             if tag_name == 'ImageDescription':
-                return ''.join(value.view(dtype='|S%s' % (value.nbytes//value.size)))
+                return ''.join(value.view('|S%s' % (value.nbytes//value.size)))
         return value
 
     def __str__(self):

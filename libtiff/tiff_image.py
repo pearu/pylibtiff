@@ -170,6 +170,11 @@ class TIFFimage:
           Specify the size of uncompressed strip.
         validate : bool
           When True then check compression by decompression.
+
+        Returns
+        -------
+        compression : float
+          Compression factor.
         """
         if os.path.splitext (filename)[1].lower () not in ['.tif', '.tiff']:
             filename = filename + '.tif'
@@ -353,11 +358,13 @@ class TIFFimage:
         # last offset must be 0
         tif[offset-4:offset].view(dtype=numpy.uint32)[0] = 0
 
+        compression = 1/(compressed_data_size/image_data_size)
+
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
             sys.stdout.write('resizing records: %s -> %s (compression: %.2fx)\n' \
                 % (bytes2str(total_size), bytes2str(total_size - sdiff), 
-                   1/(compressed_data_size/image_data_size)))
+                   compression))
             total_size -= sdiff
             tif._mmap.resize(total_size)
         if VERBOSE:
@@ -366,3 +373,5 @@ class TIFFimage:
         del tif
         if VERBOSE:
             sys.stdout.write ('done\n'); sys.stdout.flush ()        
+
+        return compression
