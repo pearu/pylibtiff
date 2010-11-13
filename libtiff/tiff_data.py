@@ -4,7 +4,8 @@ Defines data for TIFF manipulations.
 """
 
 __all__ = ['type2name', 'name2type', 'type2bytes', 'type2dtype',
-           'tag_value2name', 'tag_name2value', 'tag_value2type']
+           'tag_value2name', 'tag_name2value', 'tag_value2type',
+           'LittleEndianNumpyDTypes', 'BigEndianNumpyDTypes']
 
 import numpy
 
@@ -144,4 +145,53 @@ for line in tag_info.split('\n'):
         tag_value2type[h]=t
         tag_name2value[n]=h
 
+sample_format_map = {1:'uint', 2:'int', 3:'float', None:'uint', 6:'complex'}
 
+class NumpyDTypes:
+
+    def get_dtype(self, sample_format, bits_per_sample):
+        format = sample_format_map[sample_format]
+        dtypename = '%s%s' % (format, bits_per_sample)
+        return getattr (self, dtypename)
+
+class LittleEndianNumpyDTypes(NumpyDTypes):
+    uint8 = numpy.dtype('<u1')
+    uint16 = numpy.dtype('<u2')
+    uint32 = numpy.dtype('<u4')
+    uint64 = numpy.dtype('<u8')
+    int8 = numpy.dtype('<i1')
+    int16 = numpy.dtype('<i2')
+    int32 = numpy.dtype('<i4')
+    int64 = numpy.dtype('<i8')
+    float32 = numpy.dtype('<f4')
+    float64 = numpy.dtype('<f8')
+    complex64 = numpy.dtype('<c8')
+    complex128 = numpy.dtype('<c16')
+
+    @property
+    def type2dt(self):
+        return dict((k,numpy.dtype(v).newbyteorder('<')) for k,v in type2dtype.items())
+
+
+
+LittleEndianNumpyDTypes = LittleEndianNumpyDTypes()
+
+class BigEndianNumpyDTypes(NumpyDTypes):
+    uint8 = numpy.dtype('>u1')
+    uint16 = numpy.dtype('>u2')
+    uint32 = numpy.dtype('>u4')
+    uint64 = numpy.dtype('>u8')
+    int8 = numpy.dtype('>i1')
+    int16 = numpy.dtype('>i2')
+    int32 = numpy.dtype('>i4')
+    int64 = numpy.dtype('>i8')
+    float32 = numpy.dtype('>f4')
+    float64 = numpy.dtype('>f8')
+    complex64 = numpy.dtype('>c8')
+    complex128 = numpy.dtype('>c16')
+
+    @property
+    def type2dt(self):
+        return dict((k,numpy.dtype(v).newbyteorder('>')) for k,v in type2dtype.items())
+
+BigEndianNumpyDTypes = BigEndianNumpyDTypes()

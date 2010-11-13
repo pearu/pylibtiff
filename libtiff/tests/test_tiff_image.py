@@ -23,6 +23,7 @@ def test_write_read():
             assert image.dtype==data[0].dtype, `image.dtype,data[0].dtype`
             assert (image==data[0]).all()
 
+
 def test_write_lzw():
     for itype in [uint8, uint16, uint32, uint64, 
                   int8, int16, int32, int64,

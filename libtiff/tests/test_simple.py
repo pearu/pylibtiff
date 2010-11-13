@@ -42,4 +42,4 @@ def test_slicing():
             
             assert (image1==image2).all(),`i,j`
 
-    os.remove(fn)
+            os.remove(fn)
