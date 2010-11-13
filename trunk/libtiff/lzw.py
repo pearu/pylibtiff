@@ -1,18 +1,23 @@
 """ Encoder and decoder of Lempel-Ziv-Welch algorithm for TIFF.
+
+This module is obsolete, use tif_lzw extension module instead.
 """
 # Author: Pearu Peterson
 # Created: May 2010
 from __future__ import division
 import numpy
-from bitarray import bitarray
-from bittools import setword, getword
+
+default_backend='bittools'
+#default_backend='bittools'
+
+if default_backend=='bitarray':
+    from bitarray import bitarray
+if default_backend=='bittools':
+    from bittools import setword, getword
 
 CODECLEAR = 256
 CODEEOI = 257
 CODESTART = 258
-
-default_backend='bitarray'
-#default_backend='bittools'
 
 def encode_bitarray(seq, max_bits=12):
     """ Compress sequence using Lempel-Ziv-Welch algorithm for TIFF.

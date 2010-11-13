@@ -12,7 +12,7 @@ def test_write_read():
                       int8, int16, int32, int64,
                       float32, float64,
                       complex64, complex128]:
-            image = array([[0,0,0], [0,0,0]], itype)
+            image = array([[1,2,3], [4,5,6]], itype)
             fn = mktemp('.tif')
 
             if 0:
@@ -30,3 +30,5 @@ def test_write_read():
             assert len(data)==1, `len(data)`
             assert image.dtype==data[0].dtype, `image.dtype, data[0].dtype`
             assert (image==data[0]).all()
+
+            os.remove(fn)
