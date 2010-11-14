@@ -12,7 +12,7 @@ import sys
 import numpy
 from numpy.testing.utils import memusage
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
-from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes
+from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, default_tag_values, sample_format_map
 from .utils import bytes2str
 import lsm
 import tif_lzw
@@ -23,6 +23,7 @@ IFDEntry_finalize_hooks = []
 class TIFFfile:
     """
     Hold a TIFF file image stack that is accessed via memmap.
+    To access image, use get_tiff_array method.
 
     Attributes
     ----------
@@ -91,6 +92,7 @@ class TIFFfile:
         values = self.get_values(offset, type, 1)
         if values is not None:
             return values[0]
+
     def get_values(self, offset, typ, count):
         if isinstance(typ, numpy.dtype):
             dtype = typ
@@ -222,147 +224,21 @@ class TIFFfile:
                 depth += 1
         return depth
 
-    def get_info(self, name, index=0, subfile_type=0, default=None):
-        """ Return information from the given IFD.
-        
+    def get_first_ifd(self, subfile_type=0):
+        """ Return the first IFD entry with given subfile type.
+
         Parameters
         ----------
-        name : str
-          Specify the name of value. For example, ImageWidth, ImageHeight, etc.
-        index : int
-          Specify the index of IFD for given subfile_type.
-        subfile_type : {0, 1}
-          Specify subfile type. Subfile type 1 corresponds to reduced resolution image.
-
+        subfile_type : {0, 1, 2, 4}
+          Specify subfile type. 0: image, 1: reduced image, 2: single page, 4: transparency mask.
+          
         Returns
         -------
-        value : int
+        ifd : IFDEntry
         """
-        count = 0
         for ifd in self.IFD:
-            if ifd.get_value('NewSubfileType', subfile_type)==subfile_type:
-                if count == index:
-                    return ifd.get_value(name, default)
-                count += 1
-        return default
-
-    def get_sample_names(self, subfile_type=0):
-        """ Return a list of sample names (channels).
-        """
-        samples_per_pixel = self.get_info('SamplesPerPixel', subfile_type=subfile_type, default=1)
-        if self.is_lsm:
-            if subfile_type==0:
-                return self.lsminfo.get('data channel name')
-            if subfile_type==1:
-                assert samples_per_pixel==3,`samples_per_pixel`
-                return ['red', 'green', 'blue']
-            raise NotImplementedError (`subfile_type`)
-        return ['sample%s' % (j) for j in range (samples_per_pixel)]
-
-    def get_sample_typename(self, subfile_type=0):
-        """ Return sample type name.
-        """
-        bits_per_sample = self.get_info('BitsPerSample', subfile_type=subfile_type, default=8)
-        sample_format = self.get_info('SampleFormat', subfile_type=subfile_type, default=1)
-        format = {1:'uint', 2:'int', 3:'float', None:'uint', 6:'complex'}.get(sample_format)
-        assert format is not None, `sample_format, bits_per_sample`
-        if isinstance (bits_per_sample, numpy.ndarray):
-            assert len(set (bits_per_sample))==1, `bits_per_sample`
-            return '%s%s' % (format, bits_per_sample[0])
-        else:
-            return '%s%s' % (format, bits_per_sample)
-
-    def get_data_strips(self, subfile_type=0):
-        """ Return data location information as a list of tuples.
-
-        Returns
-        -------
-        strips : list
-          List of strips: (offset_start, offset_end, compression, bytes_uncompressed)
-        """
-        raise
-        strips = []
-        i = -1
-        compression = 1
-        rows_per_strip = 2**32-1
-        samples_per_pixel = 1
-        planar_config = 1
-        photometric = 0 # white is zero
-        sample_format = 1 # uint
-        bits_per_sample = 1
-        orientation = 1
-
-        for ifd in self.IFD:
-            if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
-                # subfile_type: 0: image, 1: reduced image, 2: single page, 4: transparency mask
-                continue
-            if not ifd.is_contiguous():
-                raise NotImplementedError('none contiguous strips')
-            i += 1
-
-            strip_offsets = ifd.get_value('StripOffsets')
-            strip_nbytes = ifd.get_value('StripByteCounts') # same size as strip_offsets
-            rows_per_strip = ifd.get_value('RowsPerStrip', rows_per_strip)
-            compression = ifd.get_value('Compression', compression)
-            # 1: topleft, 2: topright, etc
-            orientation = ifd.get_value('Orientation', orientation)
-
-            if i==0:
-                pixels_per_row = width = ifd.get_value('ImageWidth')
-                rows_of_pixels = length = ifd.get_value('ImageLength')
-
-                # 1: RGBRGB..., 2: RR..GG..BB..
-                planar_config = ifd.get_value('PlanarConfiguration', planar_config)
-                # int
-                samples_per_pixel = ifd.get_value('SamplesPerPixel', samples_per_pixel) 
-                # None or (samples_per_pixel-3)-array with values: 0 (unspecified), 1 (assocalpha), 2 (unassalpha)
-                extra_samples = ifd.get_value('ExtraSamples') 
-
-                if planar_config==1:
-                    if isinstance(strip_offsets, numpy.ndarray):
-                        strips_per_image = len(strip_offsets)
-                    else:
-                        strips_per_image = 1
-                else: # planar_config==2
-                    if isinstance(strip_offsets, numpy.ndarray):
-                        strips_per_image = len(strip_offsets) // samples_per_pixel
-                    else:
-                        assert samples_per_pixel==1, `samples_per_pixel, strip_offsets`
-                        strips_per_image = 1
-
-                strips_per_image2 = (length + rows_per_strip - 1)//rows_per_strip
-                assert strips_per_image==strips_per_image2,`strips_per_image, strips_per_image2`
-
-                # int or samples_per_pixel-array
-                bits_per_sample = ifd.get_value('BitsPerSample', bits_per_sample)
-
-                # int or samples_per_pixel-array with values: 
-                #   1: uint, 2: int, 3: float, 4: void, 5: complex int, 6: complex float
-                sample_format = ifd.get_value('SampleFormat', sample_format) 
-
-                # 0:WhiteIsZero, 1:BlackIsZero, 2: RGB, 3: Palett, 4: TransparencyMask, 5: CMYK, 
-                # 6: YCbCr, 8: CIE L*a*b*, 9: ICC L*a*b*, 10: ITU L*a*b*, 32803: CFA, 
-                # 34892: LinearRaw, 32844: Pixar LogL, 32845: Pixar LogLuv
-                photometric = ifd.get_value('PhotometricInterpretation', photometric) 
-
-                if isinstance(bits_per_sample, numpy.ndarray):
-                    bits_per_pixel = sum(bits_per_sample[:samples_per_pixel])
-                else:
-                    bits_per_pixel = bits_per_sample
-                assert bits_per_pixel % 8 == 0, `bits_per_pixel`
-                bytes_per_pixel = bits_per_pixel // 8
-
-                bytes_per_row = pixels_per_row * bytes_per_pixel
-
-            bytes_per_strip = rows_per_strip * bytes_per_row
-
-            if isinstance(strip_offsets, numpy.ndarray):
-                for off, nb in zip(strip_offsets, strip_nbytes):
-                    strips.append ((off, off+nb, compression, bytes_per_strio))
-            else:
-                strips.append((strip_offsets, strip_offsets+strip_nbytes, compression, bytes_per_strip))
-
-        return strips
+            if ifd.get_value('NewSubfileType')==subfile_type:
+                return ifd
 
     def get_tiff_array(self, sample_index = 0, subfile_type=0):
         """ Create array of sample images.
@@ -385,7 +261,7 @@ class TIFFfile:
             if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
                 # subfile_type: 0: image, 1: reduced image, 2: single page, 4: transparency mask
                 continue
-            planes.append(TiffSamplePlane (ifd, sample_index=sample_index))
+            planes.append(TiffSamplePlane(ifd, sample_index=sample_index))
         return TiffArray(planes)
 
     def get_samples(self, subfile_type=0, verbose=False):
@@ -420,13 +296,9 @@ class TIFFfile:
 
             strip_offsets = ifd.get_value('StripOffsets')
             strip_nbytes = ifd.get_value('StripByteCounts')
-            if isinstance(strip_offsets, numpy.ndarray):
-                l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
-                for off, nb in zip (strip_offsets, strip_nbytes):
-                    full_l.append ((off, off+nb))
-            else:
-                l.append((strip_offsets, strip_offsets+strip_nbytes))
-                full_l.append (l[-1])
+            l.append((strip_offsets[0], strip_offsets[-1]+strip_nbytes[-1]))
+            for off, nb in zip (strip_offsets, strip_nbytes):
+                full_l.append ((off, off+nb))
 
             if i==0:
                 compression = ifd.get_value('Compression')
@@ -438,28 +310,23 @@ class TIFFfile:
                 samples_per_pixel = ifd.get_value('SamplesPerPixel', 1)
                 planar_config = ifd.get_value('PlanarConfiguration')
                 bits_per_sample = ifd.get_value('BitsPerSample')
-                sample_format = ifd.get_value('SampleFormat')
+                sample_format = ifd.get_value('SampleFormat')[0]
                 if self.is_lsm or not isinstance(strip_offsets, numpy.ndarray):
                     strips_per_image = 1
                 else:
                     strips_per_image = len(strip_offsets)
-                format = {1:'uint', 2:'int', 3:'float', None:'uint', 6:'complex'}.get(sample_format)
+                format = sample_format_map.get(sample_format)
                 if format is None:
                     print 'Warning(TIFFfile.get_samples): unsupported sample_format=%s is mapped to uint' % (sample_format)
                     format = 'uint'
 
-                if isinstance (bits_per_sample, numpy.ndarray):
-                    dtype_lst = []
-                    bits_per_pixel = 0
-                    for j in range(samples_per_pixel):
-                        bits = bits_per_sample[j]
-                        bits_per_pixel += bits
-                        dtype = getattr (self.dtypes, '%s%s' % (format, bits))
-                        dtype_lst.append(dtype)
-                else:
-                    bits_per_pixel = bits_per_sample
-                    dtype = getattr (self.dtypes, '%s%s' % (format, bits_per_sample))
-                    dtype_lst = [dtype]
+                dtype_lst = []
+                bits_per_pixel = 0
+                for j in range(samples_per_pixel):
+                    bits = bits_per_sample[j]
+                    bits_per_pixel += bits
+                    dtype = getattr (self.dtypes, '%s%s' % (format, bits))
+                    dtype_lst.append(dtype)
                 bytes_per_pixel = bits_per_pixel // 8
                 assert 8*bytes_per_pixel == bits_per_pixel,`bits_per_pixel`
                 bytes_per_row = width * bytes_per_pixel
@@ -481,10 +348,8 @@ class TIFFfile:
                 else:
                     strip_length = max (strip_length, l[-1][1] - l[-1][0])
                     strip_length_str = ' < ' + bytes2str(strip_length)
-                if isinstance (bits_per_sample, numpy.ndarray):
-                    assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),`bits_per_sample, ifd.get_value('BitsPerSample')`
-                else:
-                    assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)),`bits_per_sample, ifd.get_value('BitsPerSample')`
+
+                assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),`bits_per_sample, ifd.get_value('BitsPerSample')`
             if i>0:
                 if i==1:
                     step = l[-1][0] - l[-2][1]
@@ -565,31 +430,20 @@ strip_length : %(strip_length_str)s
                 else:
                     raise NotImplementedError (`subfile_type`)
                 samples = []
-                if isinstance(bits_per_sample, numpy.ndarray):
-                    for j in range(samples_per_pixel):
-                        bytes = bits_per_sample[j] // 8 * width * length
-                        tmp = arr[:,k:k+bytes]
-                        #tmp = tmp.reshape((tmp.size,))
-                        tmp = tmp.view(dtype=dtype_lst[j])
-                        tmp = tmp.reshape((depth, length, width))
-                        samples.append(tmp)
-                        k += bytes
-                else:
-                    assert samples_per_pixel==1,`samples_per_pixel, bits_per_sample`
-                    bytes = bits_per_sample // 8 * width * length
+
+                for j in range(samples_per_pixel):
+                    bytes = bits_per_sample[j] // 8 * width * length
                     tmp = arr[:,k:k+bytes]
-                    #tmp = tmp.reshape((tmp.size,))
-                    tmp = tmp.view(dtype=dtype_lst[0])
+                        #tmp = tmp.reshape((tmp.size,))
+                    tmp = tmp.view(dtype=dtype_lst[j])
                     tmp = tmp.reshape((depth, length, width))
                     samples.append(tmp)
+                    k += bytes
                 return samples, sample_names
             raise NotImplementedError (`planar_config, self.is_lsm`)
         elif planar_config==1:
             samples = []
-            if isinstance(bits_per_sample, numpy.ndarray):
-                bytes = sum(bits_per_sample[:samples_per_pixel]) // 8 * width * length
-            else:
-                bytes = bits_per_sample // 8 * width * length
+            bytes = sum(bits_per_sample[:samples_per_pixel]) // 8 * width * length
             for j in range(samples_per_pixel):
                 tmp = arr[:,k+j:k+j+bytes:samples_per_pixel]
                 tmp = tmp.reshape((tmp.size,)).view(dtype=dtype_lst[j])
@@ -610,12 +464,14 @@ class IFD:
     def __init__(self, tiff):
         self.tiff = tiff
         self.entries = []
+        self.entries_dict = {}
 
     def __len__ (self):
         return len (self.entries)
 
     def append(self, entry):
         self.entries.append(entry)
+        self.entries_dict[entry.tag_name] = entry
 
     @property
     def memory_usage(self):
@@ -639,9 +495,8 @@ class IFD:
     def get(self, tag_name):
         """Return IFD entry with given tag name.
         """
-        for entry in self.entries:
-            if entry.tag_name==tag_name:
-                return entry
+        return self.entries_dict.get(tag_name)
+
     def get_value(self, tag_name, default=None):
         """ Return the value of IFD entry with given tag name.
 
@@ -649,8 +504,57 @@ class IFD:
         """
         entry = self.get(tag_name)
         if entry is not None:
-            return entry.value
-        return default
+            value = entry.value
+        else:
+            if default is None:
+                value = default_tag_values.get(tag_name)
+            else:
+                sys.stdout.write ('Warning: no default value defined for %r IFD tag\n' % (tag_name))
+                value = default
+        if tag_name in ['StripOffsets', 'StripByteCounts']:
+            if not isinstance (value, numpy.ndarray):
+                value = numpy.array([value])                
+        if tag_name in ['BitsPerSample', 'SampleFormat']:
+            samples_per_pixel = self.get_value ('SamplesPerPixel', 1)
+            if not isinstance (value, numpy.ndarray):
+                value = numpy.array([value]*samples_per_pixel)
+            if tag_name in ['BitsPerSample']:
+                value = value[:samples_per_pixel]
+        return value
+
+    def get_sample_names(self):
+        subfile_type = self.get_value('NewSubfileType')
+        samples_per_pixel = self.get_value('SamplesPerPixel')
+        if self.tiff.is_lsm:
+            if subfile_type==0:
+                return self.tiff.lsminfo.get('data channel name')
+            if subfile_type==1 and samples_per_pixel==3:
+                return ['red', 'green', 'blue']
+        return ['sample%i' % i for i in range(samples_per_pixel)]
+
+    def get_pixel_name(self):
+        subfile_type = self.get_value('NewSubfileType')
+        samples_per_pixel = self.get_value('SamplesPerPixel')
+        if self.tiff.is_lsm:
+            if subfile_type==0:
+                return '_'.join(self.tiff.lsminfo.get('data channel name'))
+            if subfile_type==1 and samples_per_pixel==3:
+                return 'rgb'
+        return 'pixel'
+
+    def get_sample_dtypes(self):
+        sample_format = self.get_value('SampleFormat')
+        bits_per_sample = self.get_value('BitsPerSample')
+        return [self.tiff.dtypes.get_dtype(f, b) for f,b in zip(sample_format, bits_per_sample)]
+
+    def get_pixel_dtype(self):
+        sample_names = self.get_sample_names ()
+        sample_dtypes = self.get_sample_dtypes ()
+        return numpy.dtype (zip(sample_names, sample_dtypes))
+
+    def get_pixel_typename(self):
+        sample_dtypes = self.get_sample_dtypes ()
+        return '_'.join (map(str, sample_dtypes))
 
     def finalize(self):
         for entry in self.entries:

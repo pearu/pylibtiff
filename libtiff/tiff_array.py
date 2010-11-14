@@ -19,68 +19,70 @@ class TiffSamplePlane:
     """
 
     def __init__(self, ifd, sample_index=0):
+        """ Construct TiffSamplePlane instance.
+
+        Parameters
+        ----------
+        ifd : `libtiff.tiff_file.IFDEntry`
+        sample_index : int
+          Specify sample index. When None then interpret pixel as a sample.
+        """
         self.ifd = ifd
         self.sample_index = sample_index
 
-        self.planar_config = planar_config = ifd.get_value('PlanarConfiguration', 1)
+        self.planar_config = planar_config = ifd.get_value('PlanarConfiguration')
 
-        self.samples_per_pixel = samples_per_pixel = ifd.get_value('SamplesPerPixel', 1)
-        if sample_index >= samples_per_pixel:
+        self.samples_per_pixel = samples_per_pixel = ifd.get_value('SamplesPerPixel')
+
+        if sample_index is not None and sample_index >= samples_per_pixel:
             raise IndexError ('sample index %r must be less that nof samples %r' % (sample_index, samples_per_pixel))
 
         pixels_per_row = ifd.get_value('ImageWidth')
         rows_of_pixels = ifd.get_value('ImageLength')
         self.shape = (rows_of_pixels, pixels_per_row)
 
-        rows_per_strip = ifd.get_value('RowsPerStrip', 2**32-1)
+        rows_per_strip = ifd.get_value('RowsPerStrip')
         strips_per_image = (rows_of_pixels + rows_per_strip - 1) // rows_per_strip
         rows_per_strip = min(rows_of_pixels, rows_per_strip)
         self.rows_per_strip = rows_per_strip
 
-        strip_offsets = ifd.get_value('StripOffsets')
-        strip_nbytes = ifd.get_value('StripByteCounts')
-        bits_per_sample = ifd.get_value('BitsPerSample', 1)
-        sample_format = ifd.get_value('SampleFormat', 1)
-
-        if not isinstance(strip_offsets, numpy.ndarray):
-            strip_offsets = numpy.array ([strip_offsets])
-            strip_nbytes = numpy.array ([strip_nbytes])
-        if not isinstance(bits_per_sample, numpy.ndarray):
-            bits_per_sample = numpy.array ([bits_per_sample])
-        else:
-            bits_per_sample = bits_per_sample[:samples_per_pixel]
-        if not isinstance(sample_format, numpy.ndarray):
-            sample_format = numpy.array ([sample_format])
-
-        self.strip_offsets = strip_offsets
-        self.strip_nbytes = strip_nbytes
-        self.sample_format = sample_format
-        self.bits_per_sample = bits_per_sample
+        self.strip_offsets = strip_offsets = ifd.get_value('StripOffsets')
+        self.strip_nbytes = strip_nbytes = ifd.get_value('StripByteCounts')
+        self.sample_format = sample_format = ifd.get_value('SampleFormat')
+        self.bits_per_sample = bits_per_sample = ifd.get_value('BitsPerSample')
 
         bits_per_pixel = sum(bits_per_sample)
-        assert bits_per_pixel % 8==0, `bits_per_pixel`
+        assert bits_per_pixel % 8==0, `bits_per_pixel, bits_per_sample`
         bytes_per_pixel = bits_per_pixel // 8
         
-        bytes_per_sample = bits_per_sample[sample_index] // 8
+        if sample_index is None:
+            bytes_per_sample = bytes_per_pixel
+        else:
+            bytes_per_sample = bits_per_sample[sample_index] // 8
         bytes_per_row = bytes_per_pixel * pixels_per_row
         bytes_per_strip = rows_per_strip * bytes_per_row
 
-        dtype = ifd.tiff.dtypes.get_dtype (sample_format[sample_index], bits_per_sample[sample_index])
-        sample_names = ['sample%i' % i for i in range(samples_per_pixel)]
+        sample_names = ifd.get_sample_names()
+        pixel_dtype = ifd.get_pixel_dtype()
+
+        sample_offset = 0
+        if sample_index is None:
+            dtype = pixel_dtype
+            sample_names = ['pixel']
+            sample_name = 'pixel'
+        else:
+            dtype = ifd.get_sample_dtypes ()[sample_index]
+            sample_name = sample_names[sample_index]
+            if planar_config==1:
+                sample_offset = sum(bits_per_sample[:sample_index]) // 8
 
         bytes_per_row = pixels_per_row * bytes_per_pixel # uncompressed
 
-        if planar_config==1:
+        sample_offset = 0
+        if planar_config==1 or sample_index is None:
             bytes_per_sample_row = bytes_per_row
-            sample_offset = sum(bits_per_sample[:sample_index]) // 8
-            d = []
-            for name, format, bits in zip(sample_names, sample_format, bits_per_sample):
-                d.append((name, ifd.tiff.dtypes.get_dtype(format, bits)))
-            pixel_dtype = numpy.dtype(d)
         else:
             bytes_per_sample_row = bytes_per_row // samples_per_pixel
-            sample_offset = 0
-            pixel_dtype = None
 
         self.dtype = dtype
         self.pixel_dtype = pixel_dtype
@@ -89,8 +91,8 @@ class TiffSamplePlane:
         self.bytes_per_row = bytes_per_row
         self.bytes_per_sample_image = bytes_per_sample_row * rows_of_pixels
         self.uncompressed_bytes_per_strip = bytes_per_strip
-        self.compression = compression = ifd.get_value('Compression', 1)
-        self.sample_name = sample_names[sample_index]
+        self.compression = compression = ifd.get_value('Compression')
+        self.sample_name = sample_name
         self.sample_offset = sample_offset
         self.bytes_per_sample_row = bytes_per_sample_row
         self.strips_per_image = strips_per_image
@@ -183,7 +185,10 @@ rows_per_strip=%(rows_per_strip)s
             image = image[self.sample_name].reshape (self.shape)
             return image
         else:
-            start = self.strip_offsets[0] + self.sample_index * self.bytes_per_sample_image
+            if self.sample_index is None:
+                start = self.strip_offsets[0]
+            else:
+                start = self.strip_offsets[0] + self.sample_index * self.bytes_per_sample_image
             stop = start + self.bytes_per_sample_image
             image = self.ifd.tiff.data[start:stop]
             image = image.view(dtype=self.dtype).reshape(self.shape)
@@ -200,6 +205,10 @@ rows_per_strip=%(rows_per_strip)s
                 return self.get_image()[index]
             return self.get_rows(index)
         elif isinstance(index, tuple):
+            if len(index)==0:
+                if self.is_contiguous:
+                    return self.get_image()
+                return self.get_rows(slice(None))
             if len(index)==1:
                 return self[index[0]]
             index0 = index[0]
@@ -228,12 +237,14 @@ class TiffArray:
 
     def __getitem__ (self, index):
         if isinstance(index, (int, long)):
-            return self.planes[index][slice(self.shape[1])]
+            if self.sample_index is None:
+                print self.shape
+            return self.planes[index][()]
         elif isinstance (index, slice):
             indices = range (*index.indices(self.shape[0]))
             r = numpy.empty((len(indices),)+self.shape[1:], dtype=self.dtype)
             for i,j in enumerate(indices):
-                r[i] = self.planes[j][slice(self.shape[1])]
+                r[i] = self.planes[j][()]
             return r
         elif isinstance(index, tuple):
             if len (index)==0:
@@ -261,6 +272,7 @@ class TiffArray:
         else:
             self.dtype = plane.dtype
             self.shape = (1,) + plane.shape
+            self.sample_index = plane.sample_index
         self.planes.append(plane)
 
     def extend(self, other):
