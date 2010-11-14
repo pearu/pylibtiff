@@ -5,7 +5,8 @@ Defines data for TIFF manipulations.
 
 __all__ = ['type2name', 'name2type', 'type2bytes', 'type2dtype',
            'tag_value2name', 'tag_name2value', 'tag_value2type',
-           'LittleEndianNumpyDTypes', 'BigEndianNumpyDTypes']
+           'LittleEndianNumpyDTypes', 'BigEndianNumpyDTypes',
+           'default_tag_values', 'sample_format_map']
 
 import numpy
 
@@ -115,6 +116,13 @@ Copyright 8298 ASCII Any
 # non-standard tags:
 CZ_LSMInfo 866C CZ_LSM
 '''
+
+default_tag_values = dict(BitsPerSample=8, SampleFormat=1,
+                          RowsPerStrip=2**32-1,
+                          SamplesPerPixel=1,
+                          PlanarConfiguration=1,
+                          Compression=1,
+                          NewSubfileType=0)
 
 rational = numpy.dtype([('numer', numpy.uint32), ('denom', numpy.uint32)])
 srational = numpy.dtype([('numer', numpy.int32), ('denom', numpy.int32)])
