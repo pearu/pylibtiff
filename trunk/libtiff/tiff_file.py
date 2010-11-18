@@ -214,13 +214,13 @@ class TIFFfile:
         """
         s = set()
         for ifd in self.IFD:
-            s.add(ifd.get_value('NewSubfileType', 0))
+            s.add(ifd.get_value('NewSubfileType'))
         return sorted(s)
 
     def get_depth (self, subfile_type=0):
         depth = 0
         for ifd in self.IFD:
-            if ifd.get_value('NewSubfileType', 0)==subfile_type:
+            if ifd.get_value('NewSubfileType')==subfile_type:
                 depth += 1
         return depth
 
@@ -286,7 +286,7 @@ class TIFFfile:
         i = 0
         step = 0
         can_return_memmap = True
-        ifd_lst = [ifd for ifd in self.IFD if ifd.get_value('NewSubfileType', subfile_type)==subfile_type]
+        ifd_lst = [ifd for ifd in self.IFD if ifd.get_value('NewSubfileType')==subfile_type]
 
         depth = len(ifd_lst)
         full_l = []
@@ -307,7 +307,7 @@ class TIFFfile:
                     #raise ValueError('Unable to get contiguous samples from compressed data (compression=%s)' % (compression))            
                 width = ifd.get_value('ImageWidth')
                 length = ifd.get_value('ImageLength')
-                samples_per_pixel = ifd.get_value('SamplesPerPixel', 1)
+                samples_per_pixel = ifd.get_value('SamplesPerPixel')
                 planar_config = ifd.get_value('PlanarConfiguration')
                 bits_per_sample = ifd.get_value('BitsPerSample')
                 sample_format = ifd.get_value('SampleFormat')[0]
@@ -508,14 +508,15 @@ class IFD:
         else:
             if default is None:
                 value = default_tag_values.get(tag_name)
+                if value is None:
+                    sys.stdout.write ('%s.get_value:warning: no default value defined tiff_data.default_tag_values dict for %r IFD tag\n' % (self.__class__.__name__, tag_name))
             else:
-                sys.stdout.write ('Warning: no default value defined for %r IFD tag\n' % (tag_name))
                 value = default
         if tag_name in ['StripOffsets', 'StripByteCounts']:
             if not isinstance (value, numpy.ndarray):
                 value = numpy.array([value])                
         if tag_name in ['BitsPerSample', 'SampleFormat']:
-            samples_per_pixel = self.get_value ('SamplesPerPixel', 1)
+            samples_per_pixel = self.get_value ('SamplesPerPixel')
             if not isinstance (value, numpy.ndarray):
                 value = numpy.array([value]*samples_per_pixel)
             if tag_name in ['BitsPerSample']:

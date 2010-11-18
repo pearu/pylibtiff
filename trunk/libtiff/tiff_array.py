@@ -265,6 +265,8 @@ class TiffArray:
         raise NotImplementedError (`index`)
 
     def append(self, plane):
+        """ Append tiff plane to tiff array.
+        """
         if self.planes:
             if not self.planes[0].check_same_shape_and_type (plane):
                 raise TypeError('planes are not homogeneous (same shape and sample type), expected %s but got %s' % ((self.planes[0].shape, self.dtype), (plane.shape, plane.dtype)))
@@ -276,5 +278,17 @@ class TiffArray:
         self.planes.append(plane)
 
     def extend(self, other):
+        """ Extend tiff array with the content of another.
+        """
         map(self.append, other.planes)
                 
+    def get_pixel_sizes(self):
+        """ Return ZYX pixels sizes in microns.
+        """
+        ifd = self.planes[0].ifd
+        if ifd.tiff.is_lsm:
+            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
+            line_spacing = ifd.tiff.lsminfo.get('recording line spacing')[0]
+            plane_spacing = ifd.tiff.lsminfo.get('recording plane spacing')[0]
+            return (plane_spacing, line_spacing, sample_spacing)
+        return (1,1,1)
