@@ -6,6 +6,7 @@ available memory in computer.
 Usage:
 >>> tiff = TIFFfile('<filename.(tif|lsm)>')
 >>> samples, sample_names = tiff.get_samples()
+>>> arr = tiff.get_tiff_array(sample_index=0, subfile_type=0)
 
 >>> tiff = TIFFimage(data, description=<str>)
 >>> tiff.write_file (<filename.tif>, compression='none'|'lzw')
@@ -14,7 +15,7 @@ Usage:
 # Author: Pearu Peterson
 # Created: April 2010
 from __future__ import division
-__all__ = ['TIFFfile', 'TIFFimage']
+__all__ = ['TIFFfile', 'TIFFimage', 'TiffArray']
 
 import os
 import sys
@@ -23,6 +24,7 @@ import numpy
 
 from .tiff_file import TIFFfile
 from .tiff_image import TIFFimage
+from .tiff_array import TiffArray
 
 def main ():
     filename = sys.argv[1]
