@@ -64,17 +64,14 @@ def runner (parser, options, args):
         tiff.check_memory_usage(verbose=True)
         print '-----'
 
-    print 'reading samples...'
-    r = tiff.get_samples(0, verbose=True)
-    print 'samples:'
-    for arr, name in zip(*r):
-        print '  %s: class=%s, dtype=%s, shape=%s, size=%s' \
-              % (name, type(arr).__name__, arr.dtype, arr.shape, bytes2str(arr.size))
-    if tiff.is_lsm:
-        for arr, name in zip(*tiff.get_samples(1)):
-            print '  %s: class=%s, dtype=%s, shape=%s, size=%s' \
-                  % (name, type(arr).__name__, arr.dtype, arr.shape, bytes2str(arr.size))
-
+    for subfile_type in tiff.get_subfile_types():
+        ifd0 = tiff.get_first_ifd (subfile_type=subfile_type)
+        for sample_index, n in enumerate (ifd0.get_sample_names()):
+            print 'Sample %s in subfile %s:' % (sample_index, subfile_type)
+            arr = tiff.get_tiff_array (sample_index=sample_index, subfile_type=subfile_type)
+            print '  shape=',arr.shape
+            print '  dtype=',arr.dtype
+            print '  pixel_sizes=',arr.get_pixel_sizes()
 
 def main ():
     try:
