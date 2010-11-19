@@ -699,7 +699,10 @@ class IFDEntry:
                 return r
         if hasattr(self, 'value'):
             self.value_str = self._value_str
-            return 'IFDEntry(tag=%(tag_name)s, value=%(value_str)r, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
+            if self.tag_name=='ImageDescription':
+                return 'IFDEntry(tag=%(tag_name)s, value="%(value_str)s", count=%(count)s, offset=%(offset)s)' % (self.__dict__)
+            else:
+                return 'IFDEntry(tag=%(tag_name)s, value=%(value_str)r, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
         else:
             return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (self.__dict__)
 
