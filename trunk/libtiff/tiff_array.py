@@ -39,7 +39,7 @@ class TiffSamplePlane:
 
         pixels_per_row = ifd.get_value('ImageWidth')
         rows_of_pixels = ifd.get_value('ImageLength')
-        self.shape = (rows_of_pixels, pixels_per_row)
+        self.shape = (int(rows_of_pixels), int(pixels_per_row))
 
         rows_per_strip = ifd.get_value('RowsPerStrip')
         strips_per_image = (rows_of_pixels + rows_per_strip - 1) // rows_per_strip
