@@ -119,10 +119,22 @@ CZ_LSMInfo 866C CZ_LSM
 
 default_tag_values = dict(BitsPerSample=8, SampleFormat=1,
                           RowsPerStrip=2**32-1,
-                          SamplesPerPixel=1,
+                          SamplesPerPixel=1, ExtraSamples = None,
                           PlanarConfiguration=1,
-                          Compression=1,
-                          NewSubfileType=0)
+                          Compression=1, Predictor = 1, 
+                          NewSubfileType=0,
+                          Orientation = 1,
+                          MaxSampleValue = None, MinSampleValue = None,
+                          DateTime = None,
+                          Artist = None,
+                          HostComputer = None,
+                          Software = None,
+                          ImageDescription = None,
+                          DocumentName = None,
+                          ResolutionUnit = 2, XResolution = 1, YResolution = 1,
+                          FillOrder = 1,
+                          XPosition = None, YPosition = None,
+                          Make = None, Model = None, Copyright=None,)
 
 rational = numpy.dtype([('numer', numpy.uint32), ('denom', numpy.uint32)])
 srational = numpy.dtype([('numer', numpy.int32), ('denom', numpy.int32)])

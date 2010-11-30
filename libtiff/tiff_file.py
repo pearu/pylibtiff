@@ -7,7 +7,7 @@ from __future__ import division
 
 __all__ = ['TIFFfile']
 
-
+import os
 import sys
 import numpy
 from numpy.testing.utils import memusage
@@ -32,15 +32,30 @@ class TIFFfile:
     IFD : IFD-list
     """
 
-    def __init__(self, filename, mode='r', first_byte = 0):
+    def close(self):
+        if hasattr(self, 'data'):
+            if self.verbose:
+                sys.stdout.write('Closing TIFF file %r\n' % (self.filename)); sys.stdout.flush()
+            del self.data
+
+    __del__ = close
+
+    def __init__(self, filename, mode='r', first_byte = 0, verbose=False):
+        if verbose:
+            sys.stdout.write ('Opening file %r\n' % (filename)); sys.stdout.flush()
+        self.verbose = verbose
+        self.filename = filename
         if mode!='r':
             raise NotImplementedError(`mode`)
-        self.filename = filename
+        if not os.path.isfile (filename):
+            raise ValueError ('file does not exists')
+        if not os.stat(filename).st_size:
+            raise ValueError ('file has zero size')
         self.first_byte = first_byte
-        self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
 
+        self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
-        byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)
+        byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)[0]
         if byteorder==0x4949:
             self.endian = 'little'
             self.dtypes = LittleEndianNumpyDTypes
@@ -67,7 +82,12 @@ class TIFFfile:
             IFD_list.append(ifd)
             self.memory_usage.append((IFD_offset, IFD_offset + 2 + n*12 + 4, 'IFD%s entries (%s)' % (len(IFD_list), len(ifd))))
             IFD_offset = self.get_uint32(IFD_offset + 2 + n*12)
+            if verbose:
+                sys.stdout.write('\rIFD information read: %s..' % (len (IFD_list))); sys.stdout.flush()
+
         self.IFD = IFD_list
+        if verbose:
+            sys.stdout.write(' done\n'); sys.stdout.flush()
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.filename)
@@ -88,8 +108,8 @@ class TIFFfile:
     get_long = get_uint32
     get_double = get_float64
 
-    def get_value(self, offset, type):
-        values = self.get_values(offset, type, 1)
+    def get_value(self, offset, typ):
+        values = self.get_values(offset, typ, 1)
         if values is not None:
             return values[0]
 
@@ -454,6 +474,57 @@ strip_length : %(strip_length_str)s
         else:
             raise NotImplementedError (`planar_config`)
 
+    def get_info (self):
+        """ Return basic information about the file.
+        """
+        l = []
+        subfile_types = self.get_subfile_types()
+        l.append ('Number of subfile types: %s' % (len (subfile_types)))
+        for subfile_type in subfile_types:
+            ifd = self.get_first_ifd(subfile_type=subfile_type)
+            l.append ('-'*50)
+            l.append('Subfile type: %s' % (subfile_type))
+            l.append('Number of images: %s' % (self.get_depth(subfile_type = subfile_type)))
+            for tag in ['ImageLength', 
+                        'ImageWidth', 
+                        'SamplesPerPixel','ExtraSamples',
+                        'SampleFormat',
+                        'Compression','Predictor',
+                        'PhotometricInterpretation',
+                        'Orientation',
+                        'PlanarConfiguration',
+                        'MinSampleValue', 'MaxSampleValue',
+                        'XResolution', 'YResolution','ResolutionUnit',
+                        'XPosition','YPosition',
+                        'DocumentName',
+                        'Software',
+                        'HostComputer',
+                        'Artist',
+                        'DateTime',
+                        'Make','Model','Copyright',
+                        'ImageDescription',
+                        ]:
+                v = ifd.get_value(tag, human=True)
+                if v is None:
+                    continue
+                if tag=='ImageDescription' and subfile_type==0:
+                    if v.startswith ('<?xml') or v[:4].lower()=='<ome':
+                        try:
+                            import lxml.etree
+                            tree = lxml.etree.fromstring(v)
+                            v = lxml.etree.tostring (tree, pretty_print=True)
+                        except Exception, msg:
+                            print '%s.get_info: failed to parse xml in ImageDescription: %s' % (self.__class__.__name__, msg)
+                        l.append ('%s:\n"""%s"""' % (tag, v))
+                    else:
+                        l.append ('%s:\n"""%s"""' % (tag, v))
+                else:
+                    l.append ('%s: %s' % (tag, v))
+            if self.is_lsm and subfile_types==0:
+                l.append ('LSM info:\n"""%s"""' % (self.lsminfo))
+
+        return '\n'.join(l)
+
 class IFD:
     """ Image File Directory data structure.
 
@@ -497,7 +568,7 @@ class IFD:
         """
         return self.entries_dict.get(tag_name)
 
-    def get_value(self, tag_name, default=None):
+    def get_value(self, tag_name, default=None, human=False):
         """ Return the value of IFD entry with given tag name.
 
         When the entry does not exist, return default.
@@ -507,9 +578,11 @@ class IFD:
             value = entry.value
         else:
             if default is None:
-                value = default_tag_values.get(tag_name)
-                if value is None:
-                    sys.stdout.write ('%s.get_value:warning: no default value defined tiff_data.default_tag_values dict for %r IFD tag\n' % (self.__class__.__name__, tag_name))
+                if default_tag_values.has_key(tag_name):
+                    value = default_tag_values[tag_name]
+                else:
+                    value = None
+                    sys.stdout.write ('%s.get_value: no default value defined tiff_data.default_tag_values dict for %r IFD tag\n' % (self.__class__.__name__, tag_name))
             else:
                 value = default
         if tag_name in ['StripOffsets', 'StripByteCounts']:
@@ -521,6 +594,33 @@ class IFD:
                 value = numpy.array([value]*samples_per_pixel)
             if tag_name in ['BitsPerSample']:
                 value = value[:samples_per_pixel]
+        if tag_name in ['ImageDescription', 'Software', 'Copyright', 'DocumentName', 'Model', 'Make', 'PageName',
+                        'DateTime', 'Artist', 'HostComputer']:
+            if value is not None:
+                return ''.join(value.view('|S%s' % (value.nbytes//value.size)))
+        if human:
+            if tag_name=='Compression':
+                value = {1:'Uncompressed', 2:'CCITT1D', 3:'Group3Fax', 4:'Group4Fax',
+                         5:'LZW', 6:'JPEG', 32773:'PackBits'}.get (value, value)
+            elif tag_name=='Predictor':
+                value = {1: 'None', 2: 'HorizontalDifferencing'}.get (value,value)
+            elif tag_name=='PhotometricInterpretation':
+                value = {0:'WhiteIsZero', 1:'BlackIsZero', 2:'RGB',3:'RGBPalette',
+                         4:'TransparencyMask', 5:'CMYK', 6:'YCbCr', 8:'CIELab'}.get (value, value)
+            elif tag_name=='PlanarConfiguration':
+                value = {1:'Chunky', 2:'Planar'}.get (value, value)
+            elif tag_name=='Orientation':
+                value = {1:'TopLeft',2:'TopRight', 3:'BottomRight', 4:'BottomLeft',
+                         5:'LeftTop', 6:'RightTop', 7:'RightBottom', 8:'LeftBottom'}.get (value, value)
+            elif tag_name=='SampleFormat':
+                new_value = []
+                for v in value:
+                    new_value.append(type2name.get (v, v))
+                value = new_value
+            elif tag_name=='ResolutionUnit':
+                value = {1: 'Arbitrary', 2: 'Inch', 3: 'Centimeter'}.get (value, value)
+            elif tag_name=='FillOrder':
+                pass
         return value
 
     def get_sample_names(self):
@@ -678,7 +778,7 @@ class IFDEntry:
         tag_name = self.tag_name
         value = self.value
         if value is not None:
-            if tag_name == 'ImageDescription':
+            if tag_name in ['ImageDescription', 'Software']:
                 return ''.join(value.view('|S%s' % (value.nbytes//value.size)))
         return value
 
