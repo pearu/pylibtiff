@@ -177,20 +177,38 @@ rows_per_strip=%(rows_per_strip)s
         raise NotImplementedError (`index`)
 
     def get_image(self):
-        assert self.is_contiguous
-        if self.planar_config==1:
-            start = self.strip_offsets[0] + self.sample_offset
-            stop = self.strip_offsets[-1] + self.strip_nbytes[-1]
-            image =self.ifd.tiff.data[start:stop].view(dtype=self.pixel_dtype)
-            image = image[self.sample_name].reshape (self.shape)
-            return image
-        else:
-            if self.sample_index is None:
-                start = self.strip_offsets[0]
+        if self.is_contiguous:
+            if self.planar_config==1:
+                start = self.strip_offsets[0] + self.sample_offset
+                stop = self.strip_offsets[-1] + self.strip_nbytes[-1]
+                image =self.ifd.tiff.data[start:stop].view(dtype=self.pixel_dtype)
+                image = image[self.sample_name].reshape (self.shape)
+                return image
             else:
-                start = self.strip_offsets[0] + self.sample_index * self.bytes_per_sample_image
-            stop = start + self.bytes_per_sample_image
-            image = self.ifd.tiff.data[start:stop]
+                if self.sample_index is None:
+                    start = self.strip_offsets[0]
+                else:
+                    start = self.strip_offsets[0] + self.sample_index * self.bytes_per_sample_image
+                stop = start + self.bytes_per_sample_image
+                image = self.ifd.tiff.data[start:stop]
+                image = image.view(dtype=self.dtype).reshape(self.shape)
+                return image
+        else:
+            image = numpy.empty((self.bytes_per_sample_image,), dtype=numpy.uint8)
+            offset = 0
+            for strip_index in range (len (self.strip_offsets)):
+                start = self.strip_offsets[strip_index]
+                stop = start +  self.strip_nbytes[strip_index]            
+                if self.compression==1:
+                    strip = self.ifd.tiff.data[start:stop]
+                else:
+                    compressed_strip = self.ifd.tiff.data[start:stop]
+                    if self.compression==5: # lzw
+                        strip = tif_lzw.decode(compressed_strip, self.uncompressed_bytes_per_strip)
+                    else:
+                        raise NotImplementedError (`self.compression`)
+                image[offset:offset + strip.nbytes] = strip
+                offset += strip.nbytes
             image = image.view(dtype=self.dtype).reshape(self.shape)
             return image
 
@@ -201,11 +219,12 @@ rows_per_strip=%(rows_per_strip)s
         if isinstance (index, (int, long)):
             return self.get_row(index)
         elif isinstance(index, slice):
-            if self.is_contiguous:
+            if self.is_contiguous or 1:
                 return self.get_image()[index]
             return self.get_rows(index)
         elif isinstance(index, tuple):
             if len(index)==0:
+                return self.get_image()
                 if self.is_contiguous:
                     return self.get_image()
                 return self.get_rows(slice(None))
