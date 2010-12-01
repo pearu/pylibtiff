@@ -219,23 +219,16 @@ rows_per_strip=%(rows_per_strip)s
         if isinstance (index, (int, long)):
             return self.get_row(index)
         elif isinstance(index, slice):
-            if self.is_contiguous or 1:
-                return self.get_image()[index]
-            return self.get_rows(index)
+            return self.get_image()[index]
         elif isinstance(index, tuple):
             if len(index)==0:
                 return self.get_image()
-                if self.is_contiguous:
-                    return self.get_image()
-                return self.get_rows(slice(None))
             if len(index)==1:
                 return self[index[0]]
             index0 = index[0]
             if isinstance(index0, (int, long)):
                 return self.get_row(index0, index[1:])
-            if self.is_contiguous:
-                return self.get_image()[index]
-            return self.get_rows(index0, index[1:])
+            return self.get_image()[index]
         raise NotImplementedError (`index`)
 
 class TiffArray:
