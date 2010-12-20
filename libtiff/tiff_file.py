@@ -5,7 +5,7 @@ Provides TIFFfile class.
 # Created: June 2010
 from __future__ import division
 
-__all__ = ['TIFFfile']
+__all__ = ['TIFFfile', 'TiffFile']
 
 import os
 import sys
@@ -14,13 +14,16 @@ from numpy.testing.utils import memusage
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
 from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, default_tag_values, sample_format_map
 from .utils import bytes2str
+from .tiff_base import TiffBase
 import lsm
 import tif_lzw
+
+
 
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []
 
-class TIFFfile:
+class TIFFfile(TiffBase):
     """
     Hold a TIFF file image stack that is accessed via memmap.
     To access image, use get_tiff_array method.
@@ -53,7 +56,24 @@ class TIFFfile:
             raise ValueError ('file has zero size')
         self.first_byte = first_byte
 
-        self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
+        try:
+            self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
+        except Exception, msg:
+            if 'Too many open files' in str (msg):
+                print '''\
+======================================================================
+An exception was raised with message: 
+  %s
+Ubuntu Linux users:
+  Check `ulimit -n`.
+  To increase the number of open files limits, add the following lines
+    *            hard    nofile          16384
+    *            soft    nofile          16384
+  to /etc/security/limits.conf and run `sudo start procps`
+======================================================================
+''' % (msg)
+                raise IOError ('%s' % (msg))
+            raise
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
         byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)[0]
         if byteorder==0x4949:
@@ -88,6 +108,10 @@ class TIFFfile:
         self.IFD = IFD_list
         if verbose:
             sys.stdout.write(' done\n'); sys.stdout.flush()
+
+        self.time = None
+    def set_time (self, time):
+        self.time = time
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.filename)
@@ -272,17 +296,24 @@ class TIFFfile:
 
         Returns
         -------
-        array : TiffArray
+        tiff_array : TiffArray
           Array of sample images. The array has rank equal to 3.
         """
         from tiff_array import TiffArray, TiffSamplePlane
         planes = []
+        index = 0
+        time_lst = self.time
         for ifd in self.IFD:
             if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
                 # subfile_type: 0: image, 1: reduced image, 2: single page, 4: transparency mask
                 continue
-            planes.append(TiffSamplePlane(ifd, sample_index=sample_index))
-        return TiffArray(planes)
+            plane = TiffSamplePlane(ifd, sample_index=sample_index)
+            if time_lst is not None:
+                plane.set_time(time_lst[index])
+            planes.append(plane)
+            index += 1
+        tiff_array = TiffArray(planes)
+        return tiff_array
 
     def get_samples(self, subfile_type=0, verbose=False):
         """
@@ -525,6 +556,8 @@ strip_length : %(strip_length_str)s
 
         return '\n'.join(l)
 
+TiffFile = TIFFfile
+
 class IFD:
     """ Image File Directory data structure.
 
@@ -719,6 +752,53 @@ class IFD:
         else:
             raise NotImplementedError (`self.tiff`)
 
+    def get_voxel_sizes(self):
+        tiff = self.tiff
+        if tiff.is_lsm:
+            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
+            line_spacing = ifd.tiff.lsminfo.get('recording line spacing')[0]
+            plane_spacing = ifd.tiff.lsminfo.get('recording plane spacing')[0]
+            return (line_spacing, sample_spacing)
+        descr = self.get_value('ImageDescription', human=True)
+        if descr is None:
+            return (1,1,1)
+        if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
+            raise NotImplementedError('getting voxel sizes from OME-XML string')
+        ix = descr.find('PixelSizeX')
+        iy = descr.find('PixelSizeY')
+        iz = descr.find('PixelSizeZ')
+        if ix == -1: x = 1
+        else: x = float(descr[ix:].split (None, 2)[1].strip())
+        if iy == -1: y = 1
+        else: y = float(descr[iy:].split (None, 2)[1].strip())
+        if iz == -1: z = 1
+        else: z = float(descr[iz:].split (None, 2)[1].strip())
+
+        if -1 not in [ix,iy]:
+            return (z, y, x)
+        print 'Could not determine voxel sizes from\n%s' % (descr)
+        return (z,y,x)
+
+    def get_pixel_sizes(self):
+        tiff = self.tiff
+        if tiff.is_lsm:
+            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
+            line_spacing = tiff.lsminfo.get('recording line spacing')[0]
+            return (line_spacing, sample_spacing)
+        descr = self.get_value('ImageDescription', human=True)
+        if descr is None:
+            return (1,1)
+        if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
+            raise NotImplementedError('getting pixels sizes from OME-XML string')
+        ix = descr.find('PixelSizeX')
+        iy = descr.find('PixelSizeY')
+        if -1 not in [ix,iy]:
+            x = descr[ix:].split (None, 2)[1].strip()
+            y = descr[iy:].split (None, 2)[1].strip()
+            return (float(y), float(x))
+        print 'Could not determine pixel sizes from\n%s' % (descr)
+        return (1,1)
+
 class IFDEntry:
     """ Entry for Image File Directory data structure.
 
@@ -808,6 +888,9 @@ class IFDEntry:
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.tiff, self.offset)
+
+
+
 
 def StripOffsets_hook(ifdentry):
     if ifdentry.tag_name=='StripOffsets':
