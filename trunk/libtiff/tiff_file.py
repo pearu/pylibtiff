@@ -764,18 +764,21 @@ class IFD:
             return (1,1,1)
         if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
             raise NotImplementedError('getting voxel sizes from OME-XML string')
-        ix = descr.find('PixelSizeX')
-        iy = descr.find('PixelSizeY')
-        iz = descr.find('PixelSizeZ')
-        if ix == -1: x = 1
-        else: x = float(descr[ix:].split (None, 2)[1].strip())
-        if iy == -1: y = 1
-        else: y = float(descr[iy:].split (None, 2)[1].strip())
-        if iz == -1: z = 1
-        else: z = float(descr[iz:].split (None, 2)[1].strip())
+        for vx,vy,vz in [('VoxelSizeX', 'VoxelSizeY', 'VoxelSizeZ'),
+                         ('PixelSizeX', 'PixelSizeY', 'PixelSizeZ'),
+                         ]:
+            ix = descr.find(vx)
+            iy = descr.find(vy)
+            iz = descr.find(vz)
+            if ix == -1: x = 1
+            else: x = float(descr[ix:].split (None, 2)[1].strip())
+            if iy == -1: y = 1
+            else: y = float(descr[iy:].split (None, 2)[1].strip())
+            if iz == -1: z = 1
+            else: z = float(descr[iz:].split (None, 2)[1].strip())
 
-        if -1 not in [ix,iy]:
-            return (z, y, x)
+            if -1 not in [ix,iy]:
+                return (z, y, x)
         print 'Could not determine voxel sizes from\n%s' % (descr)
         return (z,y,x)
 
@@ -790,12 +793,17 @@ class IFD:
             return (1,1)
         if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
             raise NotImplementedError('getting pixels sizes from OME-XML string')
-        ix = descr.find('PixelSizeX')
-        iy = descr.find('PixelSizeY')
-        if -1 not in [ix,iy]:
-            x = descr[ix:].split (None, 2)[1].strip()
-            y = descr[iy:].split (None, 2)[1].strip()
-            return (float(y), float(x))
+        for vx,vy,vz in [('PixelSizeX', 'PixelSizeY', 'PixelSizeZ'),
+                         ('VoxelSizeX', 'VoxelSizeY', 'VoxelSizeZ'),
+                         ]:
+            ix = descr.find(vx)
+            iy = descr.find(vy)
+            if ix == -1: x = 1
+            else: x = float(descr[ix:].split (None, 2)[1].strip())
+            if iy == -1: y = 1
+            else: y = float(descr[iy:].split (None, 2)[1].strip())
+            if -1 not in [ix,iy]:
+                return (y, x)
         print 'Could not determine pixel sizes from\n%s' % (descr)
         return (1,1)
 
