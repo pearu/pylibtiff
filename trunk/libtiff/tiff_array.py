@@ -98,6 +98,22 @@ class TiffSamplePlane:
         self.strips_per_image = strips_per_image
         self.is_contiguous = compression==1 and ifd.is_contiguous()
 
+        time = None
+        descr = ifd.get_value('ImageDescription', human=True)
+        if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
+            pass
+        elif descr is not None:
+            it = descr.find('RelativeTime')
+            if it != -1:
+                time = float(descr[it:].split (None, 2)[1].strip())
+        self.time = time
+
+    def set_time (self, time):
+        if None not in [self.time, time]:
+            if self.time!=time:
+                print '%s:warning: overwriting time value %s with %s' % (self.__class__.__name__, self.time, time)
+        self.time = time
+
     def check_same_shape_and_type(self, other):
         return self.shape==other.shape and self.dtype==other.dtype
 
@@ -293,14 +309,22 @@ class TiffArray:
         """ Extend tiff array with the content of another.
         """
         map(self.append, other.planes)
-                
-    def get_pixel_sizes(self):
-        """ Return ZYX pixels sizes in microns.
+              
+    def get_voxel_sizes(self):
+        """ Return ZYX voxel sizes in microns.
         """
-        ifd = self.planes[0].ifd
-        if ifd.tiff.is_lsm:
-            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
-            line_spacing = ifd.tiff.lsminfo.get('recording line spacing')[0]
-            plane_spacing = ifd.tiff.lsminfo.get('recording plane spacing')[0]
-            return (plane_spacing, line_spacing, sample_spacing)
-        return (1,1,1)
+        return self.planes[0].ifd.get_voxel_sizes()
+
+    def get_pixel_sizes(self):
+        """ Return YX pixel sizes in microns.
+        """
+        return self.planes[0].ifd.get_pixel_sizes()
+
+    def get_time(self, index = 0):
+        """ Return time parameter of a plane.
+        """
+        return self.planes[index].time
+
+    @property
+    def nbytes(self):
+        return self.shape[0] * self.shape[1] * self.shape[2] * self.dtype.itemsize
