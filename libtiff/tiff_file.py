@@ -755,10 +755,10 @@ class IFD:
     def get_voxel_sizes(self):
         tiff = self.tiff
         if tiff.is_lsm:
-            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
-            line_spacing = ifd.tiff.lsminfo.get('recording line spacing')[0]
-            plane_spacing = ifd.tiff.lsminfo.get('recording plane spacing')[0]
-            return (line_spacing, sample_spacing)
+            sample_spacing = tiff.lsminfo.get('recording sample spacing')[0]
+            line_spacing = tiff.lsminfo.get('recording line spacing')[0]
+            plane_spacing = tiff.lsminfo.get('recording plane spacing')[0]
+            return (plane_spacing, line_spacing, sample_spacing)
         descr = self.get_value('ImageDescription', human=True)
         if descr is None:
             return (1,1,1)
@@ -782,7 +782,7 @@ class IFD:
     def get_pixel_sizes(self):
         tiff = self.tiff
         if tiff.is_lsm:
-            sample_spacing = ifd.tiff.lsminfo.get('recording sample spacing')[0]
+            sample_spacing = tiff.lsminfo.get('recording sample spacing')[0]
             line_spacing = tiff.lsminfo.get('recording line spacing')[0]
             return (line_spacing, sample_spacing)
         descr = self.get_value('ImageDescription', human=True)

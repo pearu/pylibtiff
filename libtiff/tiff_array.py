@@ -100,12 +100,13 @@ class TiffSamplePlane:
 
         time = None
         descr = ifd.get_value('ImageDescription', human=True)
-        if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
-            pass
-        elif descr is not None:
-            it = descr.find('RelativeTime')
-            if it != -1:
-                time = float(descr[it:].split (None, 2)[1].strip())
+        if descr is not None:
+            if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
+                pass
+            else:
+                it = descr.find('RelativeTime')
+                if it != -1:
+                    time = float(descr[it:].split (None, 2)[1].strip())
         self.time = time
 
     def set_time (self, time):
