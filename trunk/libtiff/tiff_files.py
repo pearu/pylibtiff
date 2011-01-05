@@ -1,6 +1,8 @@
+import time
 
 from .tiff_file import TiffFile
-from .tiff_array import TiffArray, TiffSamplePlane
+from .tiff_array import TiffArray
+from .tiff_sample_plane import TiffSamplePlane, TiffSamplePlaneLazy
 from .tiff_base import TiffBase
 
 class TiffFiles(TiffBase):
@@ -20,21 +22,45 @@ class TiffFiles(TiffBase):
             self.tiff_files[filename] = tiff
         return tiff
 
-    def get_tiff_array(self, sample_index = 0, subfile_type=0):
+    def get_tiff_array(self, sample_index = 0, subfile_type=0, assume_one_image_per_file=False):
+        start = time.time ()
         planes = []
-        for index,filename in enumerate(self.files):
-            tiff = self.get_tiff_file(filename)
-            time_lst = self.time_map.get(filename)
-            index = 0
-            for ifd in tiff.IFD:
-                if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
-                    continue
-                plane = TiffSamplePlane(ifd, sample_index=sample_index)
+        
+        if assume_one_image_per_file:
+            for index, filename in enumerate (self.files):
+                time_lst = self.time_map.get(filename)
+                if index==0:
+                    tiff = self.get_tiff_file(filename)
+                    assert len (tiff.IFD)==1,`len (tiff.IFD)`
+                    ifd = tiff.IFD[0]
+                    assert ifd.get_value('NewSubfileType', subfile_type)==subfile_type
+                    plane = TiffSamplePlane(ifd, sample_index=sample_index)
+                else:
+                    def tiff_file_getter(parent=self, filename=filename):
+                        tiff = parent.get_tiff_file(filename)
+                        return tiff
+                    plane = TiffSamplePlaneLazy(tiff_file_getter)
+                    plane.copy_attrs(planes[0])
                 if time_lst is not None:
-                    plane.set_time(time_lst[index])
-                planes.append(plane)
-                index += 1
-        return TiffArray(planes)
+                    assert len (time_lst)==1,`len(time_lst)`
+                    plane.set_time(time_lst[0])
+                planes.append(plane)                    
+        else:
+            for filename in self.files:
+                tiff = self.get_tiff_file(filename)
+                time_lst = self.time_map.get(filename)
+                index = 0
+                for ifd in tiff.IFD:
+                    if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
+                        continue
+                    plane = TiffSamplePlane(ifd, sample_index=sample_index)
+                    if time_lst is not None:
+                        plane.set_time(time_lst[index])
+                    planes.append(plane)
+                    index += 1
+        tiff_array = TiffArray(planes)
+        print '%s.get_tiff_array: took %ss' % (self.__class__.__name__, time.time ()-start)
+        return tiff_array
 
     def close (self):
         for tiff in self.tiff_files.values():
