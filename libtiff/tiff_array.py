@@ -4,6 +4,7 @@
 # Created: Nov 2010
 
 from __future__ import division
+import sys
 import numpy
 
 __all__ = ['TiffArray']
@@ -25,32 +26,37 @@ class TiffArray:
         return self.shape[0]
 
     def __getitem__ (self, index):
-        if isinstance(index, (int, long)):
-            if self.sample_index is None:
-                print self.shape
-            return self.planes[index][()]
-        elif isinstance (index, slice):
-            indices = range (*index.indices(self.shape[0]))
-            r = numpy.empty((len(indices),)+self.shape[1:], dtype=self.dtype)
-            for i,j in enumerate(indices):
-                r[i] = self.planes[j][()]
-            return r
-        elif isinstance(index, tuple):
-            if len (index)==0:
-                return self[:]
-            if len (index)==1:
-                return self[index[0]]
-            index0 = index[0]
-            if isinstance(index0, (int, long)):
-                return self.planes[index0][index[1:]]
-            elif isinstance (index0, slice):
-                indices = range (*index0.indices(self.shape[0]))
+        try:
+            if isinstance(index, (int, long)):
+                if self.sample_index is None:
+                    print self.shape
+                return self.planes[index][()]
+            elif isinstance (index, slice):
+                indices = range (*index.indices(self.shape[0]))
+                r = numpy.empty((len(indices),)+self.shape[1:], dtype=self.dtype)
                 for i,j in enumerate(indices):
-                    s = self.planes[j][index[1:]]
-                    if i==0:
-                        r = numpy.empty((len(indices),)+s.shape, dtype=self.dtype)
-                    r[i] = s
+                    r[i] = self.planes[j][()]
                 return r
+            elif isinstance(index, tuple):
+                if len (index)==0:
+                    return self[:]
+                if len (index)==1:
+                    return self[index[0]]
+                index0 = index[0]
+                if isinstance(index0, (int, long)):
+                    return self.planes[index0][index[1:]]
+                elif isinstance (index0, slice):
+                    indices = range (*index0.indices(self.shape[0]))
+                    for i,j in enumerate(indices):
+                        s = self.planes[j][index[1:]]
+                        if i==0:
+                            r = numpy.empty((len(indices),)+s.shape, dtype=self.dtype)
+                        r[i] = s
+                    return r
+        except IOError, msg:
+            sys.stderr.write('%s.__getitem__:\n%s\n' % (self.__class__.__name__, msg))
+            sys.stderr.flush ()
+            return None
         raise NotImplementedError (`index`)
 
     def append(self, plane):

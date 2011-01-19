@@ -15,6 +15,9 @@ from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2n
 from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, default_tag_values, sample_format_map
 from .utils import bytes2str
 from .tiff_base import TiffBase
+from .tiff_sample_plane import TiffSamplePlane
+from .tiff_array import TiffArray
+
 import lsm
 import tif_lzw
 
@@ -33,6 +36,10 @@ class TIFFfile(TiffBase):
     filename : str
     data : memmap
     IFD : IFD-list
+
+    See also
+    --------
+    TiffFiles, TiffChannelsAndFiles
     """
 
     def close(self):
@@ -58,7 +65,7 @@ class TIFFfile(TiffBase):
 
         try:
             self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
-        except Exception, msg:
+        except IOError, msg:
             if 'Too many open files' in str (msg):
                 print '''\
 ======================================================================
@@ -70,6 +77,16 @@ Ubuntu Linux users:
     *            hard    nofile          16384
     *            soft    nofile          16384
   to /etc/security/limits.conf and run `sudo start procps`
+======================================================================
+''' % (msg)
+                raise IOError ('%s' % (msg))
+            if 'Operation not permitted' in str (msg):
+                print '''\
+======================================================================
+An exception was raised with message: 
+  %s
+The exception may be due to unsufficient access rights or due to
+opening too many files for the given file system.
 ======================================================================
 ''' % (msg)
                 raise IOError ('%s' % (msg))
@@ -299,7 +316,6 @@ Ubuntu Linux users:
         tiff_array : TiffArray
           Array of sample images. The array has rank equal to 3.
         """
-        from tiff_array import TiffArray, TiffSamplePlane
         planes = []
         index = 0
         time_lst = self.time
