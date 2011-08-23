@@ -378,6 +378,7 @@ opening too many files for the given file system.
                 planar_config = ifd.get_value('PlanarConfiguration')
                 bits_per_sample = ifd.get_value('BitsPerSample')
                 sample_format = ifd.get_value('SampleFormat')[0]
+                photometric_interpretation = ifd.get_value('PhotometricInterpretation')
                 if self.is_lsm or not isinstance(strip_offsets, numpy.ndarray):
                     strips_per_image = 1
                 else:
@@ -448,7 +449,11 @@ rows_per_strip : %(rows_per_strip)s
 strip_length : %(strip_length_str)s
 ''' % (locals ())
 
-        sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
+        if photometric_interpretation==2:
+            assert samples_per_pixel==3, `samples_per_pixel`
+            sample_names = ['red', 'green', 'blue']
+        else:
+            sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
         depth = i
 
         if not can_return_memmap:
@@ -456,9 +461,7 @@ strip_length : %(strip_length_str)s
                 if samples_per_pixel==1:
                     i = 0
                     arr = numpy.empty(depth * bytes_per_image, dtype=self.dtypes.uint8)
-                    #bytes_per_strip = bytes_per_image // strips_per_image
                     bytes_per_strip = rows_per_strip * bytes_per_row
-                    #assert len(l)==strips_per_image*depth,`len(l), strips_per_image, depth, bytes_per_strip`
                     for start, end in full_l:
                         #sys.stdout.write ("%s:%s," % (start, end)); sys.stdout.flush ()
                         if compression==1: # none
@@ -471,7 +474,22 @@ strip_length : %(strip_length_str)s
                     arr = arr.view(dtype=dtype_lst[0]).reshape((depth, length, width))
                     return [arr], sample_names
                 else:
-                    raise NotImplementedError(`samples_per_pixel`)
+                    i = 0
+                    arr = numpy.empty(depth * bytes_per_image, dtype=self.dtypes.uint8)
+                    bytes_per_strip = rows_per_strip * bytes_per_row
+                    for start, end in full_l:
+                        sys.stdout.write ("%s:%s," % (start, end)); sys.stdout.flush ()
+                        if compression==1: # none
+                            d = self.data[start:end]
+                        elif compression==5: # lzw
+                            d = self.data[start:end]
+                            d = tif_lzw.decode(d, bytes_per_strip)
+                        arr[i:i+d.nbytes] = d
+                        i += d.nbytes
+                    dt = numpy.dtype(dict(names=sample_names, formats=dtype_lst))
+                    arr = arr.view(dtype=dt).reshape((depth, length, width))
+                    return [arr[n] for n in arr.dtype.names], arr.dtype.names
+                    raise NotImplementedError(`depth, bytes_per_image, samples_per_pixel`)
             else:
                 raise NotImplementedError (`planar_config`)
 
@@ -501,7 +519,6 @@ strip_length : %(strip_length_str)s
                 for j in range(samples_per_pixel):
                     bytes = bits_per_sample[j] // 8 * width * length
                     tmp = arr[:,k:k+bytes]
-                        #tmp = tmp.reshape((tmp.size,))
                     tmp = tmp.view(dtype=dtype_lst[j])
                     tmp = tmp.reshape((depth, length, width))
                     samples.append(tmp)
@@ -511,12 +528,16 @@ strip_length : %(strip_length_str)s
         elif planar_config==1:
             samples = []
             bytes = sum(bits_per_sample[:samples_per_pixel]) // 8 * width * length
+            bytes_per_sample = bits_per_sample // 8
             for j in range(samples_per_pixel):
-                tmp = arr[:,k+j:k+j+bytes:samples_per_pixel]
-                tmp = tmp.reshape((tmp.size,)).view(dtype=dtype_lst[j])
+                i0 = k+j*bytes_per_sample[j]
+                #print j, i0, i0+bytes, samples_per_pixel, arr.shape
+                tmp = arr[:,i0:i0+bytes:samples_per_pixel]
+                tmp = numpy.array(tmp.reshape((tmp.size,)))
+                tmp = tmp.view(dtype=dtype_lst[j])
                 tmp = tmp.reshape((depth, length, width))
                 samples.append(tmp)
-                k += bytes
+                #k += bytes
             return samples, sample_names
         else:
             raise NotImplementedError (`planar_config`)
