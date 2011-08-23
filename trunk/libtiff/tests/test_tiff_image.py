@@ -3,6 +3,32 @@ from tempfile import mktemp
 from numpy import *
 from libtiff import TIFFfile, TIFFimage, TIFF
 
+def test_rw_rgb():
+    itype = uint8
+    dt = dtype(dict(names = list('rgb'), formats = [itype]*3))
+    
+    image = zeros((2,3), dtype=dt)
+    image['r'][:,0] = 250
+    image['g'][:,1] = 251
+    image['b'][:,2] = 252
+
+    fn = mktemp('.tif')
+    tif = TIFFimage(image)
+    tif.write_file(fn,compression='lzw')#, samples='rgb')
+    del tif
+
+    tif = TIFFfile(fn)
+    data, names = tif.get_samples()
+    os.remove(fn)
+    print image
+    print data
+
+    assert itype == data[0].dtype, `itype, data[0].dtype`
+    assert (image['r']==data[0]).all()
+    assert (image['g']==data[1]).all()
+    assert (image['b']==data[2]).all()
+    
+
 def test_write_read():
     for compression in ['none', 'lzw']:
         for itype in [uint8, uint16, uint32, uint64, 

@@ -67,7 +67,9 @@ class TIFFentry:
         return self.values[index]
 
     def add_value(self, value):
-        if self.type_name=='ASCII':
+        if isinstance(value, (list, tuple)):
+            map(self.add_value, value)
+        elif self.type_name=='ASCII':
             value = str(value)
             if self.count[0]==0:
                 self.values.append(value)
@@ -157,7 +159,7 @@ class TIFFimage:
         self.description = description
 
     def write_file(self, filename, compression='none',
-                   strip_size = 2**13, planar_config = 1,
+                   strip_size = 2**13, planar_config = 1,                   
                    validate = False, verbose=None):
         """
         Write image data to TIFF file.
@@ -210,8 +212,16 @@ class TIFFimage:
             if verbose:
                 sys.stdout.write('\r  creating records: %5s%% done  ' % (int(100.0*i/len(self.data))))
                 sys.stdout.flush ()
-
-            sample_format = dict(u=1,i=2,f=3,c=6).get(image.dtype.kind)
+            if image.dtype.kind=='V' and len(image.dtype.names)==3: # RGB image
+                sample_format = dict(u=1,i=2,f=3,c=6).get(image.dtype.fields[image.dtype.names[0]][0].kind)
+                bits_per_sample = [image.dtype.fields[f][0].itemsize*8 for f in image.dtype.names]
+                samples_per_pixel = 3
+                photometric_interpretation = 2
+            else: # gray scale image
+                sample_format = dict(u=1,i=2,f=3,c=6).get(image.dtype.kind)
+                bits_per_sample = image.dtype.itemsize * 8
+                samples_per_pixel = 1
+                photometric_interpretation = 1
             if sample_format is None:
                 print 'Warning(TIFFimage.write_file): unknown data kind %r, mapping to void' % (image.dtype.kind)
                 sample_format = 4
@@ -222,16 +232,16 @@ class TIFFimage:
             assert bytes_per_row * rows_per_strip * strips_per_image >= image.nbytes
             d = dict(ImageWidth=width,
                      ImageLength=length,
-                     Compression=compression_map.get (compression, 1),
-                     PhotometricInterpretation=1,
+                     Compression=compression_map.get(compression, 1),
+                     PhotometricInterpretation=photometric_interpretation,
                      PlanarConfiguration=planar_config,
                      Orientation=1,
                      ResolutionUnit = 1,
                      XResolution = 1,
                      YResolution = 1,
-                     SamplesPerPixel = 1,
+                     SamplesPerPixel = samples_per_pixel,
                      RowsPerStrip = rows_per_strip,
-                     BitsPerSample = image.dtype.itemsize * 8,
+                     BitsPerSample = bits_per_sample,
                      SampleFormat = sample_format,
                      )
             if i==0:
