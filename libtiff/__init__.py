@@ -1,3 +1,19 @@
+"""LibTiff - a Python TIFF library
+
+.. currentmodule:: libtiff
+
+.. autosummary::
+
+   TIFF
+   TIFFfile
+   TiffArray
+   TiffFile
+   TiffFiles
+   TiffChannelsAndFiles
+
+"""
+
+__autodoc__ = ['libtiff_ctypes', 'tiff', 'tiff_file', 'tiff_files', 'tiff_channels_and_files']
 
 __all__ = ['TIFF', 'TIFFfile', 'TiffArray', 'TiffFile', 'TiffFiles', 'TiffChannelsAndFiles', 'TiffBase']
 
