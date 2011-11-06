@@ -282,7 +282,9 @@ class TIFF(ctypes.c_void_p):
         """ Return numpy dtype corresponding to bits and sample format.
         """
         typ = None
-        if sample_format==SAMPLEFORMAT_IEEEFP:
+        if bits==1:
+            pass
+        elif sample_format==SAMPLEFORMAT_IEEEFP:
             typ = getattr(np,'float%s' % (bits))
         elif sample_format==SAMPLEFORMAT_UINT or sample_format is None:
             typ = getattr(np,'uint%s' % (bits))
