@@ -45,6 +45,7 @@
 
 
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API
 #define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
 #include "numpy/arrayobject.h"
 
@@ -878,8 +879,8 @@ LZWPreEncode(TIFF* tif/*, uint16 s*/)
 
 #define FLUSHDATA(LST, DATA, DATASIZE) {					\
     npy_intp dims[] = {(DATASIZE)};					\
-    PyObject *arr = PyArray_EMPTY(1, dims, NPY_UBYTE, NPY_CARRAY);	\
-    memcpy(PyArray_DATA(arr), (DATA), dims[0]);				\
+    PyObject *arr = PyArray_EMPTY(1, dims, NPY_UBYTE, 0);	\
+    memcpy(PyArray_DATA((PyArrayObject*)arr), (DATA), dims[0]);			\
     PyList_Append(lst, arr);						\
   }
 
@@ -1199,21 +1200,24 @@ static PyObject *py_decode(PyObject *self, PyObject *args, PyObject *kwds)
   //LZWState(&tif)->rw_mode = tif->tif_mode;
   /* eof TIFFInitLZW */
 
-  tif.tif_rawcp = tif.tif_rawdata = PyArray_DATA(arr);
-  tif.tif_rawcc = tif.tif_rawdatasize = PyArray_NBYTES(arr);
+  tif.tif_rawcp = tif.tif_rawdata = (uint8*)PyArray_DATA((PyArrayObject*)arr);
+  tif.tif_rawcc = tif.tif_rawdatasize = PyArray_NBYTES((PyArrayObject*)arr);
 
-  result = PyArray_EMPTY(1, dims, NPY_UBYTE, NPY_CARRAY);
-
-  LZWPreDecode(&tif);
-  occ = LZWDecode(&tif, PyArray_DATA(result), PyArray_NBYTES(result));
-  LZWCleanup(&tif);
-  if (occ>0)
+  result = PyArray_EMPTY(1, dims, NPY_UBYTE, 0);
+  if (result!=NULL)
     {
-      dims[0] -= occ;
-      newshape.ptr = dims;
-      newshape.len = 1;
-      if (PyArray_Resize((PyArrayObject*)result, &newshape, 0, PyArray_CORDER)==NULL)
-	return NULL;
+
+      LZWPreDecode(&tif);
+      occ = LZWDecode(&tif, (uint8*)PyArray_DATA((PyArrayObject*)result), PyArray_NBYTES((PyArrayObject*)result));
+      LZWCleanup(&tif);
+      if (occ>0)
+	{
+	  dims[0] -= occ;
+	  newshape.ptr = dims;
+	  newshape.len = 1;
+	  if (PyArray_Resize((PyArrayObject*)result, &newshape, 0, PyArray_CORDER)==NULL)
+	    return NULL;
+	}
     }
   return result;
 }
@@ -1247,7 +1251,7 @@ static PyObject *py_encode(PyObject *self, PyObject *args, PyObject *kwds)
   /* eof TIFFInitLZW */
 
   // create buffer
-  buffer_size = PyArray_NBYTES(arr);
+  buffer_size = PyArray_NBYTES((PyArrayObject*)arr);
   if (buffer_size > (1<<20))
     buffer_size = (1<<20);
   tif.tif_rawcp = tif.tif_rawdata = (uint8*)malloc(buffer_size * sizeof(uint8));
@@ -1255,7 +1259,7 @@ static PyObject *py_encode(PyObject *self, PyObject *args, PyObject *kwds)
 
   // encode
   LZWPreEncode(&tif);
-  LZWEncode(&tif, PyArray_DATA(arr), PyArray_NBYTES(arr), lst);
+  LZWEncode(&tif, (uint8*)PyArray_DATA((PyArrayObject*)arr), PyArray_NBYTES((PyArrayObject*)arr), lst);
   LZWPostEncode(&tif, lst);
 
   // get result from buffer lst
@@ -1268,13 +1272,13 @@ static PyObject *py_encode(PyObject *self, PyObject *args, PyObject *kwds)
     {
       dims[0] = 0;
       for (i=0; i<PyList_GET_SIZE(lst); ++i)
-	dims[0] += PyArray_NBYTES(PyList_GET_ITEM(lst, i));
-      result = PyArray_EMPTY(1, dims, NPY_UBYTE, NPY_CARRAY);
+	dims[0] += PyArray_NBYTES((PyArrayObject*)PyList_GET_ITEM(lst, i));
+      result = PyArray_EMPTY(1, dims, NPY_UBYTE, 0);
       for (i=0, j=0; i<PyList_GET_SIZE(lst); ++i)
 	{
 	  PyObject* item = PyList_GET_ITEM(lst, i);
-	  memcpy(PyArray_DATA(result) + j, PyArray_DATA(item), PyArray_NBYTES(item));
-	  j += PyArray_NBYTES(item);
+	  memcpy(PyArray_DATA((PyArrayObject*)result) + j, PyArray_DATA((PyArrayObject*)item), PyArray_NBYTES((PyArrayObject*)item));
+	  j += PyArray_NBYTES((PyArrayObject*)item);
 	}
     }
 
