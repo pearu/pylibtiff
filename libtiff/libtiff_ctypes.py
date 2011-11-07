@@ -378,7 +378,7 @@ class TIFF(ctypes.c_void_p):
         sample_format = None
         if arr.dtype in np.sctypes['float']:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint']:
+        elif arr.dtype in np.sctypes['uint']+[numpy.bool]:
             sample_format = SAMPLEFORMAT_UINT
         elif arr.dtype in np.sctypes['int']:
             sample_format = SAMPLEFORMAT_INT

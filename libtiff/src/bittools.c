@@ -1,4 +1,5 @@
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API
 #define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
 #include "numpy/arrayobject.h"
 
@@ -17,7 +18,7 @@
 #define DATAPTR(data, i) ((char*)(data) + ((i)>>CHAR_BITS_EXP))
 #define DATA(data, i) (*DATAPTR((data),(i)))
 #define GETBIT(value, i, width) ((value & BITMASK((i),(width))) ? 1 : 0)
-#define ARRGETBIT(arr, i) ((DATA(PyArray_DATA(arr), (i)) & BITMASK((i),CHAR_BITS)) ? 1 : 0)
+#define ARRGETBIT(arr, i) ((DATA(PyArray_DATA((PyArrayObject*)arr), (i)) & BITMASK((i),CHAR_BITS)) ? 1 : 0)
 
 static PyObject *getbit(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -34,7 +35,7 @@ static PyObject *getbit(PyObject *self, PyObject *args, PyObject *kwds)
       PyErr_SetString(PyExc_TypeError,"first argument must be array object");
       return NULL;
     }
-  if (index >= BITS(PyArray_NBYTES(arr)))
+  if (index >= BITS(PyArray_NBYTES((PyArrayObject*)arr)))
     {
       PyErr_SetString(PyExc_IndexError,"bit index out of range");
       return NULL;
@@ -59,16 +60,16 @@ static PyObject *setbit(PyObject *self, PyObject *args, PyObject *kwds)
 	  PyErr_SetString(PyExc_TypeError,"first argument must be array object");
 	  return NULL;
 	}
-      if (NBYTES(index) >= PyArray_NBYTES(arr))
+      if (NBYTES(index) >= PyArray_NBYTES((PyArrayObject*)arr))
 	{
 	  PyErr_SetString(PyExc_IndexError,"bit index out of range");
 	  return NULL;
 	}
     }
   if (bit)
-    DATA(PyArray_DATA(arr), index) |= BITMASK(index, CHAR_BITS);
+    DATA(PyArray_DATA((PyArrayObject*)arr), index) |= BITMASK(index, CHAR_BITS);
   else
-    DATA(PyArray_DATA(arr), index) &= ~BITMASK(index, CHAR_BITS);
+    DATA(PyArray_DATA((PyArrayObject*)arr), index) &= ~BITMASK(index, CHAR_BITS);
   Py_INCREF(Py_None);
   return Py_None;
 }
@@ -87,7 +88,7 @@ static PyObject *getword(PyObject *self, PyObject *args, PyObject *kwds)
       PyErr_SetString(PyExc_TypeError,"first argument must be array object");
       return NULL;
     }
-  if (((index+width-1) >= BITS(PyArray_NBYTES(arr))) || (width<0))
+  if (((index+width-1) >= BITS(PyArray_NBYTES((PyArrayObject*)arr))) || (width<0))
     {
       PyErr_SetString(PyExc_IndexError,"bit index out of range");
       return NULL;
@@ -96,7 +97,7 @@ static PyObject *getword(PyObject *self, PyObject *args, PyObject *kwds)
   // fast code, at least 3x
   if (width<=32)
     {
-      npy_uint32 x = *((npy_uint64*)DATAPTR(PyArray_DATA(arr), index)) >> (index % CHAR_BITS);
+      npy_uint32 x = *((npy_uint64*)DATAPTR(PyArray_DATA((PyArrayObject*)arr), index)) >> (index % CHAR_BITS);
       return Py_BuildValue("kn",x & (NPY_MAX_UINT32>>(32-width)), index+width);
     }
   // generic code
@@ -133,9 +134,9 @@ static PyObject *setword(PyObject *self, PyObject *args, PyObject *kwds)
 	  PyErr_SetString(PyExc_TypeError,"first argument must be array object");
 	  return NULL;
 	}
-      if ((index+width-1) >= BITS(PyArray_NBYTES(arr)) || width<0)
+      if ((index+width-1) >= BITS(PyArray_NBYTES((PyArrayObject*)arr)) || width<0)
 	{
-	  printf("index,width,nbits=%d,%d,%d\n", index, width, BITS(PyArray_NBYTES(arr)));
+	  printf("index,width,nbits=%d,%d,%d\n", index, width, BITS(PyArray_NBYTES((PyArrayObject*)arr)));
 	  PyErr_SetString(PyExc_IndexError,"bit index out of range");
 	  return NULL;
 	}
@@ -147,9 +148,9 @@ static PyObject *setword(PyObject *self, PyObject *args, PyObject *kwds)
     }
   for (i=0; i<width; ++i)
     if ((i<value_width) && (GETBIT(value, i, value_width)))
-      DATA(PyArray_DATA(arr), index+i) |= BITMASK(index+i, CHAR_BITS);
+      DATA(PyArray_DATA((PyArrayObject*)arr), index+i) |= BITMASK(index+i, CHAR_BITS);
     else
-      DATA(PyArray_DATA(arr), index+i) &= ~BITMASK(index+i, CHAR_BITS);
+      DATA(PyArray_DATA((PyArrayObject*)arr), index+i) &= ~BITMASK(index+i, CHAR_BITS);
 
   return Py_BuildValue("n",index + width);
   /*
