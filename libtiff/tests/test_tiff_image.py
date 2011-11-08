@@ -1,4 +1,5 @@
 import os
+import atexit
 from tempfile import mktemp
 from numpy import *
 from libtiff import TIFFfile, TIFFimage, TIFF
@@ -19,7 +20,8 @@ def test_rw_rgb():
 
     tif = TIFFfile(fn)
     data, names = tif.get_samples()
-    os.remove(fn)
+    #os.remove(fn)
+    atexit.register(os.remove, fn)
     print image
     print data
 
@@ -43,7 +45,8 @@ def test_write_read():
             
             tif = TIFFfile(fn)
             data, names = tif.get_samples()
-            os.remove(fn)
+            #os.remove(fn)
+            atexit.register(os.remove, fn)
             assert names==['sample0'],`names`
             assert len(data)==1, `len(data)`
             assert image.dtype==data[0].dtype, `image.dtype,data[0].dtype`
@@ -68,8 +71,8 @@ def test_write_lzw():
         tif = TIFF.open(fn,'r')
         image2 = tif.read_image()
         tif.close()
-        os.remove(fn)
-
+        #os.remove(fn)
+        atexit.register(os.remove, fn)
         for i in range(image.size):
             if image.flat[i] != image2.flat[i]:
                 print `i, image.flat[i-5:i+5].view(dtype=uint8),image2.flat[i-5:i+5].view(dtype=uint8)`

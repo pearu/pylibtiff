@@ -1,5 +1,6 @@
 
 import os
+import atexit
 from tempfile import mktemp
 from numpy import *
 from libtiff import TIFF
@@ -40,4 +41,5 @@ def test_simple_slicing():
                         for i2 in indices:
                             sl = (i0, i1, i2)
                             assert (arr[sl]==image[sl]).all(),`sl`
-                os.remove(fn)
+                #os.remove(fn)
+                atexit.register(os.remove, fn)
