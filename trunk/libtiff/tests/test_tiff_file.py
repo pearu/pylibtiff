@@ -1,5 +1,6 @@
 
 import os
+import atexit
 from tempfile import mktemp
 from numpy import *
 from libtiff import TIFF
@@ -30,5 +31,6 @@ def test_write_read():
             assert len(data)==1, `len(data)`
             assert image.dtype==data[0].dtype, `image.dtype, data[0].dtype`
             assert (image==data[0]).all()
-
-            os.remove(fn)
+            
+            #os.remove(fn)
+            atexit.register(os.remove, fn)
