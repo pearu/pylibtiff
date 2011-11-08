@@ -880,7 +880,7 @@ LZWPreEncode(TIFF* tif/*, uint16 s*/)
 #define FLUSHDATA(LST, DATA, DATASIZE) {					\
     npy_intp dims[] = {(DATASIZE)};					\
     PyObject *arr = PyArray_EMPTY(1, dims, NPY_UBYTE, 0);	\
-    memcpy(PyArray_DATA((PyArrayObject*)arr), (DATA), dims[0]);			\
+    memcpy(PyArray_DATA((PyArrayObject*)arr), (DATA), dims[0]);	\
     PyList_Append(lst, arr);						\
   }
 
@@ -1277,7 +1277,7 @@ static PyObject *py_encode(PyObject *self, PyObject *args, PyObject *kwds)
       for (i=0, j=0; i<PyList_GET_SIZE(lst); ++i)
 	{
 	  PyObject* item = PyList_GET_ITEM(lst, i);
-	  memcpy(PyArray_DATA((PyArrayObject*)result) + j, PyArray_DATA((PyArrayObject*)item), PyArray_NBYTES((PyArrayObject*)item));
+	  memcpy((char*)PyArray_DATA((PyArrayObject*)result) + j, PyArray_DATA((PyArrayObject*)item), PyArray_NBYTES((PyArrayObject*)item));
 	  j += PyArray_NBYTES((PyArrayObject*)item);
 	}
     }
