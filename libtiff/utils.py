@@ -3,11 +3,19 @@
 # Created: June 2010
 
 from __future__ import division
-__all__ = ['bytes2str']
+__all__ = ['bytes2str', 'isindisk']
 
+import os
 import optparse
 
 VERBOSE = False
+
+def isindisk(path):
+    """ Return True if path is stored in a local disk.
+    """
+    return os.major(os.stat(path).st_dev) in [3, # HD 
+                                              8, # SCSI
+                                              ]
 
 def bytes2str(bytes):
     l = []

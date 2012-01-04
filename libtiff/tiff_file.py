@@ -9,11 +9,13 @@ __all__ = ['TIFFfile', 'TiffFile']
 
 import os
 import sys
+import shutil
 import numpy
+import mmap
 from numpy.testing.utils import memusage
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
 from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, default_tag_values, sample_format_map
-from .utils import bytes2str
+from .utils import bytes2str, isindisk
 from .tiff_base import TiffBase
 from .tiff_sample_plane import TiffSamplePlane
 from .tiff_array import TiffArray
@@ -25,6 +27,24 @@ import tif_lzw
 
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []
+
+IOError_too_many_open_files_hint = '''%s
+======================================================================
+Ubuntu Linux users:
+  Check `ulimit -n`.
+  To increase the number of open files limits, add the following lines
+    *            hard    nofile          16384
+    *            soft    nofile          16384
+  to /etc/security/limits.conf and run `sudo start procps`
+======================================================================
+'''
+
+OSError_operation_not_permitted_hint = '''%s
+======================================================================
+The exception may be due to unsufficient access rights or due to
+opening too many files for the given file system (NFS, for instance).
+======================================================================
+'''
 
 class TIFFfile(TiffBase):
     """
@@ -50,47 +70,50 @@ class TIFFfile(TiffBase):
 
     __del__ = close
 
-    def __init__(self, filename, mode='r', first_byte = 0, verbose=False):
-        if verbose:
-            sys.stdout.write ('Opening file %r\n' % (filename)); sys.stdout.flush()
+    def __init__(self, filename, mode='r', first_byte = 0, verbose=False, local_cache = None):
+        """
+        local_cache : {None, str}
+          Specify path to local cache. Local cache will be used to
+          temporarily store files from external devises such as NFS.
+        """
         self.verbose = verbose
-        self.filename = filename
-        if mode!='r':
-            raise NotImplementedError(`mode`)
-        if not os.path.isfile (filename):
-            raise ValueError ('file does not exists')
-        if not os.stat(filename).st_size:
-            raise ValueError ('file has zero size')
         self.first_byte = first_byte
-
         try:
+            if local_cache is not None:
+                cache_filename = local_cache + '/' + filename
+                if os.path.exists(cache_filename):
+                    filename = cache_filename
+                elif not isindisk(filename):
+                    assert isindisk(local_cache),`local_cache`
+                    dirname = os.path.dirname (cache_filename)
+                    if not os.path.isdir(dirname):
+                        os.makedirs(dirname)
+                    shutil.copyfile(filename, cache_filename)
+                    filename = cache_filename
+            if verbose:
+                sys.stdout.write ('Opening file %r\n' % (filename)); sys.stdout.flush()
+            if mode!='r':
+                raise NotImplementedError(`mode`)
+            if not os.path.isfile (filename):
+                raise ValueError ('file does not exists')
+            if not os.stat(filename).st_size:
+                raise ValueError ('file has zero size')
             self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
         except IOError, msg:
             if 'Too many open files' in str (msg):
-                print '''\
-======================================================================
-An exception was raised with message: 
-  %s
-Ubuntu Linux users:
-  Check `ulimit -n`.
-  To increase the number of open files limits, add the following lines
-    *            hard    nofile          16384
-    *            soft    nofile          16384
-  to /etc/security/limits.conf and run `sudo start procps`
-======================================================================
-''' % (msg)
-                raise IOError ('%s' % (msg))
+                raise IOError(IOError_too_many_open_files_hint % msg)
             if 'Operation not permitted' in str (msg):
-                print '''\
-======================================================================
-An exception was raised with message: 
-  %s
-The exception may be due to unsufficient access rights or due to
-opening too many files for the given file system.
-======================================================================
-''' % (msg)
-                raise IOError ('%s' % (msg))
+                raise IOError(OSError_operation_not_permitted_hint % msg)
             raise
+        except OSError, msg:
+            if 'Operation not permitted' in str (msg):
+                raise OSError(OSError_operation_not_permitted_hint % msg)
+            raise
+        except mmap.error, msg:
+            if 'Too many open files' in str (msg):
+                raise mmap.error(IOError_too_many_open_files_hint % msg)
+            raise
+        self.filename = filename
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
         byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)[0]
         if byteorder==0x4949:

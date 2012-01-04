@@ -42,7 +42,7 @@ def runner (parser, options, args):
 
     input_path = options.input_path
     output_path = options.output_path
-    assert output_path is None,`output_path`
+    #assert output_path is None,`output_path`
     
     if output_path is None:
         b, e = os.path.splitext (input_path)

@@ -16,7 +16,7 @@ class TiffFiles(TiffBase):
     TiffFile, TiffChannelsAndFiles
     """
 
-    def __init__(self, files, time_map = {}, verbose = False):
+    def __init__(self, files, time_map = {}, verbose = False, local_cache = None):
         """
         Parameters
         ----------
@@ -27,17 +27,20 @@ class TiffFiles(TiffBase):
           corresponding to image file directories (IFDs) in the
           corresponding TIFF files.
         verbose : bool
+        local_cache : {None, str}
+          Specify path to local cache. Local cache will be used to
+          temporarily store files from external devises such as NFS.
         """
         self.verbose = verbose
         self.files = files
         self.tiff_files = {}
         self.time_map = time_map
-
+        self.local_cache = local_cache
 
     def get_tiff_file(self, filename):
         tiff = self.tiff_files.get(filename)
         if tiff is None:
-            tiff = TiffFile(filename, verbose=self.verbose)
+            tiff = TiffFile(filename, verbose=self.verbose, local_cache = self.local_cache)
             #tiff.set_time(self.time_map.get(filename))
             self.tiff_files[filename] = tiff
         return tiff
