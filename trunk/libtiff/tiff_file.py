@@ -66,6 +66,7 @@ class TIFFfile(TiffBase):
         if hasattr(self, 'data'):
             if self.verbose:
                 sys.stdout.write('Closing TIFF file %r\n' % (self.filename)); sys.stdout.flush()
+            self.data.base.close() # newer numpy does not have memmap.close anymore [May 2012]
             del self.data
 
     __del__ = close

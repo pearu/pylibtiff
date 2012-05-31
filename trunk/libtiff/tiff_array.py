@@ -25,6 +25,10 @@ class TiffArray:
     def __len__(self):
         return self.shape[0]
 
+    def __iter__(self):
+        for plane in self.planes:
+            yield plane
+
     def __getitem__ (self, index):
         try:
             if isinstance(index, (int, long)):
