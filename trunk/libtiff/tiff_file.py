@@ -54,7 +54,7 @@ class TIFFfile(TiffBase):
     Attributes
     ----------
     filename : str
-    data : memmap
+    data : memmap (or array when use_memmap is False)
     IFD : IFD-list
 
     See also
@@ -66,19 +66,25 @@ class TIFFfile(TiffBase):
         if hasattr(self, 'data'):
             if self.verbose:
                 sys.stdout.write('Closing TIFF file %r\n' % (self.filename)); sys.stdout.flush()
-            self.data.base.close() # newer numpy does not have memmap.close anymore [May 2012]
+            for ifd in self.IFD:
+                ifd.close()
+            if self.use_memmap:
+                #self.data.base.close() # newer numpy does not have memmap.close anymore [May 2012]
+                pass
             del self.data
 
     __del__ = close
 
-    def __init__(self, filename, mode='r', first_byte = 0, verbose=False, local_cache = None):
+    def __init__(self, filename, mode='r', first_byte = 0, verbose=False, local_cache = None, use_memmap=True):
         """
         local_cache : {None, str}
           Specify path to local cache. Local cache will be used to
           temporarily store files from external devises such as NFS.
         """
+
         self.verbose = verbose
         self.first_byte = first_byte
+        self.use_memmap = use_memmap
         try:
             if local_cache is not None:
                 cache_filename = local_cache + '/' + filename
@@ -99,7 +105,13 @@ class TIFFfile(TiffBase):
                 raise ValueError ('file does not exists')
             if not os.stat(filename).st_size:
                 raise ValueError ('file has zero size')
-            self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
+            if use_memmap:
+                self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
+            else:
+                assert mode=='r',`mode`
+                f = open (filename, 'rb')
+                self.data = numpy.frombuffer(f.read(), dtype=numpy.ubyte)
+                f.close()
         except IOError, msg:
             if 'Too many open files' in str (msg):
                 raise IOError(IOError_too_many_open_files_hint % msg)
@@ -114,9 +126,13 @@ class TIFFfile(TiffBase):
             if 'Too many open files' in str (msg):
                 raise mmap.error(IOError_too_many_open_files_hint % msg)
             raise
+
         self.filename = filename
+
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
+
         byteorder = self.data[first_byte:first_byte+2].view(dtype=numpy.uint16)[0]
+
         if byteorder==0x4949:
             self.endian = 'little'
             self.dtypes = LittleEndianNumpyDTypes
@@ -129,13 +145,16 @@ class TIFFfile(TiffBase):
         if magic!=42:
             raise ValueError('wrong magic number for TIFF file: %s' % (magic))
         self.IFD0 = IFD0 = first_byte + self.get_uint32(first_byte+4)
+
         self.memory_usage.append((first_byte, first_byte+8, 'file header'))
+
         n = self.get_uint16(IFD0)
         IFD_list = []
         IFD_offset = IFD0
         while IFD_offset:
             n = self.get_uint16(IFD_offset)
             ifd = IFD(self)
+
             for i in range(n):
                 entry = IFDEntry(ifd, self, IFD_offset + 2 + i*12)
                 ifd.append(entry)
@@ -636,7 +655,13 @@ class IFD:
 
     def append(self, entry):
         self.entries.append(entry)
-        self.entries_dict[entry.tag_name] = entry
+        self.entries_dict[getattr(entry,'tag_name', id (entry))] = entry
+
+    def close (self):
+        for entry in self.entries:
+            entry.close()
+        self.entries[:] = []
+        self.entries_dict.clear()
 
     @property
     def memory_usage(self):
@@ -903,6 +928,7 @@ class IFDEntry:
         self.tag = tiff.get_uint16(offset)
         self.type = tiff.get_uint16(offset+2)
         self.count = tiff.get_uint32(offset+4)
+
         for hook in IFDEntry_init_hooks:
             hook(self)
         
@@ -916,11 +942,16 @@ class IFDEntry:
         if value is not None:
             self.value = value
         tag_name = self.tag_name = tag_value2name.get(self.tag,'TAG%s' % (hex(self.tag),))
+
         self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type,))
 
         self.memory_usage = []
+
         if self.offset is not None:
             self.memory_usage.append((self.offset, self.offset + self.bytes*self.count, self.tag_name))
+
+    def close(self):
+        del self.value
 
     @property
     def _value_str(self):
@@ -962,6 +993,7 @@ class IFDEntry:
 
 
 def StripOffsets_hook(ifdentry):
+
     if ifdentry.tag_name=='StripOffsets':
         ifd = ifdentry.ifd
         counts = ifd.get('StripByteCounts')

@@ -37,15 +37,15 @@ class TiffFiles(TiffBase):
         self.time_map = time_map
         self.local_cache = local_cache
 
-    def get_tiff_file(self, filename):
+    def get_tiff_file(self, filename, use_memmap=True):
         tiff = self.tiff_files.get(filename)
         if tiff is None:
-            tiff = TiffFile(filename, verbose=self.verbose, local_cache = self.local_cache)
+            tiff = TiffFile(filename, verbose=self.verbose, local_cache = self.local_cache, use_memmap=use_memmap)
             #tiff.set_time(self.time_map.get(filename))
             self.tiff_files[filename] = tiff
         return tiff
 
-    def get_tiff_array(self, sample_index = 0, subfile_type=0, assume_one_image_per_file=False):
+    def get_tiff_array(self, sample_index = 0, subfile_type=0, assume_one_image_per_file=False, use_memmap=True):
         """ Return an array of images.
 
         Parameters
@@ -61,6 +61,8 @@ class TiffFiles(TiffBase):
           first TIFF file is opened for reading image parameters. The
           other TIFF files are opened only when particular images are
           accessed.
+        use_memap : bool
+          When True then image data is read in using numpy.memmap.
 
         Returns
         -------
@@ -73,25 +75,27 @@ class TiffFiles(TiffBase):
         if assume_one_image_per_file:
             for index, filename in enumerate (self.files):
                 time_lst = self.time_map.get(filename)
+
                 if index==0:
-                    tiff = self.get_tiff_file(filename)
+                    tiff = self.get_tiff_file(filename, use_memmap=use_memmap)
                     assert len (tiff.IFD)==1,`len (tiff.IFD)`
                     ifd = tiff.IFD[0]
                     assert ifd.get_value('NewSubfileType', subfile_type)==subfile_type
                     plane = TiffSamplePlane(ifd, sample_index=sample_index)
                 else:
                     def tiff_file_getter(parent=self, filename=filename):
-                        tiff = parent.get_tiff_file(filename)
+                        tiff = parent.get_tiff_file(filename, use_memmap=use_memmap)
                         return tiff
                     plane = TiffSamplePlaneLazy(tiff_file_getter)
                     plane.copy_attrs(planes[0])
+
                 if time_lst is not None:
                     assert len (time_lst)==1,`len(time_lst)`
                     plane.set_time(time_lst[0])
                 planes.append(plane)                    
         else:
             for filename in self.files:
-                tiff = self.get_tiff_file(filename)
+                tiff = self.get_tiff_file(filename, use_memmap=use_memmap)
                 time_lst = self.time_map.get(filename)
                 index = 0
                 for ifd in tiff.IFD:
@@ -102,6 +106,7 @@ class TiffFiles(TiffBase):
                         plane.set_time(time_lst[index])
                     planes.append(plane)
                     index += 1
+
         tiff_array = TiffArray(planes)
         if self.verbose:
             print '%s.get_tiff_array: took %ss' % (self.__class__.__name__, time.time ()-start)
@@ -110,11 +115,12 @@ class TiffFiles(TiffBase):
     def close (self):
         for tiff in self.tiff_files.values():
             tiff.close()
+        self.tiff_files.clear()
 
     __del__ = close
 
 
-    def get_info(self):
+    def get_info(self, use_memmap=True):
         filename = self.files[0]
-        tiff = self.get_tiff_file(filename)
+        tiff = self.get_tiff_file(filename, use_memmap=True)
         return tiff.get_info()
