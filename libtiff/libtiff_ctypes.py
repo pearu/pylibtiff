@@ -464,6 +464,118 @@ class TIFF(ctypes.c_void_p):
         else:
             raise NotImplementedError (`shape`)
 
+    def write_tiles(self, arr):
+        num_tcols = self.GetField("TileWidth")
+        if num_tcols is None:
+            raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
+        num_trows = self.GetField("TileLength")
+        if num_trows is None:
+            num_trows = 1
+        num_irows = self.GetField("ImageLength")
+        if num_irows is None:
+            num_irows = 1
+        num_icols = self.GetField("ImageWidth")
+        if num_icols is None:
+            raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
+        num_idepth = self.GetField("ImageDepth")
+        if num_idepth is None:
+            num_idepth = 1
+
+        if len(arr.shape) == 1 and arr.shape[0] != num_icols:
+            raise ValueError("Input array %r must have the same shape as the image tags %r" % (arr.shape,(num_icols,)))
+        if len(arr.shape) == 2 and (arr.shape[0] != num_irows or arr.shape[1] != num_icols):
+            raise ValueError("Input array %r must have same shape as image tags %r" % (arr.shape,(num_irows,num_icols)))
+        if len(arr.shape) == 3 and (arr.shape[0] != num_idepth or arr.shape[1] != num_irows or arr.shape[2] != num_icols):
+            raise ValueError("Input array %r must have same shape as image tags %r" % (arr.shape,(num_idepth,num_irows,num_icols)))
+        if len(arr.shape) > 3:
+            raise ValueError("Can not write tiles for more than 3 dimensions")
+
+        status = 0
+        tile_arr = np.zeros((num_trows, num_tcols), dtype=arr.dtype)
+        # z direction / depth
+        for z in range(0, num_idepth):
+            # Rows
+            for y in range(0, num_irows, num_trows):
+                # Cols
+                for x in range(0, num_icols, num_tcols):
+                    # If we are over the edge of the image, use 0 as fill
+                    if len(arr.shape) == 3:
+                        if ((y + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
+                            tile_arr[:num_irows-y,:num_icols-x] = arr[z,y:y+num_trows,x:x+num_tcols]
+                        else:
+                            tile_arr[:,:] = arr[z,y:y+num_trows,x:x+num_tcols]
+                    elif len(arr.shape) == 2:
+                        if ((i + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
+                            tile_arr[:num_irows-y,:num_icols-x] = arr[y:y+num_trows, x:x+num_tcols]
+                        else:
+                            tile_arr[:,:] = arr[i:i+num_trows,x:x+num_tcols]
+                    elif len(arr.shape) == 1:
+                        # This doesn't make much sense for 1D arrays, waste of space if tiles are 2D
+                        if ((x + num_tcols) > num_icols):
+                            tile_arr[0,:num_icols-x] = arr[x:x+num_tcols]
+                        else:
+                            tile_arr[0,:] = arr[x:x+num_tcols]
+
+                    tile_arr = np.ascontiguousarray(tile_arr)
+                    r = libtiff.TIFFWriteTile(self, tile_arr.ctypes.data, x, y, z, 0)
+                    status = status + r.value
+
+        return status
+
+    def read_tiles(self, dtype=np.uint8):
+        num_tcols = self.GetField("TileWidth")
+        if num_tcols is None:
+            raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
+        num_trows = self.GetField("TileLength")
+        if num_trows is None:
+            num_trows = 1
+        num_icols = self.GetField("ImageWidth")
+        if num_icols is None:
+            raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
+        num_irows = self.GetField("ImageLength")
+        if num_irows is None:
+            num_irows = 1
+        num_idepth = self.GetField("ImageDepth")
+        if num_idepth is None:
+            num_idepth = 1
+
+        if num_idepth == 1 and num_irows == 1:
+            # 1D
+            full_image = np.zeros((num_icols,), dtype=dtype)
+        elif num_idepth == 1:
+            # 2D
+            full_image = np.zeros((num_irows,num_icols), dtype=dtype)
+        else:
+            # 3D
+            full_image = np.zeros((num_idepth,num_irows,num_icols), dtype=dtype)
+
+        tmp_tile = np.zeros((num_trows,num_tcols), dtype=dtype)
+        tmp_tile = np.ascontiguousarray(tmp_tile)
+        for z in range(0, num_idepth):
+            for y in range(0, num_irows, num_trows):
+                for x in range(0, num_icols, num_tcols):
+                    r = libtiff.TIFFReadTile(self, tmp_tile.ctypes.data, x, y, z, 0)
+                    if not r:
+                        raise ValueError("Could not read tile x:%d,y:%d,z:%d from file" % (x,y,z))
+
+                    if ((y + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
+                        # We only need part of the tile because we are on the edge
+                        if num_idepth == 1 and num_irows == 1:
+                            full_image[x:x+num_tcols] = tmp_tile[0,:num_icols-x]
+                        elif num_idepth == 1:
+                            full_image[y:y+num_trows,x:x+num_tcols] = tmp_tile[:num_irows-y,:num_icols-x]
+                        else:
+                            full_image[z,y:y+num_trows,x:x+num_tcols] = tmp_tile[:num_irows-y,:num_icols-x]
+                    else:
+                        if num_idepth == 1 and num_irows == 1:
+                            full_image[x:x+num_tcols] = tmp_tile[0,:]
+                        elif num_idepth == 1:
+                            full_image[y:y+num_trows, x:x+num_tcols] = tmp_tile[:,:]
+                        else:
+                            full_image[z,y:y+num_trows, x:x+num_tcols] = tmp_tile[:,:]
+
+        return full_image
+
     def iter_images(self, verbose=False):
         """ Iterator of all images in a TIFF file.
         """
@@ -887,6 +999,51 @@ libtiff.TIFFStripSize.argtypes = [TIFF]
 libtiff.TIFFRawStripSize.restype = c_tsize_t
 libtiff.TIFFRawStripSize.argtypes = [TIFF, c_tstrip_t]
 
+# Tile Support
+# TODO:
+#   TIFFTileRowSize64
+#   TIFFTileSize64
+#   TIFFVTileSize
+#   TIFFVTileSize64
+libtiff.TIFFTileRowSize.restype = c_tsize_t
+libtiff.TIFFTileRowSize.argtypes = [TIFF]
+
+libtiff.TIFFTileSize.restype = c_tsize_t
+libtiff.TIFFTileSize.argtypes = [TIFF]
+
+libtiff.TIFFComputeTile.restype = c_ttile_t
+libtiff.TIFFComputeTile.argtypes = [TIFF, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFCheckTile.restype = ctypes.c_int
+libtiff.TIFFCheckTile.argtypes = [TIFF, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFNumberOfTiles.restype = c_ttile_t
+libtiff.TIFFNumberOfTiles.argtypes = [TIFF]
+
+libtiff.TIFFReadTile.restype = c_tsize_t
+libtiff.TIFFReadTile.argtypes = [TIFF, c_tdata_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFWriteTile.restype = c_tsize_t
+libtiff.TIFFWriteTile.argtypes = [TIFF, c_tdata_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFReadEncodedTile.restype = ctypes.c_int
+libtiff.TIFFReadEncodedTile.argtypes = [TIFF, ctypes.c_ulong, ctypes.c_char_p, ctypes.c_ulong]
+
+libtiff.TIFFReadRawTile.restype = c_tsize_t
+libtiff.TIFFReadRawTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
+
+libtiff.TIFFReadRGBATile.restype = ctypes.c_int
+libtiff.TIFFReadRGBATile.argtypes = [TIFF, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32)]
+
+libtiff.TIFFWriteEncodedTile.restype = c_tsize_t
+libtiff.TIFFWriteEncodedTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
+
+libtiff.TIFFWriteRawTile.restype = c_tsize_t
+libtiff.TIFFWriteRawTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
+
+libtiff.TIFFDefaultTileSize.restype = None
+libtiff.TIFFDefaultTileSize.argtypes = [TIFF, ctypes.c_uint32, ctypes.c_uint32]
+
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
 
@@ -908,6 +1065,136 @@ def suppress_warnings():
     libtiff.TIFFSetWarningHandler(_null_warning_handler)
 def suppress_errors():
     libtiff.TIFFSetErrorHandler(_null_error_handler)
+
+def _test_tile_write():
+    a = TIFF.open("/tmp/libtiff_test_tile_write.tiff", "w")
+
+    # 1D Arrays (doesn't make much sense to tile)
+    assert a.SetField("ImageWidth", 3000)==1,"could not set ImageWidth tag" #1D,2D,3D
+    assert a.SetField("ImageLength", 1)==1,"could not set ImageLength tag" #1D
+    assert a.SetField("ImageDepth", 1)==1,"could not set ImageDepth tag" #1D,2D
+    # Must be multiples of 16
+    assert a.SetField("TileWidth", 512)==1,"could not set TileWidth tag"
+    assert a.SetField("TileLength", 528)==1,"could not set TileLength tag"
+    assert a.SetField("BitsPerSample", 8)==1,"could not set BitsPerSample tag"
+    assert a.SetField("Compression", COMPRESSION_NONE)==1,"could not set Compression tag"
+    data_array = np.array(range(500)*6).astype(np.uint8)
+    assert a.write_tiles(data_array)==(512*528)*6,"could not write tile images" #1D
+    a.WriteDirectory()
+    print "Tile Write: Wrote array of shape %r" % (data_array.shape,)
+
+    # 2D Arrays
+    assert a.SetField("ImageWidth", 3000)==1,"could not set ImageWidth tag" #1D,2D,3D
+    assert a.SetField("ImageLength", 2500)==1,"could not set ImageLength tag" #2D,3D
+    assert a.SetField("ImageDepth", 1)==1,"could not set ImageDepth tag" #1D,2D
+    # Must be multiples of 16
+    assert a.SetField("TileWidth", 512)==1,"could not set TileWidth tag"
+    assert a.SetField("TileLength", 528)==1,"could not set TileLength tag"
+    assert a.SetField("BitsPerSample", 8)==1,"could not set BitsPerSample tag"
+    assert a.SetField("Compression", COMPRESSION_NONE)==1,"could not set Compression tag"
+    data_array = np.tile(range(500), (2500,6)).astype(np.uint8)
+    assert a.write_tiles(data_array)==(512*528) * 5 * 6,"could not write tile images" #2D
+    a.WriteDirectory()
+    print "Tile Write: Wrote array of shape %r" % (data_array.shape,)
+
+    # 3D Arrays
+    assert a.SetField("ImageWidth", 3000)==1,"could not set ImageWidth tag" #1D,2D,3D
+    assert a.SetField("ImageLength", 2500)==1,"could not set ImageLength tag" #2D,3D
+    assert a.SetField("ImageDepth", 3)==1,"could not set ImageDepth tag" #3D
+    assert a.SetField("TileWidth", 512)==1,"could not set TileWidth tag"
+    assert a.SetField("TileLength", 528)==1,"could not set TileLength tag"
+    assert a.SetField("BitsPerSample", 8)==1,"could not set BitsPerSample tag"
+    assert a.SetField("Compression", COMPRESSION_NONE)==1,"could not set Compression tag"
+    data_array = np.tile(range(500), (3,2500,6)).astype(np.uint8)
+    assert a.write_tiles(data_array)==(512*528) * 5 * 6 * 3,"could not write tile images" #3D
+    a.WriteDirectory()
+    print "Tile Write: Wrote array of shape %r" % (data_array.shape,)
+
+    print "Tile Write: SUCCESS"
+
+def _test_tile_read(filename=None):
+    import sys
+    if filename is None:
+        if len(sys.argv) != 2:
+            print "Run `libtiff.py <filename>` for testing."
+            return
+        filename = sys.argv[1]
+
+    a = TIFF.open(filename, "r")
+
+    # 1D Arrays (doesn't make much sense to tile)
+    a.SetDirectory(0)
+    iwidth = tmp = a.GetField("ImageWidth")
+    assert tmp is not None,"ImageWidth tag must be defined for reading tiles"
+    ilength = tmp = a.GetField("ImageLength")
+    assert tmp is not None,"ImageLength tag must be defined for reading tiles"
+    idepth = tmp = a.GetField("ImageDepth")
+    assert tmp is not None,"ImageDepth tag must be defined for reading tiles"
+    tmp = a.GetField("TileWidth")
+    assert tmp is not None,"TileWidth tag must be defined for reading tiles"
+    tmp = a.GetField("TileLength")
+    assert tmp is not None,"TileLength tag must be defined for reading tiles"
+    tmp = a.GetField("BitsPerSample")
+    assert tmp is not None,"BitsPerSample tag must be defined for reading tiles"
+    tmp = a.GetField("Compression")
+    assert tmp is not None,"Compression tag must be defined for reading tiles"
+
+    data_array = a.read_tiles()
+    print "Tile Read: Read array of shape %r" % (data_array.shape,)
+    assert data_array.shape==(iwidth,),"tile data read was the wrong shape"
+    test_array = np.array(range(500)*6).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,"tile data read was not the same as the expected data"
+    print "Tile Read: Data is the same as expected from tile write test"
+
+    # 2D Arrays (doesn't make much sense to tile)
+    a.SetDirectory(1)
+    iwidth = tmp = a.GetField("ImageWidth")
+    assert tmp is not None,"ImageWidth tag must be defined for reading tiles"
+    ilength = tmp = a.GetField("ImageLength")
+    assert tmp is not None,"ImageLength tag must be defined for reading tiles"
+    idepth = tmp = a.GetField("ImageDepth")
+    assert tmp is not None,"ImageDepth tag must be defined for reading tiles"
+    tmp = a.GetField("TileWidth")
+    assert tmp is not None,"TileWidth tag must be defined for reading tiles"
+    tmp = a.GetField("TileLength")
+    assert tmp is not None,"TileLength tag must be defined for reading tiles"
+    tmp = a.GetField("BitsPerSample")
+    assert tmp is not None,"BitsPerSample tag must be defined for reading tiles"
+    tmp = a.GetField("Compression")
+    assert tmp is not None,"Compression tag must be defined for reading tiles"
+
+    data_array = a.read_tiles()
+    print "Tile Read: Read array of shape %r" % (data_array.shape,)
+    assert data_array.shape==(ilength,iwidth),"tile data read was the wrong shape"
+    test_array = np.tile(range(500), (2500,6)).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,"tile data read was not the same as the expected data"
+    print "Tile Read: Data is the same as expected from tile write test"
+
+    # 3D Arrays (doesn't make much sense to tile)
+    a.SetDirectory(2)
+    iwidth = tmp = a.GetField("ImageWidth")
+    assert tmp is not None,"ImageWidth tag must be defined for reading tiles"
+    ilength = tmp = a.GetField("ImageLength")
+    assert tmp is not None,"ImageLength tag must be defined for reading tiles"
+    idepth = tmp = a.GetField("ImageDepth")
+    assert tmp is not None,"ImageDepth tag must be defined for reading tiles"
+    tmp = a.GetField("TileWidth")
+    assert tmp is not None,"TileWidth tag must be defined for reading tiles"
+    tmp = a.GetField("TileLength")
+    assert tmp is not None,"TileLength tag must be defined for reading tiles"
+    tmp = a.GetField("BitsPerSample")
+    assert tmp is not None,"BitsPerSample tag must be defined for reading tiles"
+    tmp = a.GetField("Compression")
+    assert tmp is not None,"Compression tag must be defined for reading tiles"
+
+    data_array = a.read_tiles()
+    print "Tile Read: Read array of shape %r" % (data_array.shape,)
+    assert data_array.shape==(idepth,ilength,iwidth),"tile data read was the wrong shape"
+    test_array = np.tile(range(500), (3,2500,6)).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,"tile data read was not the same as the expected data"
+    print "Tile Read: Data is the same as expected from tile write test"
+    print "Tile Read: SUCCESS"
+
 
 def _test_tags_write():
     tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
@@ -1037,7 +1324,9 @@ def _test_copy():
     print 'test copy ok'
 
 if __name__=='__main__':
-    _test_tags_write()
+    _test_tile_write()
+    #_test_tile_read()
+    #_test_tags_write()
     #_test_tags_read()
     #_test_write_float()
     #_test_write()
