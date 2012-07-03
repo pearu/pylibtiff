@@ -127,7 +127,6 @@ class c_thandle_t(ctypes.c_void_p): pass
 tifftags = {
 
 #TODO:
-#TIFFTAG_COLORMAP                3      uint16**          1<<BitsPerSample arrays
 #TIFFTAG_DOTRANGE                2      uint16*
 #TIFFTAG_HALFTONEHINTS           2      uint16*
 #TIFFTAG_PAGENUMBER              2      uint16*
@@ -140,6 +139,8 @@ tifftags = {
 #TIFFTAG_ICCPROFILE              2      uint32*,void**    count, profile data
 
     # TIFFTAG: type, conversion  
+    # 3 uint16* for Set, 3 uint16** for Get; size:(1<<BitsPerSample arrays)
+    TIFFTAG_COLORMAP: (ctypes.c_uint16, lambda d:(d[0].contents[:],d[1].contents[:],d[2].contents[:])),
     TIFFTAG_ARTIST: (ctypes.c_char_p, lambda d:d.value),
     TIFFTAG_COPYRIGHT: (ctypes.c_char_p, lambda d:d.value),
     TIFFTAG_DATETIME: (ctypes.c_char_p, lambda d:d.value),
@@ -565,22 +566,45 @@ class TIFF(ctypes.c_void_p):
                 print 'Warning: no tag %r defined' % (tag)
             return
         data_type, convert = t
-        if hasattr(data_type, "_length_"):
-            # data type is ctypes array
+
+        if tag == TIFFTAG_COLORMAP:
+            bps = self.GetField("BitsPerSample")
+            if bps is None:
+                print "Warning: BitsPerSample is required to get ColorMap, assuming 8 bps..."
+                bps = 8
+            num_cmap_elems = 1 << bps
+            data_type = data_type * num_cmap_elems
             pdt = ctypes.POINTER(data_type)
-            data = pdt()
+            rdata = pdt()
+            gdata = pdt()
+            bdata = pdt()
+            rdata_ptr = ctypes.byref(rdata)
+            gdata_ptr = ctypes.byref(gdata)
+            bdata_ptr = ctypes.byref(bdata)
+
+            # ignore count, it's not used for colormap
+            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p]*3
+            r = libtiff.TIFFGetField(self, tag, rdata_ptr, gdata_ptr, bdata_ptr)
+            data = (rdata,gdata,bdata)
         else:
-            data = data_type()
-        if count is None:
-            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p]
-            r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
-        else:
-            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_uint, ctypes.c_void_p]
-            r = libtiff.TIFFGetField(self, tag, count, ctypes.byref(data))
-        if not r: # tag not defined for current directory
-            if not ignore_undefined_tag:
-                print 'Warning: tag %r not defined in currect directory' % (tag)
-            return None
+            if hasattr(data_type, "_length_"):
+                # data type is ctypes array
+                pdt = ctypes.POINTER(data_type)
+                data = pdt()
+            else:
+                data = data_type()
+
+            if count is None:
+                libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p]
+                r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
+            else:
+                libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_uint, ctypes.c_void_p]
+                r = libtiff.TIFFGetField(self, tag, count, ctypes.byref(data))
+            if not r: # tag not defined for current directory
+                if not ignore_undefined_tag:
+                    print 'Warning: tag %r not defined in currect directory' % (tag)
+                return None
+
         return convert(data)
 
     #@debug
@@ -600,18 +624,46 @@ class TIFF(ctypes.c_void_p):
         data_type, convert = t
         if data_type == ctypes.c_float:
             data_type = ctypes.c_double
-        try:
-            len(value)
-            # value is an iterable
-            data = data_type(*value)
-        except TypeError:
-            data = data_type(value)
-        if count is None:
-            libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [data_type]
-            r = libtiff.TIFFSetField(self, tag, data)
+
+        if tag == TIFFTAG_COLORMAP:
+            # ColorMap passes 3 values each a c_uint16 pointer
+            try:
+                if len(value) != 3:
+                    print "Error: TIFFTAG_COLORMAP expects 3 uint16* arrays (not %d) as a list/tuple of lists" % len(value)
+                    r_arr,g_arr,b_arr = None,None,None
+                else:
+                    r_arr,g_arr,b_arr = value
+            except TypeError:
+                print "Error: TIFFTAG_COLORMAP expects 3 uint16* arrays as a list/tuple of lists"
+                r_arr,g_arr,b_arr = None,None,None
+            if r_arr is None:
+                return
+
+            bps = self.GetField("BitsPerSample")
+            if bps is None:
+                print "Warning: BitsPerSample is required to get ColorMap, assuming 8 bps..."
+                bps = 8
+            num_cmap_elems = 1 << bps
+            data_type = data_type * num_cmap_elems
+            r_ptr = data_type(*r_arr)
+            g_ptr = data_type(*g_arr)
+            b_ptr = data_type(*b_arr)
+            libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [ctypes.POINTER(data_type)]*3
+            r = libtiff.TIFFSetField(self, tag, r_ptr, g_ptr, b_ptr)
         else:
-            libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [ctypes.c_uint, data_type]
-            r = libtiff.TIFFSetField(self, tag, count, data)
+            try:
+                len(value)
+                # value is an iterable
+                data = data_type(*value)
+            except TypeError:
+                data = data_type(value)
+
+            if count is None:
+                libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [data_type]
+                r = libtiff.TIFFSetField(self, tag, data)
+            else:
+                libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [ctypes.c_uint, data_type]
+                r = libtiff.TIFFSetField(self, tag, count, data)
         return r
 
     def info(self):
@@ -863,8 +915,12 @@ def _test_tags_write():
     assert tmp==1,"Tag 'Artist' was not written properly"
     tmp = tiff.SetField("PrimaryChromaticities", [1,2,3,4,5,6])
     assert tmp==1,"Tag 'PrimaryChromaticities' was not written properly"
+    tmp = tiff.SetField("BitsPerSample", 8)
+    assert tmp==1,"Tag 'BitsPerSample' was not written properly"
+    tmp = tiff.SetField("ColorMap", [[ x*256 for x in range(256) ]]*3)
+    assert tmp==1,"Tag 'ColorMap' was not written properly"
 
-    arr = np.zeros((100,100), np.uint32)
+    arr = np.zeros((100,100), np.uint8)
     tiff.write_image(arr)
 
     print "Tag Write: SUCCESS"
@@ -881,6 +937,17 @@ def _test_tags_read(filename=None):
     assert tmp=="A Name","Tag 'Artist' did not read the correct value (Got '%s'; Expected 'A Name')" % (tmp,)
     tmp = tiff.GetField("PrimaryChromaticities")
     assert tmp==[1,2,3,4,5,6],"Tag 'PrimaryChromaticities' did not read the correct value (Got '%r'; Expected '[1,2,3,4,5,6]'" % (tmp,)
+    tmp = tiff.GetField("BitsPerSample")
+    assert tmp==8,"Tag 'BitsPerSample' did not read the correct value (Got %s; Expected 8)" % (str(tmp),)
+    tmp = tiff.GetField("ColorMap")
+    try:
+        assert len(tmp) == 3,"Tag 'ColorMap' should be three arrays, found %d" % len(tmp)
+        assert len(tmp[0])==256,"Tag 'ColorMap' should be three arrays of 256 elements, found %d elements" % len(tmp[0])
+        assert len(tmp[1])==256,"Tag 'ColorMap' should be three arrays of 256 elements, found %d elements" % len(tmp[1])
+        assert len(tmp[2])==256,"Tag 'ColorMap' should be three arrays of 256 elements, found %d elements" % len(tmp[2])
+    except TypeError:
+        print "Tag 'ColorMap' has the wrong shape of 3 arrays of 256 elements each"
+        return
 
     print "Tag Read: SUCCESS"
 
