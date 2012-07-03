@@ -197,17 +197,17 @@ tifftags = {
     TIFFTAG_SMAXSAMPLEVALUE: (ctypes.c_double, lambda d:d.value),
     TIFFTAG_SMINSAMPLEVALUE: (ctypes.c_double, lambda d:d.value),
 
-    TIFFTAG_STONITS: (ctypes.POINTER(ctypes.c_double), lambda d:d.contents),
+    TIFFTAG_STONITS: (ctypes.c_double, lambda d:d.value),
 
     TIFFTAG_XPOSITION: (ctypes.c_float, lambda d:d.value),
     TIFFTAG_XRESOLUTION: (ctypes.c_float, lambda d:d.value),
     TIFFTAG_YPOSITION: (ctypes.c_float, lambda d:d.value),
     TIFFTAG_YRESOLUTION: (ctypes.c_float, lambda d:d.value),
 
-    TIFFTAG_PRIMARYCHROMATICITIES: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
-    TIFFTAG_REFERENCEBLACKWHITE: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
-    TIFFTAG_WHITEPOINT: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
-    TIFFTAG_YCBCRCOEFFICIENTS: (ctypes.POINTER(ctypes.c_float), lambda d:d.contents),
+    TIFFTAG_PRIMARYCHROMATICITIES: (ctypes.c_float*6, lambda d:d.contents[:]),
+    TIFFTAG_REFERENCEBLACKWHITE: (ctypes.c_float*6, lambda d:d.contents[:]),
+    TIFFTAG_WHITEPOINT: (ctypes.c_float*2, lambda d:d.contents[:]),
+    TIFFTAG_YCBCRCOEFFICIENTS: (ctypes.c_float*3, lambda d:d.contents[:]),
 
     TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda d:d.value) # offset to CZ_LSMINFO record
 
@@ -542,7 +542,7 @@ class TIFF(ctypes.c_void_p):
     #def (self): return libtiff.TIFF(self)
 
     @debug
-    def GetField(self, tag, ignore_undefined_tag=True):
+    def GetField(self, tag, ignore_undefined_tag=True, count=None):
         """ Return TIFF field value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
@@ -565,8 +565,18 @@ class TIFF(ctypes.c_void_p):
                 print 'Warning: no tag %r defined' % (tag)
             return
         data_type, convert = t
-        data = data_type()
-        r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
+        if hasattr(data_type, "_length_"):
+            # data type is ctypes array
+            pdt = ctypes.POINTER(data_type)
+            data = pdt()
+        else:
+            data = data_type()
+        if count is None:
+            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p]
+            r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
+        else:
+            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_uint, ctypes.c_void_p]
+            r = libtiff.TIFFGetField(self, tag, count, ctypes.byref(data))
         if not r: # tag not defined for current directory
             if not ignore_undefined_tag:
                 print 'Warning: tag %r not defined in currect directory' % (tag)
@@ -574,7 +584,7 @@ class TIFF(ctypes.c_void_p):
         return convert(data)
 
     #@debug
-    def SetField (self, tag, value):
+    def SetField (self, tag, value, count=None):
         """ Set TIFF field value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
@@ -590,9 +600,18 @@ class TIFF(ctypes.c_void_p):
         data_type, convert = t
         if data_type == ctypes.c_float:
             data_type = ctypes.c_double
-        data = data_type(value)
-        libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [data_type]
-        r = libtiff.TIFFSetField(self, tag, data)
+        try:
+            len(value)
+            # value is an iterable
+            data = data_type(*value)
+        except TypeError:
+            data = data_type(value)
+        if count is None:
+            libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [data_type]
+            r = libtiff.TIFFSetField(self, tag, data)
+        else:
+            libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:-1] + [ctypes.c_uint, data_type]
+            r = libtiff.TIFFSetField(self, tag, count, data)
         return r
 
     def info(self):
@@ -838,6 +857,33 @@ def suppress_warnings():
 def suppress_errors():
     libtiff.TIFFSetErrorHandler(_null_error_handler)
 
+def _test_tags_write():
+    tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
+    tmp = tiff.SetField("Artist", "A Name")
+    assert tmp==1,"Tag 'Artist' was not written properly"
+    tmp = tiff.SetField("PrimaryChromaticities", [1,2,3,4,5,6])
+    assert tmp==1,"Tag 'PrimaryChromaticities' was not written properly"
+
+    arr = np.zeros((100,100), np.uint32)
+    tiff.write_image(arr)
+
+    print "Tag Write: SUCCESS"
+
+def _test_tags_read(filename=None):
+    import sys
+    if filename is None:
+        if len(sys.argv) != 2:
+            print 'Run `libtiff.py <filename>` for testing.'
+            return
+        filename = sys.argv[1]
+    tiff = TIFF.open(filename)
+    tmp = tiff.GetField("Artist")
+    assert tmp=="A Name","Tag 'Artist' did not read the correct value (Got '%s'; Expected 'A Name')" % (tmp,)
+    tmp = tiff.GetField("PrimaryChromaticities")
+    assert tmp==[1,2,3,4,5,6],"Tag 'PrimaryChromaticities' did not read the correct value (Got '%r'; Expected '[1,2,3,4,5,6]'" % (tmp,)
+
+    print "Tag Read: SUCCESS"
+
 def _test_read(filename=None):
     import sys
     import time
@@ -924,8 +970,10 @@ def _test_copy():
     print 'test copy ok'
 
 if __name__=='__main__':
+    _test_tags_write()
+    #_test_tags_read()
     #_test_write_float()
     #_test_write()
-    _test_read()
+    #_test_read()
     #_test_copy()
     
