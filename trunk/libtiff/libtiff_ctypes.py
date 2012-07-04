@@ -124,6 +124,121 @@ class c_toff_t(ctypes.c_int32): pass
 class c_tdata_t(ctypes.c_void_p): pass
 class c_thandle_t(ctypes.c_void_p): pass
 
+# types defined for creating custom tags
+FIELD_CUSTOM = 65
+
+class TIFFDataType(object):
+    """Place holder for the enum in C.
+
+    typedef enum {
+        TIFF_NOTYPE = 0,    /* placeholder */
+        TIFF_BYTE   = 1,    /* 8-bit unsigned integer */
+        TIFF_ASCII  = 2,    /* 8-bit bytes w/ last byte null */
+        TIFF_SHORT  = 3,    /* 16-bit unsigned integer */
+        TIFF_LONG   = 4,    /* 32-bit unsigned integer */
+        TIFF_RATIONAL   = 5,    /* 64-bit unsigned fraction */
+        TIFF_SBYTE  = 6,    /* !8-bit signed integer */
+        TIFF_UNDEFINED  = 7,    /* !8-bit untyped data */
+        TIFF_SSHORT = 8,    /* !16-bit signed integer */
+        TIFF_SLONG  = 9,    /* !32-bit signed integer */
+        TIFF_SRATIONAL  = 10,   /* !64-bit signed fraction */
+        TIFF_FLOAT  = 11,   /* !32-bit IEEE floating point */
+        TIFF_DOUBLE = 12,   /* !64-bit IEEE floating point */
+        TIFF_IFD    = 13    /* %32-bit unsigned integer (offset) */
+    } TIFFDataType;
+    """
+    ctype = ctypes.c_int
+    TIFF_NOTYPE = 0
+    TIFF_BYTE = 1
+    TIFF_ASCII = 2
+    TIFF_SHORT = 3
+    TIFF_LONG = 4
+    TIFF_RATIONAL = 5
+    TIFF_SBYTE = 6
+    TIFF_UNDEFINED = 7
+    TIFF_SSHORT = 8
+    TIFF_SLONG = 9
+    TIFF_SRATIONAL = 10
+    TIFF_FLOAT = 11
+    TIFF_DOUBLE = 12
+    TIFF_IFD = 13
+
+ttype2ctype = {
+    TIFFDataType.TIFF_NOTYPE : None,
+    TIFFDataType.TIFF_BYTE : ctypes.c_ubyte,
+    TIFFDataType.TIFF_ASCII : ctypes.c_char_p,
+    TIFFDataType.TIFF_SHORT : ctypes.c_uint16,
+    TIFFDataType.TIFF_LONG : ctypes.c_uint32,
+    TIFFDataType.TIFF_RATIONAL : ctypes.c_double, # Should be unsigned
+    TIFFDataType.TIFF_SBYTE : ctypes.c_byte,
+    TIFFDataType.TIFF_UNDEFINED : ctypes.c_char,
+    TIFFDataType.TIFF_SSHORT : ctypes.c_int16,
+    TIFFDataType.TIFF_SLONG : ctypes.c_int32,
+    TIFFDataType.TIFF_SRATIONAL : ctypes.c_double,
+    TIFFDataType.TIFF_FLOAT : ctypes.c_float,
+    TIFFDataType.TIFF_DOUBLE : ctypes.c_double,
+    TIFFDataType.TIFF_IFD : ctypes.c_uint32
+    }
+
+class TIFFFieldInfo(ctypes.Structure):
+    """
+    typedef struct {
+        ttag_t  field_tag;      /* field's tag */
+        short   field_readcount;    /* read count/TIFF_VARIABLE/TIFF_SPP */
+        short   field_writecount;   /* write count/TIFF_VARIABLE */
+        TIFFDataType field_type;    /* type of associated data */
+        unsigned short field_bit;   /* bit in fieldsset bit vector */
+        unsigned char field_oktochange; /* if true, can change while writing */
+        unsigned char field_passcount;  /* if true, pass dir count on set */
+        char    *field_name;        /* ASCII name */
+        } TIFFFieldInfo;
+    """
+    _fields_ = [
+            ("field_tag", ctypes.c_uint32),
+            ("field_readcount", ctypes.c_short),
+            ("field_writecount", ctypes.c_short),
+            ("field_type", TIFFDataType.ctype),
+            ("field_bit", ctypes.c_ushort),
+            ("field_oktochange", ctypes.c_ubyte),
+            ("field_passcount", ctypes.c_ubyte),
+            ("field_name", ctypes.c_char_p)
+            ]
+
+# Custom Tags
+class TIFFExtender(object):
+    def __init__(self, new_tag_list):
+        self._ParentExtender = None
+        self.new_tag_list = new_tag_list
+        def extender_pyfunc(tiff_struct):
+            libtiff.TIFFMergeFieldInfo(tiff_struct, self.new_tag_list, len(self.new_tag_list))
+
+            if self._ParentExtender:
+                self._ParentExtender(tiff_struct)
+
+            # Just make being a void function more obvious
+            return
+
+        # ctypes callback function prototype (return void, arguments void pointer)
+        self.EXT_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+        # ctypes callback function instance
+        self.EXT_FUNC_INST = self.EXT_FUNC(extender_pyfunc)
+
+        libtiff.TIFFSetTagExtender.restype = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+        self._ParentExtender = libtiff.TIFFSetTagExtender(self.EXT_FUNC_INST)
+
+def add_tags(tag_list):
+    tag_list_array = (TIFFFieldInfo * len(tag_list))(*tag_list)
+    for field_info in tag_list_array:
+        name = "TIFFTAG_" + str(field_info.field_name).upper()
+        exec 'global %s; %s = %s' % (name, name, field_info.field_tag)
+        if field_info.field_writecount > 1 and field_info.field_type != TIFFDataType.TIFF_ASCII:
+            tifftags[field_info.field_tag] = (ttype2ctype[field_info.field_type]*field_info.field_writecount, lambda d:d.contents[:])
+        else:
+            tifftags[field_info.field_tag] = (ttype2ctype[field_info.field_type], lambda d:d.value)
+
+    return TIFFExtender(tag_list_array)
+
+
 tifftags = {
 
 #TODO:
@@ -999,6 +1114,10 @@ libtiff.TIFFStripSize.argtypes = [TIFF]
 libtiff.TIFFRawStripSize.restype = c_tsize_t
 libtiff.TIFFRawStripSize.argtypes = [TIFF, c_tstrip_t]
 
+# For adding custom tags (must be void pointer otherwise callback seg faults
+libtiff.TIFFMergeFieldInfo.restype = ctypes.c_int32
+libtiff.TIFFMergeFieldInfo.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
+
 # Tile Support
 # TODO:
 #   TIFFTileRowSize64
@@ -1065,6 +1184,58 @@ def suppress_warnings():
     libtiff.TIFFSetWarningHandler(_null_warning_handler)
 def suppress_errors():
     libtiff.TIFFSetErrorHandler(_null_error_handler)
+
+def _test_custom_tags():
+    def _tag_write():
+        a = TIFF.open("/tmp/libtiff_test_custom_tags.tif", "w")
+
+        a.SetField("ARTIST", "MY NAME")
+        a.SetField("LibtiffTestByte", 42)
+        a.SetField("LibtiffTeststr", "FAKE")
+        a.SetField("LibtiffTestuint16", 42)
+        a.SetField("LibtiffTestMultiuint32", (1,2,3,4,5,6,7,8,9,10))
+        a.SetField("XPOSITION", 42.0)
+        a.SetField("PRIMARYCHROMATICITIES", (1.0, 2, 3, 4, 5, 6))
+
+        arr = numpy.ones((512,512), dtype=numpy.uint8)
+        arr[:,:] = 255
+        a.write_image(arr)
+
+        print "Tag Write: SUCCESS"
+
+    def _tag_read():
+        a = TIFF.open("/tmp/libtiff_test_custom_tags.tif", "r")
+
+        tmp = a.read_image()
+        assert tmp.shape==(512,512),"Image read was wrong shape (%r instead of (512,512))" % (tmp.shape,)
+        tmp = a.GetField("XPOSITION")
+        assert tmp == 42.0,"XPosition was not read as 42.0"
+        tmp = a.GetField("ARTIST")
+        assert tmp=="MY NAME","Artist was not read as 'MY NAME'"
+        tmp = a.GetField("LibtiffTestByte")
+        assert tmp==42,"LibtiffTestbyte was not read as 42"
+        tmp = a.GetField("LibtiffTestuint16")
+        assert tmp==42,"LibtiffTestuint16 was not read as 42"
+        tmp = a.GetField("LibtiffTestMultiuint32")
+        assert tmp==[1,2,3,4,5,6,7,8,9,10],"LibtiffTestMultiuint32 was not read as [1,2,3,4,5,6,7,8,9,10]"
+        tmp = a.GetField("LibtiffTeststr")
+        assert tmp=="FAKE","LibtiffTeststr was not read as 'FAKE'"
+        tmp = a.GetField("PRIMARYCHROMATICITIES")
+        assert tmp==[1.0,2.0,3.0,4.0,5.0,6.0],"PrimaryChromaticities was not read as [1.0,2.0,3.0,4.0,5.0,6.0]"
+        print "Tag Read: SUCCESS"
+
+    # Define a C structure that says how each tag should be used
+    test_tags = [
+        TIFFFieldInfo(40100, 1, 1, TIFFDataType.TIFF_BYTE, FIELD_CUSTOM, True, False, "LibtiffTestByte"),
+        TIFFFieldInfo(40103, 10, 10, TIFFDataType.TIFF_LONG, FIELD_CUSTOM, True, False, "LibtiffTestMultiuint32"),
+        TIFFFieldInfo(40102, 1, 1, TIFFDataType.TIFF_SHORT, FIELD_CUSTOM, True, False, "LibtiffTestuint16"),
+        TIFFFieldInfo(40101, -1, -1, TIFFDataType.TIFF_ASCII, FIELD_CUSTOM, True, False, "LibtiffTeststr")
+        ]
+
+    # Add tags to the libtiff library
+    test_extender = add_tags(test_tags) # Keep pointer to extender object, no gc
+    _tag_write()
+    _tag_read()
 
 def _test_tile_write():
     a = TIFF.open("/tmp/libtiff_test_tile_write.tiff", "w")
@@ -1324,7 +1495,8 @@ def _test_copy():
     print 'test copy ok'
 
 if __name__=='__main__':
-    _test_tile_write()
+    _test_custom_tags()
+    #_test_tile_write()
     #_test_tile_read()
     #_test_tags_write()
     #_test_tags_read()
