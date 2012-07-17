@@ -61,6 +61,9 @@ if tiff_h is None:
         # fix me for windows:
         include_tiff_h = os.path.join('/usr','include','tiff.h')
     if not os.path.isfile(include_tiff_h):
+        # Base it off of the python called
+        include_tiff_h = os.path.realpath(os.path.join(os.path.split(sys.executable)[0], '..', 'include', 'tiff.h'))
+    if not os.path.isfile(include_tiff_h):
         raise ValueError('Failed to find TIFF header file (may be need to run: sudo apt-get install libtiff4-dev)')
     # Read TIFFTAG_* constants for the header file:
     f = open (include_tiff_h, 'r')
