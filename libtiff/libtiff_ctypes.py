@@ -698,12 +698,10 @@ class TIFF(ctypes.c_void_p):
         """ Iterator of all images in a TIFF file.
         """
         yield self.read_image(verbose=verbose)
-        if not self.LastDirectory():
-            while 1:
-                self.ReadDirectory()
-                yield self.read_image(verbose=verbose)
-                if self.LastDirectory():
-                    break
+        while not self.LastDirectory():
+            self.ReadDirectory()
+            yield self.read_image(verbose=verbose)
+        self.SetDirectory(0)
 
     def __del__(self):
         self.close()
