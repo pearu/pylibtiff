@@ -617,16 +617,17 @@ class TIFF(ctypes.c_void_p):
                 # Cols
                 for x in range(0, num_icols, num_tcols):
                     # If we are over the edge of the image, use 0 as fill
+                    tile_arr[:] = 0
                     if len(arr.shape) == 3:
                         if ((y + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
                             tile_arr[:num_irows-y,:num_icols-x] = arr[z,y:y+num_trows,x:x+num_tcols]
                         else:
                             tile_arr[:,:] = arr[z,y:y+num_trows,x:x+num_tcols]
                     elif len(arr.shape) == 2:
-                        if ((i + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
+                        if ((y + num_trows) > num_irows) or ((x + num_tcols) > num_icols):
                             tile_arr[:num_irows-y,:num_icols-x] = arr[y:y+num_trows, x:x+num_tcols]
                         else:
-                            tile_arr[:,:] = arr[i:i+num_trows,x:x+num_tcols]
+                            tile_arr[:,:] = arr[y:y+num_trows,x:x+num_tcols]
                     elif len(arr.shape) == 1:
                         # This doesn't make much sense for 1D arrays, waste of space if tiles are 2D
                         if ((x + num_tcols) > num_icols):
