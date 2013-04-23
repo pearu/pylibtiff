@@ -71,7 +71,10 @@ if tiff_h is None:
     d = {}
     for line in f.readlines():
         if not line.startswith('#define'): continue
-        words = line[7:].lstrip().split()[:2]
+        words = line[7:].lstrip().split()
+        if len(words)>2:
+            words[1] = ''.join(words[1:])
+            del words[2:]
         if len (words)!=2: continue
         name, value = words
         i = value.find('/*')
@@ -79,7 +82,11 @@ if tiff_h is None:
         if value in d:
             value = d[value]
         else:
-            value = eval(value)
+            try:
+                value = eval(value)
+            except:
+                print `value, line`
+                raise
         d[name] = value
         l.append('%s = %s' % (name, value))
     f.close()
