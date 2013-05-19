@@ -45,7 +45,10 @@
 
 
 #include <Python.h>
-#define NPY_NO_DEPRECATED_API
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#if NPY_VERSION < 0x01000009
+  #define NPY_CORDER PyArray_CORDER
+#endif
 #define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
 #include "numpy/arrayobject.h"
 
@@ -1215,7 +1218,7 @@ static PyObject *py_decode(PyObject *self, PyObject *args, PyObject *kwds)
 	  dims[0] -= occ;
 	  newshape.ptr = dims;
 	  newshape.len = 1;
-	  if (PyArray_Resize((PyArrayObject*)result, &newshape, 0, PyArray_CORDER)==NULL)
+	  if (PyArray_Resize((PyArrayObject*)result, &newshape, 0, NPY_CORDER)==NULL)
 	    return NULL;
 	}
     }
