@@ -532,39 +532,32 @@ class TIFF(ctypes.c_void_p):
         else:
             WriteStrip = self.WriteEncodedStrip
 
-        if len(shape)==1:
-            width, = shape
-            size = width * arr.itemsize
-            self.SetField(TIFFTAG_IMAGEWIDTH, width)
-            self.SetField(TIFFTAG_IMAGELENGTH, 1)
-            self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-            self.SetField(TIFFTAG_COMPRESSION, compression)
-            self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
-            self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-            if sample_format is not None:
-                self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
-            WriteStrip(0, arr.ctypes.data, size)
-            self.WriteDirectory()
+        self.SetField(TIFFTAG_COMPRESSION, compression)
+        if (compression == COMPRESSION_LZW and
+            sample_format in [SAMPLEFORMAT_INT, SAMPLEFORMAT_UINT]):
+            # This field can only be set after compression and before writing data
+            # Horizontal predictor often improves compression, but some rare
+            # readers might support LZW only without predictor.
+            self.SetField(TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL)
 
-        elif len(shape)==2:
+        self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+        self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+        self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
+
+        if len(shape)==1:
+            shape = (shape[0], 1) # Same as 2D with height == 1
+
+        if len(shape) == 2:
             height, width = shape
             size = width * height * arr.itemsize
 
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, height)
-            self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-            self.SetField(TIFFTAG_COMPRESSION, compression)
-            #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-
-            if sample_format is not None:
-                self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
-
             WriteStrip(0, arr.ctypes.data, size)            
             self.WriteDirectory()
+
         elif len(shape)==3:
             if write_rgb:
                 # Guess the planar config, with a preference for separate planes
@@ -577,16 +570,11 @@ class TIFF(ctypes.c_void_p):
                     depth, height, width = shape
                     size = width * height * arr.itemsize
 
-                self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-                self.SetField(TIFFTAG_COMPRESSION, compression)
                 self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
-                self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
                 self.SetField(TIFFTAG_IMAGEWIDTH, width)
                 self.SetField(TIFFTAG_IMAGELENGTH, height)
                 self.SetField(TIFFTAG_SAMPLESPERPIXEL, depth)
                 self.SetField(TIFFTAG_PLANARCONFIG, planar_config)
-                if sample_format is not None:
-                    self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
                 if depth == 4: # RGBA
                     self.SetField(TIFFTAG_EXTRASAMPLES, [EXTRASAMPLE_UNASSALPHA],
                                   count=1)
@@ -607,15 +595,8 @@ class TIFF(ctypes.c_void_p):
                 for n in range(depth):
                     self.SetField(TIFFTAG_IMAGEWIDTH, width)
                     self.SetField(TIFFTAG_IMAGELENGTH, height)
-                    self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-                    self.SetField(TIFFTAG_COMPRESSION, compression)
-                    #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
                     self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-                    self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
                     self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-
-                    if sample_format is not None:
-                        self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
 
                     WriteStrip(0, arr[n].ctypes.data, size)
                     self.WriteDirectory()
