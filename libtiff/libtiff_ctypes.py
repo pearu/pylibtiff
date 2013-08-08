@@ -510,7 +510,7 @@ class TIFF(ctypes.c_void_p):
         write_rgb: bool
           Write rgb image if data has 3 dimensions (otherwise, writes a multipage TIFF).
         """
-        COMPRESSION = self._fix_compression (compression)
+        compression = self._fix_compression (compression)
 
         arr = np.ascontiguousarray(arr)
         sample_format = None
@@ -538,7 +538,7 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, 1)
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-            self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
+            self.SetField(TIFFTAG_COMPRESSION, compression)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
@@ -554,7 +554,7 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_IMAGEWIDTH, width)
             self.SetField(TIFFTAG_IMAGELENGTH, height)
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-            self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
+            self.SetField(TIFFTAG_COMPRESSION, compression)
             #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
@@ -578,7 +578,7 @@ class TIFF(ctypes.c_void_p):
                     size = width * height * arr.itemsize
 
                 self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-                self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
+                self.SetField(TIFFTAG_COMPRESSION, compression)
                 self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
                 self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
                 self.SetField(TIFFTAG_IMAGEWIDTH, width)
@@ -608,7 +608,7 @@ class TIFF(ctypes.c_void_p):
                     self.SetField(TIFFTAG_IMAGEWIDTH, width)
                     self.SetField(TIFFTAG_IMAGELENGTH, height)
                     self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-                    self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
+                    self.SetField(TIFFTAG_COMPRESSION, compression)
                     #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
                     self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
                     self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
