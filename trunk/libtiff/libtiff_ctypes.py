@@ -61,6 +61,9 @@ if tiff_h is None:
         # fix me for windows:
         include_tiff_h = os.path.join('/usr','include','tiff.h')
     if not os.path.isfile(include_tiff_h):
+        import glob
+        include_tiff_h = (glob.glob(os.path.join('/usr','include','*linux-gnu','tiff.h')) + [include_tiff_h])[0]
+    if not os.path.isfile(include_tiff_h):
         # Base it off of the python called
         include_tiff_h = os.path.realpath(os.path.join(os.path.split(sys.executable)[0], '..', 'include', 'tiff.h'))
     if not os.path.isfile(include_tiff_h):
