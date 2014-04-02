@@ -56,7 +56,7 @@ def runner (parser, options, args):
 
     description = []
     for ifd in tiff.IFD:
-        assert ifd.get ('Compression').value==1,`ifd.get ('Compression')`
+        #assert ifd.get ('Compression').value in [1,None],`ifd.get ('Compression')`
         s = ifd.get('ImageDescription')
         if s is not None:
             description.append(s.value.tostring())
@@ -98,7 +98,10 @@ def runner (parser, options, args):
     return
 
 def main ():
-    from libtiff.optparse_gui import OptionParser
+    try:
+        from libtiff.optparse_gui import OptionParser
+    except ImportError:
+        from optparse import OptionParser
     from libtiff.script_options import set_convert_options
     parser = OptionParser()
 

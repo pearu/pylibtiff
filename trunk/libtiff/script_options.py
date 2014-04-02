@@ -6,6 +6,12 @@ import os
 from optparse import OptionGroup, NO_DEFAULT
 from optparse import TitledHelpFormatter
 
+try:
+    import wx
+    have_wx = True
+except ImportError:
+    have_wx = False
+
 class MyHelpFormatter(TitledHelpFormatter):
 
     def format_option(self, option):
@@ -57,11 +63,11 @@ def set_convert_options(parser):
     parser.set_usage ('%prog [options] -i INPUTPATH [-o OUTPUTPATH]')
     parser.set_description('Convert INPUTPATH to OUTPUTPATH.')
     parser.add_option ('--input-path', '-i',
-                       type = 'file', metavar='INPUTPATH',
+                       type = 'file' if have_wx else str, metavar='INPUTPATH',
                        help = 'Specify INPUTPATH.'
                        )
     parser.add_option ('--output-path', '-o',
-                       type = 'file', metavar='OUTPUTPATH',
+                       type = 'file' if have_wx else str, metavar='OUTPUTPATH',
                        help = 'Specify OUTPUTPATH.'
                        )
     parser.add_option ('--compression',
@@ -86,7 +92,7 @@ def set_info_options(parser):
     parser.set_usage ('%prog [options] -i INPUTPATH')
     parser.set_description('Show INPUTPATHs information.')
     parser.add_option ('--input-path', '-i',
-                       type = 'file', metavar='INPUTPATH',
+                       type = 'file' if have_wx else str, metavar='INPUTPATH',
                        help = 'Specify INPUTPATH.'
                        )
     parser.add_option ('--memory-usage',
