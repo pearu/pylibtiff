@@ -78,7 +78,7 @@ def main ():
         from libtiff.optparse_gui import OptionParser
     except ImportError:
         from optparse import OptionParser
-        raise
+        #raise
     from libtiff.script_options import set_info_options
     from libtiff.utils import Options
     parser = OptionParser()
