@@ -223,7 +223,10 @@ rows_per_strip=%(rows_per_strip)s
                         strip = tif_lzw.decode(compressed_strip, self.uncompressed_bytes_per_strip)
                     else:
                         raise NotImplementedError (`self.compression`)
-                image[offset:offset + strip.nbytes] = strip
+                target = image[offset:offset + strip.nbytes]
+                if target.nbytes < strip.nbytes:
+                    print '%s.get_image warning: tiff data contains %s extra bytes (compression=%r) that are ignored' % (self.__class__.__name__, strip.nbytes-target.nbytes, self.compression)
+                image[offset:offset + strip.nbytes] = strip[:target.nbytes]
                 offset += strip.nbytes
             image = image.view(dtype=self.dtype).reshape(self.shape)
             return image
