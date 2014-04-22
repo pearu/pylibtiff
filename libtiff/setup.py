@@ -84,3 +84,7 @@ if %(d)r not in sys.path:
         config.add_scripts(generate_a_script)
 
     return config
+
+if __name__ == '__main__':
+    from numpy.distutils.core import setup
+    setup (configuration=configuration)
