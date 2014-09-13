@@ -154,14 +154,19 @@ class TIFFfile(TiffBase):
         while IFD_offset:
             n = self.get_uint16(IFD_offset)
             ifd = IFD(self)
-
+            exif_offset = 0
             for i in range(n):
                 entry = IFDEntry(ifd, self, IFD_offset + 2 + i*12)
                 ifd.append(entry)
+                if entry.tag == 0x8769: # TIFFTAG_EXIFIFD
+                    exif_offset=entry.value
             ifd.finalize()
             IFD_list.append(ifd)
             self.memory_usage.append((IFD_offset, IFD_offset + 2 + n*12 + 4, 'IFD%s entries (%s)' % (len(IFD_list), len(ifd))))
             IFD_offset = self.get_uint32(IFD_offset + 2 + n*12)
+            if IFD_offset == 0 and exif_offset != 0:
+                IFD_offset = exif_offset
+                exif_offset = 0
             if verbose:
                 sys.stdout.write('\rIFD information read: %s..' % (len (IFD_list))); sys.stdout.flush()
 
