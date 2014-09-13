@@ -115,6 +115,66 @@ Copyright 8298 ASCII Any
 
 # non-standard tags:
 CZ_LSMInfo 866C CZ_LSM
+
+# EXIF tags, see http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif.html
+EXIF_IFDOffset 8769 SHORT 1
+EXIF_ExposureTime 829a RATIONAL 1
+EXIF_FNumber 829d RATIONAL 1
+EXIF_ExposureProgram 8822 SHORT 1
+EXIF_SpectralSensitivity 8824 ASCII
+EXIF_ISOSpeedRatings 8827 SHORT 1
+EXIF_OECF 8828 UNDEFINED
+EXIF_ExifVersion 9000 UNDEFINED 4
+EXIF_DateTimeOriginal 9003 ASCII
+EXIF_DateTimeDigitized 9004 ASCII
+EXIF_ComponentsConfiguration 9101 UNDEFINED 4
+EXIF_CompressedBitsPerPixel 9102 RATIONAL 1
+EXIF_ShutterSpeedValue 9201 SRATIONAL 1
+EXIF_ApertureValue 9202 RATIONAL 1
+EXIF_BrightnessValue 9203 SRATIONAL 1
+EXIF_ExposureBiasValue 9204 SRATIONAL 1
+EXIF_MaxApertureValue 9205 RATIONAL 1
+EXIF_SubjectDistance 9206 RATIONAL 1
+EXIF_MeteringMode 9207 SHORT 1
+EXIF_LightSource 9208 SHORT 1
+EXIF_Flash 9209 SHORT 1
+EXIF_FocalLength 920a RATIONAL 1
+EXIF_SubjectArea 9214 SHORT 2|3|4
+EXIF_MakerNote 927c UNDEFINED
+EXIF_UserComment 9286 UNDEFINED
+EXIF_SubsecTime 9290 ASCII
+EXIF_SubsecTimeOriginal 9291 ASCII
+EXIF_SubsecTimeDigitized 9292 ASCII
+EXIF_FlashpixVersion a000 UNDEFINED 4
+EXIF_ColorSpace a001 SHORT 1
+EXIF_PixelXDimension a002 SHORT!LONG 1
+EXIF_PixelYDimension a003 SHORT!LONG 1
+EXIF_RelatedSoundFile a004 ASCII 13
+EXIF_FlashEnergy a20b RATIONAL 1
+EXIF_SpatialFrequencyResponse a20c UNDEFINED
+EXIF_FocalPlaneXResolution a20e RATIONAL 1
+EXIF_FocalPlaneYResolution a20f RATIONAL 1
+EXIF_FocalPlaneResolutionUnit a210 SHORT 1
+EXIF_SubjectLocation a214 SHORT 2
+EXIF_ExposureIndex a215 RATIONAL 1
+EXIF_SensingMethod a217 SHORT 1
+EXIF_FileSource a300 UNDEFINED 1
+EXIF_SceneType a301 UNDEFINED 1
+EXIF_CFAPattern a302 UNDEFINED
+EXIF_CustomRendered a401 SHORT 1
+EXIF_ExposureMode a402 SHORT 1
+EXIF_WhiteBalance a403 SHORT 1
+EXIF_DigitalZoomRatio a404 RATIONAL 1
+EXIF_FocalLengthIn35mmFilm a405 SHORT 1
+EXIF_SceneCaptureType a406 SHORT 1
+EXIF_GainControl a407 SHORT 1
+EXIF_Contrast a408 SHORT 1
+EXIF_Saturation a409 SHORT 1
+EXIF_Sharpness a40a SHORT 1
+EXIF_DeviceSettingDescription a40b UNDEFINED
+EXIF_SubjectDistanceRange a40c SHORT 1
+EXIF_ImageUniqueID a420 ASCII 33
+
 '''
 
 default_tag_values = dict(BitsPerSample=8, SampleFormat=1,
