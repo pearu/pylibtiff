@@ -413,9 +413,10 @@ class TIFF(ctypes.c_void_p):
         """ Return numpy dtype corresponding to bits and sample format.
         """
         typ = None
-        if bits==1:
-            pass
-        elif sample_format==SAMPLEFORMAT_IEEEFP:
+        if bits % 8 != 0:
+            raise NotImplementedError("bits = %d" % bits)
+
+        if sample_format == SAMPLEFORMAT_IEEEFP:
             typ = getattr(np,'float%s' % (bits))
         elif sample_format==SAMPLEFORMAT_UINT or sample_format is None:
             typ = getattr(np,'uint%s' % (bits))
@@ -433,39 +434,45 @@ class TIFF(ctypes.c_void_p):
         """
         width = self.GetField('ImageWidth')
         height = self.GetField('ImageLength')
+        samples_pp = self.GetField('SamplesPerPixel') # this number includes extra samples
+        if samples_pp is None: # default is 1
+            samples_pp = 1
+        # Note: In the TIFF specification, BitsPerSample and SampleFormat are
+        # per samples. However, libtiff doesn't support mixed format, so it will
+        # always return just one value (or raise an error).
         bits = self.GetField('BitsPerSample')
         sample_format = self.GetField('SampleFormat')
+        planar_config = self.GetField('PlanarConfig')
+        if planar_config is None: # default is contig
+            planar_config = PLANARCONFIG_CONTIG
         compression = self.GetField('Compression')
+        if compression is None: # default is no compression
+            compression = COMPRESSION_NONE
+        # TODO: rotate according to orientation
 
+        # TODO: might need special support if bits < 8
         typ = self.get_numpy_type(bits, sample_format)
 
-        if typ is None:
-            if bits==1: # TODO: check for correctness
-                typ = np.uint8
-                itemsize = 1
-            elif bits==4: # TODO: check for correctness
-                typ = np.uint32
-                itemsize = 4
-            else:
-                raise NotImplementedError (`bits`)
+        if samples_pp == 1:
+            # only 2 dimensions array
+            arr = np.empty((height, width), typ)
         else:
-            itemsize = bits/8
+            if planar_config == PLANARCONFIG_CONTIG:
+                arr = np.empty((height, width, samples_pp), typ)
+            elif planar_config == PLANARCONFIG_SEPARATE:
+                arr = np.empty((samples_pp, height, width), typ)
+            else:
+                raise IOError("Unexpected PlanarConfig = %d" % planar_config)
+        size = arr.nbytes
 
-        size = width * height * itemsize
-        arr = np.zeros((height, width), typ)
-
-        if compression==COMPRESSION_NONE:
+        if compression == COMPRESSION_NONE:
             ReadStrip = self.ReadRawStrip
         else:
             ReadStrip = self.ReadEncodedStrip
 
         pos = 0
-        elem = None
-        for strip in range (self.NumberOfStrips()):
-            if elem is None:
-                elem = ReadStrip(strip, arr.ctypes.data + pos, size)
-            elif elem:
-                elem = ReadStrip(strip, arr.ctypes.data + pos, min(size - pos, elem))
+        for strip in range(self.NumberOfStrips()):
+            elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
             pos += elem
         return arr
 
