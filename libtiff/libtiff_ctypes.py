@@ -847,7 +847,7 @@ class TIFF(ctypes.c_void_p):
         return convert(data)
 
     #@debug
-    def SetField (self, tag, value, count=None):
+    def SetField(self, tag, value, count=None):
         """ Set TIFF field value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
@@ -890,12 +890,15 @@ class TIFF(ctypes.c_void_p):
             libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [ctypes.POINTER(data_type)]*3
             r = libtiff.TIFFSetField(self, tag, r_ptr, g_ptr, b_ptr)
         else:
-            try:
-                len(value)
-                # value is an iterable
-                data = data_type(*value)
-            except TypeError:
+            if isinstance(value, str):
                 data = data_type(value)
+            else:
+                try:
+                    len(value)
+                    # value is an iterable
+                    data = data_type(*value)
+                except TypeError:
+                    data = data_type(value)
 
             if count is None:
                 libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [data_type]
