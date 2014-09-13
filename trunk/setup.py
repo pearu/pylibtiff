@@ -16,7 +16,7 @@ Operating System :: MacOS
 MAJOR               = 0
 MINOR               = 4
 MICRO               = 0
-ISRELEASED          = not True
+ISRELEASED          = True
 VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 import os
@@ -81,7 +81,7 @@ if __name__=='__main__':
           author_email = 'pearu.peterson@gmail.com',
           license = 'http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
           url = 'http://pylibtiff.googlecode.com',
-          download_url = 'http://code.google.com/p/pylibtiff/downloads/',
+          #download_url = 'http://code.google.com/p/pylibtiff/downloads/',
           classifiers=filter(None, CLASSIFIERS.split('\n')),
           description = 'PyLibTiff: a Python tiff library.',
           long_description = '''\
