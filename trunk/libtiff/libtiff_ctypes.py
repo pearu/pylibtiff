@@ -501,7 +501,7 @@ class TIFF(ctypes.c_void_p):
           Specify image data of rank 1 to 3.
         compression : {None, 'ccittrle', 'ccittfax3','ccitt_t4','ccittfax4','ccitt_t6','lzw','ojpeg','jpeg','next','ccittrlew','packbits','thunderscan','it8ctpad','it8lw','it8mp','it8bl','pixarfilm','pixarlog','deflate','adobe_deflate','dcs','jbig','sgilog','sgilog24','jp2000'}
         write_rgb: bool
-          Write rgb image if data is of size 3xWxH (otherwise, writes a multipage TIFF).
+          Write rgb image if data has 3 dimensions (otherwise, writes a multipage TIFF).
         """
         COMPRESSION = self._fix_compression (compression)
 
@@ -533,7 +533,7 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
             self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
             if sample_format is not None:
                 self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
@@ -550,7 +550,7 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
             #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
 
             if sample_format is not None:
@@ -559,23 +559,44 @@ class TIFF(ctypes.c_void_p):
             WriteStrip(0, arr.ctypes.data, size)            
             self.WriteDirectory()
         elif len(shape)==3:
-            depth, height, width = shape
-            size = width * height * arr.itemsize
-            if depth == 3 and write_rgb:
-                self.SetField(TIFFTAG_IMAGEWIDTH, width)
-                self.SetField(TIFFTAG_IMAGELENGTH, height)
+            if write_rgb:
+                # Guess the planar config, with a preference for separate planes
+                if shape[2] == 3 or shape[2] == 4:
+                    planar_config = PLANARCONFIG_CONTIG
+                    height, width, depth = shape
+                    size = arr.nbytes
+                else:
+                    planar_config = PLANARCONFIG_SEPARATE
+                    depth, height, width = shape
+                    size = width * height * arr.itemsize
+
                 self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
                 self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
-                self.SetField(TIFFTAG_SAMPLESPERPIXEL, 3)
                 self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
-                self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE)
-
+                self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
+                self.SetField(TIFFTAG_IMAGEWIDTH, width)
+                self.SetField(TIFFTAG_IMAGELENGTH, height)
+                self.SetField(TIFFTAG_SAMPLESPERPIXEL, depth)
+                self.SetField(TIFFTAG_PLANARCONFIG, planar_config)
                 if sample_format is not None:
                     self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
-                for n in range(depth):
-                    WriteStrip(n, arr[n, :, :].ctypes.data, size)
+                if depth == 4: # RGBA
+                    self.SetField(TIFFTAG_EXTRASAMPLES, [EXTRASAMPLE_UNASSALPHA],
+                                  count=1)
+                elif depth > 4: # No idea...
+                    self.SetField(TIFFTAG_EXTRASAMPLES,
+                                  [EXTRASAMPLE_UNSPECIFIED] * (depth - 3),
+                                  count=(depth - 3))
+
+                if planar_config == PLANARCONFIG_CONTIG:
+                    WriteStrip(0, arr.ctypes.data, size)
+                else:
+                    for n in range(depth):
+                        WriteStrip(n, arr[n, :, :].ctypes.data, size)
                 self.WriteDirectory()
             else:
+                depth, height, width = shape
+                size = width * height * arr.itemsize
                 for n in range(depth):
                     self.SetField(TIFFTAG_IMAGEWIDTH, width)
                     self.SetField(TIFFTAG_IMAGELENGTH, height)
@@ -583,7 +604,7 @@ class TIFF(ctypes.c_void_p):
                     self.SetField(TIFFTAG_COMPRESSION, COMPRESSION)
                     #self.SetField(TIFFTAG_SAMPLESPERPIXEL, 1)
                     self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-                    self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_RIGHTTOP)
+                    self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
                     self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
 
                     if sample_format is not None:
