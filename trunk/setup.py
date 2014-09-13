@@ -14,7 +14,7 @@ Operating System :: MacOS
 """
 
 MAJOR               = 0
-MINOR               = 3
+MINOR               = 4
 MICRO               = 0
 ISRELEASED          = not True
 VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -75,7 +75,7 @@ if __name__=='__main__':
     if os.path.exists('libtiff/version.py'): os.remove('libtiff/version.py')
     write_version_py()
 
-    setup(name='pylibtiff',
+    setup(name='libtiff',
           #version='0.3-svn',
           author = 'Pearu Peterson',
           author_email = 'pearu.peterson@gmail.com',
