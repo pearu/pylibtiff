@@ -293,9 +293,12 @@ class TIFFimage:
                 assert end <= new_size, `end, tif.size, size_incr, new_size`
                 #sys.stdout.write('resizing: %s -> %s\n' % (tif.size, new_size))
                 #tif.resize(end, refcheck=False)
-                tif._mmap.resize(new_size)
-                new_tif = numpy.ndarray.__new__(numpy.memmap, (tif._mmap.size(), ),
-                                                dtype = tif.dtype, buffer=tif._mmap)
+                base = tif._mmap
+                if base is None:
+                    base = tif.base
+                base.resize(new_size)
+                new_tif = numpy.ndarray.__new__(numpy.memmap, (base.size(), ),
+                                                dtype = tif.dtype, buffer=base)
                 new_tif._parent = tif
                 new_tif.__array_finalize__(tif)
                 tif = new_tif
@@ -384,7 +387,10 @@ class TIFFimage:
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
             total_size -= sdiff
-            tif._mmap.resize(total_size)
+            base = tif._mmap
+            if base is None:
+                base = tif.base
+            base.resize(total_size)
             if verbose:
                 sys.stdout.write('  resized records: %s -> %s (compression: %.2fx)\n' \
                                      % (bytes2str(total_size + sdiff), bytes2str(total_size), 

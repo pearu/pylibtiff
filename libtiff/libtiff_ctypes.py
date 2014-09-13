@@ -18,6 +18,8 @@ import numpy as np
 from numpy import ctypeslib
 import ctypes
 import ctypes.util
+import struct
+import collections
 
 if os.name=='nt':
     # assume that the directory of libtiff3.dll is in PATH.
@@ -507,7 +509,7 @@ class TIFF(ctypes.c_void_p):
         sample_format = None
         if arr.dtype in np.sctypes['float']:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint']+[numpy.bool]:
+        elif arr.dtype in np.sctypes['uint']+[np.bool]:
             sample_format = SAMPLEFORMAT_UINT
         elif arr.dtype in np.sctypes['int']:
             sample_format = SAMPLEFORMAT_INT
@@ -826,8 +828,7 @@ class TIFF(ctypes.c_void_p):
             r = libtiff.TIFFGetField(self, tag, rdata_ptr, gdata_ptr, bdata_ptr)
             data = (rdata,gdata,bdata)
         else:
-            if hasattr(data_type, "_length_"):
-                # data type is ctypes array
+            if issubclass(data_type, ctypes.Array):
                 pdt = ctypes.POINTER(data_type)
                 data = pdt()
             else:
@@ -839,10 +840,10 @@ class TIFF(ctypes.c_void_p):
             else:
                 libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_uint, ctypes.c_void_p]
                 r = libtiff.TIFFGetField(self, tag, count, ctypes.byref(data))
-            if not r: # tag not defined for current directory
-                if not ignore_undefined_tag:
-                    print 'Warning: tag %r not defined in currect directory' % (tag)
-                return None
+        if not r: # tag not defined for current directory
+            if not ignore_undefined_tag:
+                print 'Warning: tag %r not defined in currect directory' % (tag)
+            return None
 
         return convert(data)
 
@@ -867,12 +868,8 @@ class TIFF(ctypes.c_void_p):
         if tag == TIFFTAG_COLORMAP:
             # ColorMap passes 3 values each a c_uint16 pointer
             try:
-                if len(value) != 3:
-                    print "Error: TIFFTAG_COLORMAP expects 3 uint16* arrays (not %d) as a list/tuple of lists" % len(value)
-                    r_arr,g_arr,b_arr = None,None,None
-                else:
-                    r_arr,g_arr,b_arr = value
-            except TypeError:
+                r_arr,g_arr,b_arr = value
+            except (TypeError, ValueError):
                 print "Error: TIFFTAG_COLORMAP expects 3 uint16* arrays as a list/tuple of lists"
                 r_arr,g_arr,b_arr = None,None,None
             if r_arr is None:
@@ -890,16 +887,20 @@ class TIFF(ctypes.c_void_p):
             libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [ctypes.POINTER(data_type)]*3
             r = libtiff.TIFFSetField(self, tag, r_ptr, g_ptr, b_ptr)
         else:
-            if isinstance(value, str):
-                data = data_type(value)
+            if issubclass(data_type, (ctypes.Array, tuple, list)):
+                data = data_type(*value)
+            elif issubclass(data_type, ctypes._Pointer): # does not include c_char_p
+                # convert to the base type, ctypes will take care of actually
+                # sending it by reference
+                base_type = data_type._type_
+                if isinstance(value, collections.Iterable):
+                    data = base_type(*value)
+                else:
+                    data = base_type(value)
             else:
-                try:
-                    len(value)
-                    # value is an iterable
-                    data = data_type(*value)
-                except TypeError:
-                    data = data_type(value)
+                data = data_type(value)
 
+            # TODO: for most of the tags, count is len(value), so it shouldn't be needed
             if count is None:
                 libtiff.TIFFSetField.argtypes = libtiff.TIFFSetField.argtypes[:2] + [data_type]
                 r = libtiff.TIFFSetField(self, tag, data)
@@ -1122,8 +1123,6 @@ class TIFF3D(TIFF):
         self.SetDirectory(0)
         return arr
 
-import struct
-import numpy
 class CZ_LSMInfo:
 
     def __init__(self, tiff):
@@ -1150,7 +1149,7 @@ class CZ_LSMInfo:
         fd.seek(self.offset)
         d = [('magic_number', 'i4'),
              ('structure_size', 'i4')]
-        print pos, numpy.rec.fromfile(fd, d, 1)
+        print pos, np.rec.fromfile(fd, d, 1)
         fd.seek(pos)
         #print hex (struct.unpack('I', fd.read (4))[0])
         #fd.close()
@@ -1321,7 +1320,7 @@ def _test_custom_tags():
         a.SetField("XPOSITION", 42.0)
         a.SetField("PRIMARYCHROMATICITIES", (1.0, 2, 3, 4, 5, 6))
 
-        arr = numpy.ones((512,512), dtype=numpy.uint8)
+        arr = np.ones((512,512), dtype=np.uint8)
         arr[:,:] = 255
         a.write_image(arr)
 
@@ -1495,6 +1494,8 @@ def _test_tags_write():
     tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
     tmp = tiff.SetField("Artist", "A Name")
     assert tmp==1,"Tag 'Artist' was not written properly"
+    tmp = tiff.SetField("DocumentName", "")
+    assert tmp==1,"Tag 'DocumentName' with empty string was not written properly"
     tmp = tiff.SetField("PrimaryChromaticities", [1,2,3,4,5,6])
     assert tmp==1,"Tag 'PrimaryChromaticities' was not written properly"
     tmp = tiff.SetField("BitsPerSample", 8)
@@ -1511,12 +1512,17 @@ def _test_tags_read(filename=None):
     import sys
     if filename is None:
         if len(sys.argv) != 2:
-            print 'Run `libtiff.py <filename>` for testing.'
-            return
-        filename = sys.argv[1]
+            filename = '/tmp/libtiff_tags_write.tiff'
+            if not os.path.isfile (filename):
+                print 'Run `%s <filename>` for testing.' % (__file__)
+                return
+        else:
+            filename = sys.argv[1]
     tiff = TIFF.open(filename)
     tmp = tiff.GetField("Artist")
     assert tmp=="A Name","Tag 'Artist' did not read the correct value (Got '%s'; Expected 'A Name')" % (tmp,)
+    tmp = tiff.GetField("DocumentName")
+    assert tmp=="","Tag 'DocumentName' did not read the correct value (Got '%s'; Expected empty string)" % (tmp,)
     tmp = tiff.GetField("PrimaryChromaticities")
     assert tmp==[1,2,3,4,5,6],"Tag 'PrimaryChromaticities' did not read the correct value (Got '%r'; Expected '[1,2,3,4,5,6]'" % (tmp,)
     tmp = tiff.GetField("BitsPerSample")
@@ -1538,9 +1544,12 @@ def _test_read(filename=None):
     import time
     if filename is None:
         if len(sys.argv) != 2:
-            print 'Run `libtiff.py <filename>` for testing.'
-            return
-        filename = sys.argv[1]
+            filename = '/tmp/libtiff_test_write.tiff'
+            if not os.path.isfile (filename):
+                print 'Run `libtiff.py <filename>` for testing.'
+                return
+        else:
+            filename = sys.argv[1]
     print 'Trying to open', filename, '...',
     tiff = TIFF.open(filename)
     print 'ok'
@@ -1554,8 +1563,6 @@ def _test_read(filename=None):
         #print image.min(), image.max(), image.mean ()
         i += 1
     print '\tok',(time.time ()-t)*1e3,'ms',i,'images'
-
-
 
 def _test_write():
     tiff = TIFF.open('/tmp/libtiff_test_write.tiff', mode='w')
@@ -1620,12 +1627,12 @@ def _test_copy():
 
 if __name__=='__main__':
     _test_custom_tags()
-    #_test_tile_write()
-    #_test_tile_read()
-    #_test_tags_write()
-    #_test_tags_read()
-    #_test_write_float()
-    #_test_write()
-    #_test_read()
-    #_test_copy()
+    _test_tile_write()
+    _test_tile_read()
+    _test_tags_write()
+    _test_tags_read()
+    _test_write_float()
+    _test_write()
+    _test_read()
+    _test_copy()
     
