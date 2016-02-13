@@ -237,7 +237,8 @@ class TIFFfile(TiffBase):
             dtype = self.dtypes.type2dt.get(typ)
             bytes = type2bytes.get(typ)
             if dtype is None or bytes is None:
-                warnings.warn('incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (typ, ntyp, dtype, bytes))
+                warnings.warn('incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (
+                              typ, ntyp, dtype, bytes))
                 return
         return self.data[offset:offset + bytes * count].view(dtype=dtype)
 
