@@ -12,6 +12,7 @@ import sys
 import shutil
 import numpy
 import mmap
+import warnings
 from numpy.testing.utils import memusage
 from .tiff_data import type2name, name2type, type2bytes, type2dtype, tag_value2name, tag_name2value
 from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, default_tag_values, sample_format_map
@@ -218,7 +219,7 @@ class TIFFfile(TiffBase):
             dtype = self.dtypes.type2dt.get(typ)
             bytes = type2bytes.get(typ)
             if dtype is None or bytes is None:
-                sys.stderr.write('get_values: incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (typ,ntyp, dtype, bytes))
+                warnings.warn('incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (typ,ntyp, dtype, bytes))
                 return
         return self.data[offset:offset+bytes*count].view(dtype=dtype)
 
