@@ -1,8 +1,8 @@
 
 # THIS FILE IS GENERATED FROM libtiff/setup.py
-short_version='0.4.0'
-version='0.4.0'
-release=True
+short_version='0.4.1'
+version='0.4.1'
+release=False
 
 if not release:
     version += '.dev'
@@ -27,4 +27,4 @@ if not release:
         else:
             version += svn_version.strip()
 
-print version
+print(version)

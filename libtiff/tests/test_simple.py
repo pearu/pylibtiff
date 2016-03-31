@@ -40,6 +40,6 @@ def test_slicing():
             image2 = tif.read_image()
             tif.close()
             
-            assert (image1==image2).all(),`i,j`
+            assert (image1==image2).all(),repr((i,j))
 
             os.remove(fn)

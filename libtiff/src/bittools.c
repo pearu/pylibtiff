@@ -7,6 +7,10 @@
 #define PyMODINIT_FUNC void
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+#define IS_PY3K
+#endif
+
 #define CHAR_BITS 8
 #define CHAR_BITS_EXP 3
 
@@ -167,15 +171,37 @@ static PyMethodDef module_methods[] = {
   {NULL}  /* Sentinel */
 };
 
+
+#ifdef IS_PY3K
+static PyModuleDef moduledef = {
+  PyModuleDef_HEAD_INIT, "bittools", 0, -1, module_methods,
+};
 PyMODINIT_FUNC
-initbittools(void) 
+PyInit_bittools(void)
+#else
+PyMODINIT_FUNC
+initbittools(void)
+#endif
 {
   PyObject* m = NULL;
   import_array();
   if (PyErr_Occurred())
     {
       PyErr_SetString(PyExc_ImportError, "can't initialize module bittools (failed to import numpy)"); 
-      return;
+      return NULL;
     }
-  m = Py_InitModule3("bittools", module_methods, "");
+  //m = Py_InitModule3("bittools", module_methods, "");
+  #ifdef IS_PY3K
+  m = PyModule_Create(&moduledef);
+  if (m == NULL)
+    return NULL;
+  #else
+  m = Py_InitModule3("bittools", module_methods, 0);
+  if (m == NULL)
+    return;
+  #endif
+
+#ifdef IS_PY3K
+  return m;
+#endif
 }

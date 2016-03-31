@@ -52,7 +52,7 @@ if not release:
         else:
             version += svn_version.strip()
 
-print version
+print(version)
 """
     a = open(filename, 'w')
     try:
@@ -69,7 +69,12 @@ def configuration(parent_package='',top_path=None):
     return config
 
 if __name__=='__main__':
-    from numpy.distutils.core import setup
+    from numpy.distutils.core import setup, Extension
+    
+    bittools_mod = Extension('bittools',
+                             sources=['libtiff/src/bittools.c'])
+    tif_lzw_mod = Extension('tif_lzw',
+                            sources=['libtiff/src/tif_lzw.c'])
 
     # Rewrite the version file everytime
     if os.path.exists('libtiff/version.py'): os.remove('libtiff/version.py')
@@ -82,7 +87,7 @@ if __name__=='__main__':
           license = 'http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
           url = 'http://pylibtiff.googlecode.com',
           #download_url = 'http://code.google.com/p/pylibtiff/downloads/',
-          classifiers=filter(None, CLASSIFIERS.split('\n')),
+          classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
           description = 'PyLibTiff: a Python tiff library.',
           long_description = '''\
 PyLibTiff? is a Python package that provides the following modules:
@@ -94,4 +99,5 @@ PyLibTiff? is a Python package that provides the following modules:
           #packages = ['libtiff'],
           #package_dir = {'libtiff': 'libtiff'},
           configuration = configuration,
+          ext_modules = [bittools_mod, tif_lzw_mod]
           )
