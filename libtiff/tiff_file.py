@@ -3,7 +3,7 @@ Provides TIFFfile class.
 """
 # Author: Pearu Peterson
 # Created: June 2010
-from __future__ import division
+
 
 __all__ = ['TIFFfile', 'TiffFile']
 
@@ -21,7 +21,7 @@ from .tiff_base import TiffBase
 from .tiff_sample_plane import TiffSamplePlane
 from .tiff_array import TiffArray
 
-import lsm
+from . import lsm
 import tif_lzw
 
 
@@ -92,7 +92,7 @@ class TIFFfile(TiffBase):
                 if os.path.exists(cache_filename):
                     filename = cache_filename
                 elif not isindisk(filename):
-                    assert isindisk(local_cache),`local_cache`
+                    assert isindisk(local_cache),repr(local_cache)
                     dirname = os.path.dirname (cache_filename)
                     if not os.path.isdir(dirname):
                         os.makedirs(dirname)
@@ -101,7 +101,7 @@ class TIFFfile(TiffBase):
             if verbose:
                 sys.stdout.write ('Opening file %r\n' % (filename)); sys.stdout.flush()
             if mode!='r':
-                raise NotImplementedError(`mode`)
+                raise NotImplementedError(repr(mode))
             if not os.path.isfile (filename):
                 raise ValueError ('file does not exists')
             if not os.stat(filename).st_size:
@@ -109,21 +109,21 @@ class TIFFfile(TiffBase):
             if use_memmap:
                 self.data = numpy.memmap(filename, dtype=numpy.ubyte, mode=mode)
             else:
-                assert mode=='r',`mode`
+                assert mode=='r',repr(mode)
                 f = open (filename, 'rb')
                 self.data = numpy.frombuffer(f.read(), dtype=numpy.ubyte)
                 f.close()
-        except IOError, msg:
+        except IOError as msg:
             if 'Too many open files' in str (msg):
                 raise IOError(IOError_too_many_open_files_hint % msg)
             if 'Operation not permitted' in str (msg):
                 raise IOError(OSError_operation_not_permitted_hint % msg)
             raise
-        except OSError, msg:
+        except OSError as msg:
             if 'Operation not permitted' in str (msg):
                 raise OSError(OSError_operation_not_permitted_hint % msg)
             raise
-        except mmap.error, msg:
+        except mmap.error as msg:
             if 'Too many open files' in str (msg):
                 raise mmap.error(IOError_too_many_open_files_hint % msg)
             raise
@@ -251,12 +251,12 @@ class TIFFfile(TiffBase):
             if last_end:
                 if last_end!=start:
                     if verbose:
-                        print '--- unknown %s bytes' % (start-last_end)
+                        print('--- unknown %s bytes' % (start-last_end))
                     ok = False
                     if start<last_end and verbose:
-                        print '--- overlapping memory area'
+                        print('--- overlapping memory area')
             if verbose:
-                print '%s..%s[%s] contains %s' % (start, end,end-start, resource)
+                print('%s..%s[%s] contains %s' % (start, end,end-start, resource))
             last_end = end
         return ok
 
@@ -304,7 +304,7 @@ class TIFFfile(TiffBase):
         strip_offsets1 = ifd1.get('StripOffsets').value
         strip_nbytes1 = ifd1.get('StripByteCounts').value
         samples_per_pixel = ifd1.get('SamplesPerPixel').value
-        assert samples_per_pixel==1,`samples_per_pixel`
+        assert samples_per_pixel==1,repr(samples_per_pixel)
 
         if isinstance (bits_per_sample, numpy.ndarray):
             dtype = getattr (self.dtypes, 'uint%s' % (bits_per_sample[i]))
@@ -434,7 +434,7 @@ class TIFFfile(TiffBase):
                     strips_per_image = len(strip_offsets)
                 format = sample_format_map.get(sample_format)
                 if format is None:
-                    print 'Warning(TIFFfile.get_samples): unsupported sample_format=%s is mapped to uint' % (sample_format)
+                    print('Warning(TIFFfile.get_samples): unsupported sample_format=%s is mapped to uint' % (sample_format))
                     format = 'uint'
 
                 dtype_lst = []
@@ -445,7 +445,7 @@ class TIFFfile(TiffBase):
                     dtype = getattr (self.dtypes, '%s%s' % (format, bits))
                     dtype_lst.append(dtype)
                 bytes_per_pixel = bits_per_pixel // 8
-                assert 8*bytes_per_pixel == bits_per_pixel,`bits_per_pixel`
+                assert 8*bytes_per_pixel == bits_per_pixel,repr(bits_per_pixel)
                 bytes_per_row = width * bytes_per_pixel
                 strip_length = l[-1][1] - l[-1][0]
                 strip_length_str = bytes2str(strip_length)
@@ -454,23 +454,23 @@ class TIFFfile(TiffBase):
                 rows_per_strip = bytes_per_image // (bytes_per_row * strips_per_image)
                 if bytes_per_image % (bytes_per_row * strips_per_image):
                     rows_per_strip += 1
-                assert rows_per_strip == ifd.get_value('RowsPerStrip', rows_per_strip), `rows_per_strip, ifd.get_value('RowsPerStrip'), bytes_per_image, bytes_per_row, strips_per_image, self.filename`
+                assert rows_per_strip == ifd.get_value('RowsPerStrip', rows_per_strip), repr((rows_per_strip, ifd.get_value('RowsPerStrip'), bytes_per_image, bytes_per_row, strips_per_image, self.filename))
             else:
-                assert width == ifd.get_value('ImageWidth', width), `width, ifd.get_value('ImageWidth')`
-                assert length == ifd.get_value('ImageLength', length),` length,  ifd.get_value('ImageLength')`
+                assert width == ifd.get_value('ImageWidth', width), repr((width, ifd.get_value('ImageWidth')))
+                assert length == ifd.get_value('ImageLength', length),repr(( length,  ifd.get_value('ImageLength')))
                 #assert samples_per_pixel == ifd.get('SamplesPerPixel').value, `samples_per_pixel, ifd.get('SamplesPerPixel').value`
                 assert planar_config == ifd.get_value('PlanarConfiguration', planar_config)
                 if can_return_memmap:
-                    assert strip_length == l[-1][1] - l[-1][0], `strip_length, l[-1][1] - l[-1][0]`
+                    assert strip_length == l[-1][1] - l[-1][0], repr((strip_length, l[-1][1] - l[-1][0]))
                 else:
                     strip_length = max (strip_length, l[-1][1] - l[-1][0])
                     strip_length_str = ' < ' + bytes2str(strip_length)
 
-                assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),`bits_per_sample, ifd.get_value('BitsPerSample')`
+                assert (bits_per_sample == ifd.get_value('BitsPerSample', bits_per_sample)).all(),repr((bits_per_sample, ifd.get_value('BitsPerSample')))
             if i>0:
                 if i==1:
                     step = l[-1][0] - l[-2][1]
-                    assert step>=0,`step, l[-2], l[-1]`
+                    assert step>=0,repr((step, l[-2], l[-1]))
                 else:
                     if step != l[-1][0] - l[-2][1]:
                         can_return_memmap = False
@@ -479,7 +479,7 @@ class TIFFfile(TiffBase):
 
         if verbose:
             bytes_per_image_str = bytes2str(bytes_per_image)
-            print '''
+            print('''
 width : %(width)s
 length : %(length)s
 depth : %(depth)s
@@ -496,10 +496,10 @@ bytes_per_image : %(bytes_per_image_str)s
 strips_per_image : %(strips_per_image)s
 rows_per_strip : %(rows_per_strip)s
 strip_length : %(strip_length_str)s
-''' % (locals ())
+''' % (locals ()))
 
         if photometric_interpretation==2:
-            assert samples_per_pixel==3, `samples_per_pixel`
+            assert samples_per_pixel==3, repr(samples_per_pixel)
             sample_names = ['red', 'green', 'blue']
         else:
             sample_names = ['sample%s' % (j) for j in range (samples_per_pixel)]
@@ -538,9 +538,9 @@ strip_length : %(strip_length_str)s
                     dt = numpy.dtype(dict(names=sample_names, formats=dtype_lst))
                     arr = arr.view(dtype=dt).reshape((depth, length, width))
                     return [arr[n] for n in arr.dtype.names], arr.dtype.names
-                    raise NotImplementedError(`depth, bytes_per_image, samples_per_pixel`)
+                    raise NotImplementedError(repr((depth, bytes_per_image, samples_per_pixel)))
             else:
-                raise NotImplementedError (`planar_config`)
+                raise NotImplementedError (repr(planar_config))
 
         start = l[0][0]
         end = l[-1][1]
@@ -551,7 +551,7 @@ strip_length : %(strip_length_str)s
             arr = self.data[start: end+step].reshape((depth, strip_length + step))
             k = 0
         else:
-            raise NotImplementedError (`start, end, step`)
+            raise NotImplementedError (repr((start, end, step)))
         sys.stdout.flush()
         if planar_config==2:
             if self.is_lsm:
@@ -560,9 +560,9 @@ strip_length : %(strip_length_str)s
                     sample_names = self.lsminfo.get('data channel name')
                 elif subfile_type==1:
                     sample_names = ['red', 'green', 'blue']
-                    assert samples_per_pixel==3,`samples_per_pixel`
+                    assert samples_per_pixel==3,repr(samples_per_pixel)
                 else:
-                    raise NotImplementedError (`subfile_type`)
+                    raise NotImplementedError (repr(subfile_type))
                 samples = []
 
                 for j in range(samples_per_pixel):
@@ -573,7 +573,7 @@ strip_length : %(strip_length_str)s
                     samples.append(tmp)
                     k += bytes
                 return samples, sample_names
-            raise NotImplementedError (`planar_config, self.is_lsm`)
+            raise NotImplementedError (repr((planar_config, self.is_lsm)))
         elif planar_config==1:
             samples = []
             bytes = sum(bits_per_sample[:samples_per_pixel]) // 8 * width * length
@@ -589,7 +589,7 @@ strip_length : %(strip_length_str)s
                 #k += bytes
             return samples, sample_names
         else:
-            raise NotImplementedError (`planar_config`)
+            raise NotImplementedError (repr(planar_config))
 
     def get_info (self):
         """ Return basic information about the file.
@@ -630,8 +630,8 @@ strip_length : %(strip_length_str)s
                             import lxml.etree
                             tree = lxml.etree.fromstring(v)
                             v = lxml.etree.tostring (tree, pretty_print=True)
-                        except Exception, msg:
-                            print '%s.get_info: failed to parse xml in ImageDescription: %s' % (self.__class__.__name__, msg)
+                        except Exception as msg:
+                            print('%s.get_info: failed to parse xml in ImageDescription: %s' % (self.__class__.__name__, msg))
                         l.append ('%s:\n"""%s"""' % (tag, v))
                     else:
                         l.append ('%s:\n"""%s"""' % (tag, v))
@@ -703,7 +703,7 @@ class IFD:
             value = entry.value
         else:
             if default is None:
-                if default_tag_values.has_key(tag_name):
+                if tag_name in default_tag_values:
                     value = default_tag_values[tag_name]
                 else:
                     value = None
@@ -722,7 +722,8 @@ class IFD:
         if tag_name in ['ImageDescription', 'Software', 'Copyright', 'DocumentName', 'Model', 'Make', 'PageName',
                         'DateTime', 'Artist', 'HostComputer']:
             if value is not None:
-                return ''.join(value.view('|S%s' % (value.nbytes//value.size)))
+                return b''.join(value.view('|S%s' % (
+                    value.nbytes//value.size)))
         if human:
             if tag_name=='Compression':
                 value = {1:'Uncompressed', 2:'CCITT1D', 3:'Group3Fax', 4:'Group4Fax',
@@ -776,7 +777,7 @@ class IFD:
     def get_pixel_dtype(self):
         sample_names = self.get_sample_names ()
         sample_dtypes = self.get_sample_dtypes ()
-        return numpy.dtype (zip(sample_names, sample_dtypes))
+        return numpy.dtype (list(zip(sample_names, sample_dtypes)))
 
     def get_pixel_typename(self):
         sample_dtypes = self.get_sample_dtypes ()
@@ -825,13 +826,13 @@ class IFD:
                 if photo_interp==2:
                     channel_names = 'rgb'
                 else:
-                    raise NotImplementedError (`photo_interp`)
+                    raise NotImplementedError (repr(photo_interp))
             else:
-                raise NotImplementedError (`subfile_type`)
-            assert planar_config==2,`planar_config`
+                raise NotImplementedError (repr(subfile_type))
+            assert planar_config==2,repr(planar_config)
             nof_channels = self.tiff.lsmentry['DimensionChannels'][0]
             scantype = self.tiff.lsmentry['ScanType'][0]
-            assert scantype==0,`scantype` # xyz-scan
+            assert scantype==0,repr(scantype) # xyz-scan
             r = {}
             for i in range (nof_channels):
                 if isinstance (bits_per_sample, numpy.ndarray):
@@ -842,7 +843,7 @@ class IFD:
                     r[channel_names[i]] = self.tiff.data[strip_offsets:strip_offsets+strip_nbytes].view (dtype=dtype).reshape((width, length))
             return r
         else:
-            raise NotImplementedError (`self.tiff`)
+            raise NotImplementedError (repr(self.tiff))
 
     def get_voxel_sizes(self):
         tiff = self.tiff
@@ -871,7 +872,7 @@ class IFD:
 
             if -1 not in [ix,iy]:
                 return (z, y, x)
-        print 'Could not determine voxel sizes from\n%s' % (descr)
+        print('Could not determine voxel sizes from\n%s' % (descr))
         return (z,y,x)
 
     def get_pixel_sizes(self):
@@ -896,7 +897,7 @@ class IFD:
             else: y = float(descr[iy:].split (None, 2)[1].strip())
             if -1 not in [ix,iy]:
                 return (y, x)
-        print 'Could not determine pixel sizes from\n%s' % (descr)
+        print('Could not determine pixel sizes from\n%s' % (descr))
         return (1,1)
 
 class IFDEntry:

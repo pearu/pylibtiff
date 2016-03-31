@@ -141,7 +141,7 @@ class LSMBlock:
         return '%s(offset=%s, size=%s, end=%s)' % (self.__class__.__name__, self.offset, self.get_size(), self.offset+self.get_size())
 
     def get_data(self, new_offset):
-        raise NotImplementedError(`new_offset`)
+        raise NotImplementedError(repr(new_offset))
 
     def toarray(self, target=None, new_offset=None):
         sz = self.get_size()
@@ -186,7 +186,7 @@ class ScanInfoEntry:
             self.type = 0
             self.header = numpy.array([entry, 0, 0], dtype=numpy.uint32).view(dtype=numpy.ubyte)
         else:
-            raise NotImplementedError (`self.record`)
+            raise NotImplementedError (repr(self.record))
 
     def __repr__ (self):
         return '%s%r' % (self.__class__.__name__, self.record)
@@ -240,7 +240,7 @@ class ScanInfoEntry:
             return 12 + 8
         if type_name == 'ASCII':
             return 12 + len(data) + 1
-        raise NotImplementedError (`self.record`)
+        raise NotImplementedError (repr(self.record))
 
     def toarray(self, target = None):
         if target is None:
@@ -261,7 +261,7 @@ class ScanInfoEntry:
         elif type_name == 'DOUBLE':
             target[12:12+8] = numpy.array([data], dtype=numpy.float64).view(dtype=dtype)
         else:
-            raise NotImplementedError (`self.record`)
+            raise NotImplementedError (repr(self.record))
         return target
 
     def tostr(self, tab='', short=False):
@@ -285,7 +285,7 @@ class ScanInfoEntry:
     __str__ = tostr
 
     def append (self, entry):
-        assert self.record[1]=='SUBBLOCK',`self.record`
+        assert self.record[1]=='SUBBLOCK',repr(self.record)
         self.record[3].append(entry)
 
 
@@ -317,7 +317,7 @@ def scaninfo(ifdentry, debug=True):
         if label is None:
             type_name = {0:'SUBBLOCK', 2:'ASCII', 4:'LONG', 5:'DOUBLE'}.get(type)
             if type_name is None:
-                raise NotImplementedError(`hex (entry), type, size`)
+                raise NotImplementedError(repr((hex (entry), type, size)))
             label = 'ENTRY%s' % (hex(entry))
             #scaninfo_map[entry] = label, type_name
             if debug:
@@ -325,7 +325,7 @@ def scaninfo(ifdentry, debug=True):
                                      % (type_name, hex(entry), record.record[2]))
                 pass
         if type_name=='SUBBLOCK':
-            assert type==0,`hex (entry), type, size`
+            assert type==0,repr((hex (entry), type, size))
             if label == 'end':
                 entry = ScanInfoEntry(entry, type_name, label, None)
                 entry.parent = record
@@ -338,19 +338,19 @@ def scaninfo(ifdentry, debug=True):
                 prev_record = record
                 record = ScanInfoEntry(entry, type_name, label, [])
                 record.parent = prev_record
-            assert size==0,`hex (entry), type, size`
+            assert size==0,repr((hex (entry), type, size))
             continue
         if type_name=='ASCII':
-            assert type==2,`hex (entry), type, size`
+            assert type==2,repr((hex (entry), type, size))
             value = ifdentry.tiff.get_string (n, size-1)
         elif type_name=='LONG':
-            assert type==4,`hex (entry), type, size, scaninfo_map[entry]`
+            assert type==4,repr((hex (entry), type, size, scaninfo_map[entry]))
             value = ifdentry.tiff.get_long(n)
         elif type_name=='DOUBLE':
-            assert type==5,`hex (entry), type, size`
+            assert type==5,repr((hex (entry), type, size))
             value = ifdentry.tiff.get_double(n)
         else:
-            raise NotImplementedError(`type_name, hex (entry), type, size`)
+            raise NotImplementedError(repr((type_name, hex (entry), type, size)))
         entry = ScanInfoEntry(entry, type_name, label, value)
         entry.parent = record
         n += size
@@ -358,7 +358,7 @@ def scaninfo(ifdentry, debug=True):
     if debug:
         size = n - n1
         record_size = record.get_size()
-        assert size==record_size,`size,record_size`
+        assert size==record_size,repr((size,record_size))
         arr = record.toarray()
         arr2 = ifdentry.tiff.data[n1:n1+size]
         assert (arr==arr2).all()
@@ -408,7 +408,7 @@ class TimeStamps:
             target = numpy.zeros((sz,), dtype=numpy.ubyte)
         dtype = target.dtype
         header = numpy.array([sz, self.stamps.size], dtype=numpy.int32).view(dtype=dtype)
-        assert header.nbytes==8,`header.nbytes`
+        assert header.nbytes==8,repr(header.nbytes)
         data = self.stamps.view(dtype=dtype)
         target[:header.nbytes] = header
         target[header.nbytes:header.nbytes+data.nbytes] = data

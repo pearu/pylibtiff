@@ -3,7 +3,7 @@
 # Author: Pearu Peterson
 # Created: May 2010
 
-from __future__ import division
+
 import os
 
 ### START UPDATE SYS.PATH ###
@@ -35,7 +35,7 @@ def runner (parser, options, args):
     if not hasattr(parser, 'runner'):
         options.output_path = None
 
-    assert not args,`args`
+    assert not args,repr(args)
 
     if options.input_path is None:
         parser.error('Expected --input-path but got nothing')
@@ -65,7 +65,7 @@ def runner (parser, options, args):
     while samples_list:
         samples = samples_list.pop()
         if options.slice is not None:
-            exec 'samples = samples[%s]' % (options.slice)
+            exec('samples = samples[%s]' % (options.slice))
         name = names_list.pop()
         if tiff.is_lsm:
             dimensions = [tiff.lsmentry['Dimension'+x][0] for x in 'XYZ'] # px

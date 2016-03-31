@@ -48,12 +48,12 @@ class TiffChannelsAndFiles (TiffBase):
 
     def get_info(self):
         l = []
-        for channel, tiff in self.channels_files_map.items ():
+        for channel, tiff in list(self.channels_files_map.items ()):
             l.append ('Channel %s:' % (channel))
             l.append ('-'*len(l[-1]))
             l.append (tiff.get_info())
         return '\n'.join(l)
 
     def close(self):
-        for channel, tiff in self.channels_files_map.items():
+        for channel, tiff in list(self.channels_files_map.items()):
             tiff.close()

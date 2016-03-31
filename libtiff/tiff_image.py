@@ -4,12 +4,12 @@ Provides TIFFimage class.
 # Author: Pearu Peterson
 # Created: June 2010
 
-from __future__ import division
+
 import os
 import sys
 import time
 import numpy
-import lzw
+from . import lzw
 import tif_lzw
 
 from .utils import bytes2str, VERBOSE
@@ -24,7 +24,7 @@ class TIFFentry:
     def __init__ (self, tag):
         if isinstance(tag, str):
             tag = tag_name2value[tag]
-        assert isinstance (tag, int), `tag`
+        assert isinstance (tag, int), repr(tag)
         self.tag = tag
         self.type_name = tag_value2type[tag]
         self.type = name2type[self.type_name]
@@ -62,13 +62,13 @@ class TIFFentry:
     def __getitem__ (self, index):
         if self.offset_is_value:
             if index>0:
-                raise IndexError(`index`)
+                raise IndexError(repr(index))
             return self.offset[0]
         return self.values[index]
 
     def add_value(self, value):
         if isinstance(value, (list, tuple)):
-            map(self.add_value, value)
+            list(map(self.add_value, value))
         elif self.type_name=='ASCII':
             value = str(value)
             if self.count[0]==0:
@@ -91,7 +91,7 @@ class TIFFentry:
             self.values.append(value)
 
     def set_value (self, value):
-        assert self.type_name!='ASCII',`self`
+        assert self.type_name!='ASCII',repr(self)
         if self.count[0]:
             self.count[0] -= 1
             if self.values:
@@ -114,7 +114,7 @@ class TIFFentry:
         else:
             for value in self.values:
                 dtype = self.type_dtype
-                if self.type_name=='RATIONAL' and isinstance(value, (int, long, float)):
+                if self.type_name=='RATIONAL' and isinstance(value, (int, float)):
                     dtype = numpy.float64
                 target[offset:offset + self.type_nbytes].view(dtype=dtype)[0] = value
                 offset += self.type_nbytes
@@ -151,9 +151,9 @@ class TIFFimage:
             elif len (shape)==3:
                 self.depth, self.length, self.width = shape
             else:
-                raise NotImplementedError (`shape`)
+                raise NotImplementedError (repr(shape))
         else:
-            raise NotImplementedError (`type (data)`)
+            raise NotImplementedError (repr(type (data)))
         self.data = data
         self.dtype = dtype
         self.description = description
@@ -201,7 +201,7 @@ class TIFFimage:
                               lzw = tif_lzw.decode)
         compress = compress_map.get(compression or 'none', None)
         if compress is None:
-            raise NotImplementedError (`compression`)
+            raise NotImplementedError (repr(compression))
         decompress = decompress_map.get(compression or 'none', None)
         # compute tif file size and create image file directories data
         image_directories = []
@@ -223,7 +223,7 @@ class TIFFimage:
                 samples_per_pixel = 1
                 photometric_interpretation = 1
             if sample_format is None:
-                print 'Warning(TIFFimage.write_file): unknown data kind %r, mapping to void' % (image.dtype.kind)
+                print('Warning(TIFFimage.write_file): unknown data kind %r, mapping to void' % (image.dtype.kind))
                 sample_format = 4
             length, width = image.shape
             bytes_per_row = width * image.dtype.itemsize
@@ -250,7 +250,7 @@ class TIFFimage:
                         Software = 'http://code.google.com/p/pylibtiff/'))
 
             entries = []
-            for tagname, value in d.items ():
+            for tagname, value in list(d.items ()):
                 entry = TIFFentry(tagname)
                 entry.add_value(value)
                 entries.append(entry)
@@ -290,7 +290,7 @@ class TIFFimage:
             if end > tif.size:
                 size_incr = int((end - tif.size)/1024**2 + 1)*1024**2
                 new_size = tif.size + size_incr
-                assert end <= new_size, `end, tif.size, size_incr, new_size`
+                assert end <= new_size, repr((end, tif.size, size_incr, new_size))
                 #sys.stdout.write('resizing: %s -> %s\n' % (tif.size, new_size))
                 #tif.resize(end, refcheck=False)
                 base = tif._mmap
@@ -322,7 +322,7 @@ class TIFFimage:
             # write the nof IFD entries
             tif[offset:offset+2].view(dtype=numpy.uint16)[0] = len(entries)
             offset += 2
-            assert offset <= first_data_offset,`offset, first_data_offset`
+            assert offset <= first_data_offset,repr((offset, first_data_offset))
 
             # write image data
             data = image.view(dtype=numpy.ubyte).reshape((image.nbytes,))
@@ -331,7 +331,7 @@ class TIFFimage:
                 c = rows_per_strip * bytes_per_row
                 k = j * c
                 c -= max((j+1) * c - image.nbytes, 0)
-                assert c>0,`c`
+                assert c>0,repr(c)
                 orig_strip = data[k:k+c]
                 strip = compress(orig_strip)
                 if validate:
@@ -355,19 +355,19 @@ class TIFFimage:
                 data_size = entry.nbytes
                 if data_size:
                     entry.set_offset(data_offset)
-                    assert data_offset+data_size <= total_size, `data_offset+data_size,total_size`
+                    assert data_offset+data_size <= total_size, repr((data_offset+data_size,total_size))
                     r = entry.toarray(tif[data_offset:data_offset + data_size])
                     assert r.nbytes==data_size
                     data_offset += data_size
-                    assert data_offset <= first_image_data_offset,`data_offset, first_image_data_offset, i`
+                    assert data_offset <= first_image_data_offset,repr((data_offset, first_image_data_offset, i))
                 tif[offset:offset+12] = entry.record
                 offset += 12
-                assert offset <= first_data_offset,`offset, first_data_offset, i`
+                assert offset <= first_data_offset,repr((offset, first_data_offset, i))
 
             # write offset to the next IFD
             tif[offset:offset+4].view(dtype=numpy.uint32)[0] = offset + 4
             offset += 4
-            assert offset <= first_data_offset,`offset, first_data_offset`
+            assert offset <= first_data_offset,repr((offset, first_data_offset))
 
             if verbose:
                 sys.stdout.write('\r  filling records: %5s%% done (%s/s)%s' \

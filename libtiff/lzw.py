@@ -4,7 +4,7 @@ This module is obsolete, use tif_lzw extension module instead.
 """
 # Author: Pearu Peterson
 # Created: May 2010
-from __future__ import division
+
 import numpy
 
 default_backend='bittools'
@@ -170,7 +170,7 @@ def decode_bitarray(bseq):
     """
     if isinstance(bseq, numpy.ndarray):
         bseq = bitarray(bseq, endian='little')
-    assert bseq.endian ()=='little',`bseq.endian()`
+    assert bseq.endian ()=='little',repr(bseq.endian())
     read = bseq.toword
 
     init_invtable = [(code, chr(code)) for code in range (256)]
@@ -288,7 +288,7 @@ def test_lzw():
     for s in ['TOBEORNOTTOBEORTOBEORNOT', '/WED/WE/WEE/WEB/WET'][:0]:
         r = encode (s)
         a = decode (r)
-        assert a==s,`a,s`
+        assert a==s,repr((a,s))
 
     if 1:
         f = open(__file__)
@@ -298,7 +298,7 @@ def test_lzw():
         r = encode (s)
         a = decode (r)
         assert a==s
-    print 'ok'
+    print('ok')
     import sys
     import os
     import time
@@ -310,18 +310,18 @@ def test_lzw():
         s = f.read()
         f.close()
         t = time.time()-t0
-        print 'Reading %s took %.3f seconds, bytes = %s' % (fn, t, len(s))
+        print('Reading %s took %.3f seconds, bytes = %s' % (fn, t, len(s)))
         t0 = time.time()
         r = encode(s)
         t = time.time()-t0
         sz = len(r)
         if default_backend=='bitarray':
             sz //= 8
-        print 'Encoding took %.3f seconds, compress ratio = %.3f, Kbytes per second = %.3f' % (t, len (s)/sz, len(s)/t/1024)
+        print('Encoding took %.3f seconds, compress ratio = %.3f, Kbytes per second = %.3f' % (t, len (s)/sz, len(s)/t/1024))
         t0 = time.time()
         s1 = decode(r)
         t = time.time()-t0
-        print 'Decoding took %.3f seconds, Kbytes per second = %.3f' % (t, (sz/t)/1024)
+        print('Decoding took %.3f seconds, Kbytes per second = %.3f' % (t, (sz/t)/1024))
         assert s1==s
 
 if __name__=='__main__':

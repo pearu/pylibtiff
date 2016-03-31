@@ -2,7 +2,7 @@
 # Author: Pearu Peterson
 # Created: June 2010
 
-from __future__ import division
+
 __all__ = ['bytes2str', 'isindisk']
 
 import os
@@ -105,9 +105,9 @@ class Options(optparse.Values):
             elif isinstance(arg, type (None)):
                 optparse.Values.__init__(self, kws)
             else:
-                raise NotImplementedError(`arg`)
+                raise NotImplementedError(repr(arg))
         else:
-            raise NotImplementedError(`args`)
+            raise NotImplementedError(repr(args))
     def get(self, **kws):
         """Return option value.
 
@@ -130,11 +130,11 @@ class Options(optparse.Values):
         --------
         Options
         """
-        assert len (kws)==1,`kws`
-        key, default = kws.items()[0]
+        assert len (kws)==1,repr(kws)
+        key, default = list(kws.items())[0]
         if key not in self.__dict__:
             if VERBOSE:
-                print 'Options.get: adding new option: %s=%r' % (key, default)
+                print('Options.get: adding new option: %s=%r' % (key, default))
             self.__dict__[key] = default
         value = self.__dict__[key]
         if value is None:

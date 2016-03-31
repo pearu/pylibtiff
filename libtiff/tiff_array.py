@@ -3,7 +3,7 @@
 # Author: Pearu Peterson
 # Created: Nov 2010
 
-from __future__ import division
+
 import sys
 import numpy
 
@@ -20,7 +20,7 @@ class TiffArray:
         self.planes = []
         self.shape = ()
         self.dtype = None
-        map(self.append, planes)
+        list(map(self.append, planes))
 
     def __len__(self):
         return self.shape[0]
@@ -31,12 +31,12 @@ class TiffArray:
 
     def __getitem__ (self, index):
         try:
-            if isinstance(index, (int, long)):
+            if isinstance(index, int):
                 if self.sample_index is None:
-                    print self.shape
+                    print(self.shape)
                 return self.planes[index][()]
             elif isinstance (index, slice):
-                indices = range (*index.indices(self.shape[0]))
+                indices = list(range(*index.indices(self.shape[0])))
                 r = numpy.empty((len(indices),)+self.shape[1:], dtype=self.dtype)
                 for i,j in enumerate(indices):
                     r[i] = self.planes[j][()]
@@ -47,21 +47,21 @@ class TiffArray:
                 if len (index)==1:
                     return self[index[0]]
                 index0 = index[0]
-                if isinstance(index0, (int, long)):
+                if isinstance(index0, int):
                     return self.planes[index0][index[1:]]
                 elif isinstance (index0, slice):
-                    indices = range (*index0.indices(self.shape[0]))
+                    indices = list(range(*index0.indices(self.shape[0])))
                     for i,j in enumerate(indices):
                         s = self.planes[j][index[1:]]
                         if i==0:
                             r = numpy.empty((len(indices),)+s.shape, dtype=self.dtype)
                         r[i] = s
                     return r
-        except IOError, msg:
+        except IOError as msg:
             sys.stderr.write('%s.__getitem__:\n%s\n' % (self.__class__.__name__, msg))
             sys.stderr.flush ()
             return None
-        raise NotImplementedError (`index`)
+        raise NotImplementedError (repr(index))
 
     def append(self, plane):
         """ Append tiff plane to tiff array.
@@ -79,7 +79,7 @@ class TiffArray:
     def extend(self, other):
         """ Extend tiff array with the content of another.
         """
-        map(self.append, other.planes)
+        list(map(self.append, other.planes))
               
     def get_voxel_sizes(self):
         """ Return ZYX voxel sizes in microns.

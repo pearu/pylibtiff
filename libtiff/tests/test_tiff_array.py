@@ -30,8 +30,8 @@ def test_simple_slicing():
                 tif = TIFFfile(fn)
                 arr = tif.get_tiff_array()
                 data = arr[:]
-                assert len(data)==len (image), `len(data)`
-                assert image.dtype==data.dtype, `image.dtype, data[0].dtype`
+                assert len(data)==len (image), repr(len(data))
+                assert image.dtype==data.dtype, repr((image.dtype, data[0].dtype))
                 assert (image==data).all()
                 assert arr.shape==image.shape
 
@@ -40,6 +40,6 @@ def test_simple_slicing():
                     for i1 in indices:
                         for i2 in indices:
                             sl = (i0, i1, i2)
-                            assert (arr[sl]==image[sl]).all(),`sl`
+                            assert (arr[sl]==image[sl]).all(),repr(sl)
                 #os.remove(fn)
                 atexit.register(os.remove, fn)
