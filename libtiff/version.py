@@ -21,7 +21,8 @@ if not release:
     elif os.path.isfile(svn_entries_file):
         import subprocess
         try:
-            svn_version = subprocess.Popen(["svnversion", os.path.dirname (__file__)], stdout=subprocess.PIPE).communicate()[0]
+            svn_version = subprocess.Popen(["svnversion", os.path.dirname (
+            __file__)], stdout=subprocess.PIPE).communicate()[0]
         except:
             pass
         else:

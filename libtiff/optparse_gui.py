@@ -1,4 +1,4 @@
-'''A drop-in replacement for :pythonlib:`optparse` ("import iocbio.optparse_gui as optparse")
+"""A drop-in replacement for :pythonlib:`optparse` ("import iocbio.optparse_gui as optparse")
 
 Provides an identical interface to
 :pythonlib:`optparse`.OptionParser, in addition, it displays an
@@ -12,7 +12,7 @@ group. By now this module has become more complete with more features.
 
 Module content
 --------------
-'''
+"""
 #Author: Pearu Peterson
 #Created: September 2009
 
