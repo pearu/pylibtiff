@@ -488,7 +488,7 @@ class TIFF(ctypes.c_void_p):
     def open(cls, filename, mode='r'):
         """ Open tiff file as TIFF.
         """
-        tiff = libtiff.TIFFOpen(filename, mode)
+        tiff = libtiff.TIFFOpen(filename.encode('ascii'), mode.encode('ascii'))
         if tiff.value is None:
             raise TypeError('Failed to open file ' + repr(filename))
         return tiff
