@@ -47,7 +47,6 @@ if lib is None:
                       'is installed and its location is listed in '
                       'PATH|LD_LIBRARY_PATH|..')
 
-# print(lib)
 libtiff = ctypes.cdll.LoadLibrary(lib)
 
 libtiff.TIFFGetVersion.restype = ctypes.c_char_p
