@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-import md5
+from hashlib import md5
 
-from bitarray import bitarray
+from ..bitarray import bitarray
 
 import numpy
 from scipy import weave
