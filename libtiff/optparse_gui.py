@@ -39,7 +39,10 @@ except ImportError:
     pass
 
 import traceback
-import queue as queue
+try:
+    import queue as queue
+except ImportError as e:
+    import Queue as queue
 
 from .utils import splitcommandline
 
@@ -531,7 +534,7 @@ that contain spaces must be entered like so: "arg with space"\
 
         user_email = user + "@" + smtp_server
         import smtplib
-        from email.MIMEText import MIMEText
+        from email.mime.text import MIMEText
         msg = MIMEText(msg)
         msg['Subject'] = '[IOCBio bug report] %s' % (sys.argv[0])
         msg['From'] = user_email
@@ -540,7 +543,8 @@ that contain spaces must be entered like so: "arg with space"\
         try:
             s = smtplib.SMTP()
             s.connect(smtp_server)
-            # Send the email - real from, real to, extra headers and content ...
+            # Send the email - real from, real to,
+            # extra headers and content ...
             s.sendmail(user_email, bug_report_email, msg.as_string())
             s.close()
             print('Bug report succesfully sent to %r' % (bug_report_email))
@@ -549,7 +553,9 @@ that contain spaces must be entered like so: "arg with space"\
             f = open('iocbio_bug_report.txt', 'w')
             f.write (message)
             f.close()
-            print('Please find the file "iocbio_bug_report.txt" in the current working directory and send it to %r using your favorite E-mail program.' % (bug_report_email))
+            print('Please find the file "iocbio_bug_report.txt" in the '
+                  'current working directory and send it to %r using your '
+                  'favorite E-mail program.' % bug_report_email)
 
     def OnSelectRunnerMethod(self, event):
         self.run_method = event.GetString()
