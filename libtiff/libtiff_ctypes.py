@@ -261,7 +261,6 @@ tifftags = {
 #TIFFTAG_HALFTONEHINTS           2      uint16*
 #TIFFTAG_PAGENUMBER              2      uint16*
 #TIFFTAG_YCBCRSUBSAMPLING        2      uint16*
-#TIFFTAG_EXTRASAMPLES            2      uint16*,uint16**  count & types array
 #TIFFTAG_FAXFILLFUNC             1      TIFFFaxFillFunc*  G3/G4 compression pseudo-tag
 #TIFFTAG_JPEGTABLES              2      u_short*,void**   count & tables
 #TIFFTAG_SUBIFD                  2      uint16*,uint32**  count & offsets array
@@ -317,6 +316,7 @@ tifftags = {
     TIFFTAG_PLANARCONFIG: (ctypes.c_uint16, lambda d:d.value),
     TIFFTAG_PREDICTOR: (ctypes.c_uint16, lambda d:d.value),
     TIFFTAG_RESOLUTIONUNIT: (ctypes.c_uint16, lambda d:d.value),
+    TIFFTAG_EXTRASAMPLES: (ctypes.c_uint16 * 2, lambda d:d[1][:d[0].value]),  # uint16*,uint16**  count & types array
     TIFFTAG_SAMPLEFORMAT: (ctypes.c_uint16, lambda d:d.value),
     TIFFTAG_YCBCRPOSITIONING: (ctypes.c_uint16, lambda d:d.value),
 
@@ -836,6 +836,13 @@ class TIFF(ctypes.c_void_p):
             libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p]*3
             r = libtiff.TIFFGetField(self, tag, rdata_ptr, gdata_ptr, bdata_ptr)
             data = (rdata,gdata,bdata)
+        elif tag == TIFFTAG_EXTRASAMPLES:
+            count = ctypes.c_uint16()
+            pdt = ctypes.POINTER(ctypes.c_uint16)
+            xsdata = pdt()
+            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[:2] + [ctypes.c_void_p] * 2
+            r = libtiff.TIFFGetField(self, tag, ctypes.byref(count), ctypes.byref(xsdata))
+            data = (count, xsdata)
         else:
             if issubclass(data_type, ctypes.Array):
                 pdt = ctypes.POINTER(data_type)
