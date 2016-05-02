@@ -1,8 +1,8 @@
 
 # THIS FILE IS GENERATED FROM libtiff/setup.py
-short_version='0.4.0'
-version='0.4.0'
-release=True
+short_version='0.4.1'
+version='0.4.1'
+release=False
 
 if not release:
     version += '.dev'
@@ -21,10 +21,11 @@ if not release:
     elif os.path.isfile(svn_entries_file):
         import subprocess
         try:
-            svn_version = subprocess.Popen(["svnversion", os.path.dirname (__file__)], stdout=subprocess.PIPE).communicate()[0]
+            svn_version = subprocess.Popen(["svnversion", os.path.dirname (
+            __file__)], stdout=subprocess.PIPE).communicate()[0]
         except:
             pass
         else:
             version += svn_version.strip()
 
-print version
+print(version)

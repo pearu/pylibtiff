@@ -1,7 +1,8 @@
-#!/usr/bin/env python
-from hashlib import md5
+# does not work with Python 3, because weave is not yet supported
 
-from ..bitarray import bitarray
+import hashlib
+
+from bitarray import bitarray
 
 import numpy
 from scipy import weave
@@ -56,7 +57,7 @@ static char f_types[] = {
 ufunc_info = weave.base_info.custom_info()
 ufunc_info.add_header('"numpy/ufuncobject.h"')
 
-mandel = weave.inline('/*' + md5.md5(support_code).hexdigest() + '''*/
+mandel = weave.inline('/* ' + hashlib.md5(support_code).hexdigest() + ''' */
 import_ufunc();
 
 return_val = PyUFunc_FromFuncAndData(f_functions,

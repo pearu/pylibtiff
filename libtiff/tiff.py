@@ -14,7 +14,7 @@ Usage:
 """
 # Author: Pearu Peterson
 # Created: April 2010
-from __future__ import division
+
 __all__ = ['TIFFfile', 'TIFFimage', 'TiffArray']
 
 import os
@@ -37,9 +37,9 @@ def main ():
 
     e = t.IFD[0].entries[-1]
     assert e.is_lsm
-    import lsm
-    print lsm.lsmblock(e)
-    print lsm.lsminfo(e, 0)
+    from . import lsm
+    print(lsm.lsmblock(e))
+    print(lsm.lsminfo(e, 0))
     #print lsm.filestructure(e)
     #print lsm.timestamps(e)
     #print lsm.channelwavelength(e)

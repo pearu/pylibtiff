@@ -27,9 +27,9 @@ def test_write_read():
 
             tif = TIFFfile(fn)
             data, names = tif.get_samples()
-            assert names==['sample0'],`names`
-            assert len(data)==1, `len(data)`
-            assert image.dtype==data[0].dtype, `image.dtype, data[0].dtype`
+            assert names==['sample0'],repr(names)
+            assert len(data)==1, repr(len(data))
+            assert image.dtype==data[0].dtype, repr((image.dtype, data[0].dtype))
             assert (image==data[0]).all()
             
             #os.remove(fn)

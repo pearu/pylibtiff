@@ -22,10 +22,10 @@ def test_rw_rgb():
     data, names = tif.get_samples()
     #os.remove(fn)
     atexit.register(os.remove, fn)
-    print image
-    print data
+    print(image)
+    print(data)
 
-    assert itype == data[0].dtype, `itype, data[0].dtype`
+    assert itype == data[0].dtype, repr((itype, data[0].dtype))
     assert (image['r']==data[0]).all()
     assert (image['g']==data[1]).all()
     assert (image['b']==data[2]).all()
@@ -47,9 +47,9 @@ def test_write_read():
             data, names = tif.get_samples()
             #os.remove(fn)
             atexit.register(os.remove, fn)
-            assert names==['sample0'],`names`
-            assert len(data)==1, `len(data)`
-            assert image.dtype==data[0].dtype, `image.dtype,data[0].dtype`
+            assert names==['sample0'],repr(names)
+            assert len(data)==1, repr(len(data))
+            assert image.dtype==data[0].dtype, repr((image.dtype,data[0].dtype))
             assert (image==data[0]).all()
 
 
@@ -59,7 +59,7 @@ def test_write_lzw():
                   float32, float64,
                   complex64, complex128]:
         #image = array([[1,2,3], [4,5,6]], itype)
-        image = array([range(10000)], itype)
+        image = array([list(range(10000))], itype)
         #image = array([[0]*14000], itype)
         fn = mktemp('.tif')
         tif = TIFFimage(image)
@@ -75,7 +75,7 @@ def test_write_lzw():
         atexit.register(os.remove, fn)
         for i in range(image.size):
             if image.flat[i] != image2.flat[i]:
-                print `i, image.flat[i-5:i+5].view(dtype=uint8),image2.flat[i-5:i+5].view(dtype=uint8)`
+                print(repr((i, image.flat[i-5:i+5].view(dtype=uint8),image2.flat[i-5:i+5].view(dtype=uint8))))
                 break
 
         assert image.dtype==image2.dtype

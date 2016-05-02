@@ -53,6 +53,10 @@
 #define PyMODINIT_FUNC void
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+#define IS_PY3K
+#endif
+
 typedef signed int tmsize_t;
 typedef tmsize_t tsize_t;
 typedef npy_uint8 uint8;
@@ -1301,17 +1305,38 @@ static PyMethodDef module_methods[] = {
   {NULL}  /* Sentinel */
 };
 
+#ifdef IS_PY3K
+static PyModuleDef moduledef = {
+  PyModuleDef_HEAD_INIT, "tif_lzw", 0, -1, module_methods,
+};
 PyMODINIT_FUNC
-inittif_lzw(void) 
+PyInit_tif_lzw(void)
+#else
+PyMODINIT_FUNC
+inittif_lzw(void)
+#endif
 {
   PyObject* m = NULL;
   import_array();
   if (PyErr_Occurred())
     {
       PyErr_SetString(PyExc_ImportError, "can't initialize module tif_lzw (failed to import numpy)"); 
-      return;
+      return NULL;
     }
+#ifdef IS_PY3K
+  m = PyModule_Create(&moduledef);
+  if (m == NULL)
+    return NULL;
+#else
   m = Py_InitModule3("tif_lzw", module_methods, "");
+  if (m == NULL)
+    return;
+#endif
+  //  m = Py_InitModule3("tif_lzw", module_methods, "");
+
+#ifdef IS_PY3K
+  return m;
+#endif
 }
 
 

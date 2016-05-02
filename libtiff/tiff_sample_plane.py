@@ -3,7 +3,7 @@
 # Author: Pearu Peterson
 # Created: Jan 2011
 
-from __future__ import division
+
 import numpy
 import tif_lzw
 
@@ -51,7 +51,7 @@ class TiffSamplePlane:
         self.bits_per_sample = bits_per_sample = ifd.get_value('BitsPerSample')
 
         bits_per_pixel = sum(bits_per_sample)
-        assert bits_per_pixel % 8==0, `bits_per_pixel, bits_per_sample`
+        assert bits_per_pixel % 8==0, repr((bits_per_pixel, bits_per_sample))
         bytes_per_pixel = bits_per_pixel // 8
         
         if sample_index is None:
@@ -98,9 +98,9 @@ class TiffSamplePlane:
         self.is_contiguous = compression==1 and ifd.is_contiguous()
 
         time = None
-        descr = ifd.get_value('ImageDescription', human=True)
+        descr = str(ifd.get_value('ImageDescription', human=True))
         if descr is not None:
-            if descr.startswith ('<?xml') or descr[:4].lower()=='<ome':
+            if descr.startswith('<?xml') or descr[:4].lower()=='<ome':
                 pass
             else:
                 it = descr.find('RelativeTime')
@@ -111,7 +111,7 @@ class TiffSamplePlane:
     def set_time (self, time):
         if None not in [self.time, time]:
             if self.time!=time:
-                print '%s:warning: overwriting time value %s with %s' % (self.__class__.__name__, self.time, time)
+                print('%s:warning: overwriting time value %s with %s' % (self.__class__.__name__, self.time, time))
         self.time = time
 
     def check_same_shape_and_type(self, other):
@@ -152,7 +152,7 @@ rows_per_strip=%(rows_per_strip)s
             if self.compression==5: # lzw
                 strip = tif_lzw.decode(compressed_strip, self.uncompressed_bytes_per_strip)
             else:
-                raise NotImplementedError (`self.compression`)
+                raise NotImplementedError (repr(self.compression))
 
         start = row_index * self.bytes_per_sample_row + self.sample_offset
         stop = start + self.bytes_per_sample_row + self.sample_offset
@@ -162,13 +162,13 @@ rows_per_strip=%(rows_per_strip)s
                 subindex = subindex[0]
 
         if self.planar_config==1:
-            if isinstance(subindex, (int, long)):
+            if isinstance(subindex, int):
                 start = start + subindex * self.bytes_per_pixel
                 stop = start + self.bytes_per_pixel
                 return strip[start:stop].view(dtype=self.pixel_dtype)[self.sample_name][0]
             row = strip[start:stop].view(dtype=self.pixel_dtype)[self.sample_name]
             if not row.size:
-                print self.get_topology()
+                print(self.get_topology())
         else:
             row = strip[start:stop].view(dtype=self.dtype)
         if subindex is not None:
@@ -176,11 +176,11 @@ rows_per_strip=%(rows_per_strip)s
         return row
 
     def get_rows(self, index, subindex=None):
-        if isinstance(index, (int,long)):
+        if isinstance(index, int):
             r = self.get_row (index, subindex=subindex)
             return r.reshape((1,)+r.shape)
         if isinstance (index, slice):
-            indices = range (*index.indices(self.shape[0]))
+            indices = list(range(*index.indices(self.shape[0])))
             for i,j in enumerate(indices):
                 s = self.get_row(j, subindex=subindex)
                 if i==0:
@@ -190,7 +190,7 @@ rows_per_strip=%(rows_per_strip)s
         if isinstance (index, tuple):
             if len (index)==1:
                 return self[index[0]]
-        raise NotImplementedError (`index`)
+        raise NotImplementedError (repr(index))
 
     def get_image(self):
         if self.is_contiguous:
@@ -222,10 +222,10 @@ rows_per_strip=%(rows_per_strip)s
                     if self.compression==5: # lzw
                         strip = tif_lzw.decode(compressed_strip, self.uncompressed_bytes_per_strip)
                     else:
-                        raise NotImplementedError (`self.compression`)
+                        raise NotImplementedError (repr(self.compression))
                 target = image[offset:offset + strip.nbytes]
                 if target.nbytes < strip.nbytes:
-                    print '%s.get_image warning: tiff data contains %s extra bytes (compression=%r) that are ignored' % (self.__class__.__name__, strip.nbytes-target.nbytes, self.compression)
+                    print('%s.get_image warning: tiff data contains %s extra bytes (compression=%r) that are ignored' % (self.__class__.__name__, strip.nbytes-target.nbytes, self.compression))
                 image[offset:offset + strip.nbytes] = strip[:target.nbytes]
                 offset += strip.nbytes
             image = image.view(dtype=self.dtype).reshape(self.shape)
@@ -235,7 +235,7 @@ rows_per_strip=%(rows_per_strip)s
         return self.shape[0]
 
     def __getitem__(self, index):
-        if isinstance (index, (int, long)):
+        if isinstance (index, int):
             return self.get_row(index)
         elif isinstance(index, slice):
             return self.get_image()[index]
@@ -245,10 +245,10 @@ rows_per_strip=%(rows_per_strip)s
             if len(index)==1:
                 return self[index[0]]
             index0 = index[0]
-            if isinstance(index0, (int, long)):
+            if isinstance(index0, int):
                 return self.get_row(index0, index[1:])
             return self.get_image()[index]
-        raise NotImplementedError (`index`)
+        raise NotImplementedError (repr(index))
 
 class TiffSamplePlaneLazy(TiffSamplePlane):
 
@@ -262,7 +262,7 @@ class TiffSamplePlaneLazy(TiffSamplePlane):
         ifd = self._ifd
         if ifd is None:
             tiff = self.tiff_file_getter()
-            assert len (tiff.IFD)==1,`len (tiff.IFD)`
+            assert len (tiff.IFD)==1,repr(len (tiff.IFD))
             self._ifd = ifd = tiff.IFD[0]
         return ifd
 

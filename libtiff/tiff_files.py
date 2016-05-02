@@ -78,7 +78,7 @@ class TiffFiles(TiffBase):
 
                 if index==0:
                     tiff = self.get_tiff_file(filename, use_memmap=use_memmap)
-                    assert len (tiff.IFD)==1,`len (tiff.IFD)`
+                    assert len (tiff.IFD)==1,repr(len (tiff.IFD))
                     ifd = tiff.IFD[0]
                     assert ifd.get_value('NewSubfileType', subfile_type)==subfile_type
                     plane = TiffSamplePlane(ifd, sample_index=sample_index)
@@ -90,7 +90,7 @@ class TiffFiles(TiffBase):
                     plane.copy_attrs(planes[0])
 
                 if time_lst is not None:
-                    assert len (time_lst)==1,`len(time_lst)`
+                    assert len (time_lst)==1,repr(len(time_lst))
                     plane.set_time(time_lst[0])
                 planes.append(plane)                    
         else:
@@ -109,11 +109,11 @@ class TiffFiles(TiffBase):
 
         tiff_array = TiffArray(planes)
         if self.verbose:
-            print '%s.get_tiff_array: took %ss' % (self.__class__.__name__, time.time ()-start)
+            print('%s.get_tiff_array: took %ss' % (self.__class__.__name__, time.time ()-start))
         return tiff_array
 
     def close (self):
-        for tiff in self.tiff_files.values():
+        for tiff in list(self.tiff_files.values()):
             tiff.close()
         self.tiff_files.clear()
 

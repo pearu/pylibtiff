@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os
 
 CLASSIFIERS = """\
 Development Status :: 3 - Alpha
@@ -13,14 +14,15 @@ Operating System :: Unix
 Operating System :: MacOS
 """
 
-MAJOR               = 0
-MINOR               = 4
-MICRO               = 1
-ISRELEASED          = not True
-VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
+MAJOR = 0
+MINOR = 4
+MICRO = 1
+ISRELEASED = not True
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
-import os
-if os.path.exists('MANIFEST'): os.remove('MANIFEST')
+if os.path.exists('MANIFEST'): 
+    os.remove('MANIFEST')
+
 
 def write_version_py(filename='libtiff/version.py'):
     cnt = """
@@ -46,13 +48,14 @@ if not release:
     elif os.path.isfile(svn_entries_file):
         import subprocess
         try:
-            svn_version = subprocess.Popen(["svnversion", os.path.dirname (__file__)], stdout=subprocess.PIPE).communicate()[0]
+            svn_version = subprocess.Popen(["svnversion", os.path.dirname (
+            __file__)], stdout=subprocess.PIPE).communicate()[0]
         except:
             pass
         else:
             version += svn_version.strip()
 
-print version
+print(version)
 """
     a = open(filename, 'w')
     try:
@@ -60,38 +63,47 @@ print version
     finally:
         a.close()
 
-def configuration(parent_package='',top_path=None):
+
+def configuration(parent_package='', top_path=None):
     from numpy.distutils.misc_util import Configuration
-    config = Configuration(None,parent_package,top_path)
+    config = Configuration(None, parent_package, top_path)
     config.add_subpackage('libtiff')
     config.get_version('libtiff/version.py')
-    config.add_data_files(('libtiff','LICENSE'))
+    config.add_data_files(('libtiff', 'LICENSE'))
     return config
 
-if __name__=='__main__':
-    from numpy.distutils.core import setup
+
+if __name__ == '__main__':
+    from numpy.distutils.core import setup, Extension
+
+    bittools_mod = Extension('bittools',
+                             sources=['libtiff/src/bittools.c'])
+    tif_lzw_mod = Extension('tif_lzw',
+                            sources=['libtiff/src/tif_lzw.c'])
 
     # Rewrite the version file everytime
-    if os.path.exists('libtiff/version.py'): os.remove('libtiff/version.py')
+    if os.path.exists('libtiff/version.py'):
+        os.remove('libtiff/version.py')
     write_version_py()
 
     setup(name='libtiff',
-          #version='0.3-svn',
-          author = 'Pearu Peterson',
-          author_email = 'pearu.peterson@gmail.com',
-          license = 'http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
-          url = 'http://pylibtiff.googlecode.com',
-          #download_url = 'http://code.google.com/p/pylibtiff/downloads/',
-          classifiers=filter(None, CLASSIFIERS.split('\n')),
-          description = 'PyLibTiff: a Python tiff library.',
-          long_description = '''\
+          # version='0.3-svn',
+          author='Pearu Peterson',
+          author_email='pearu.peterson@gmail.com',
+          license='http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
+          url='http://pylibtiff.googlecode.com',
+          # download_url = 'http://code.google.com/p/pylibtiff/downloads/',
+          classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
+          description='PyLibTiff: a Python tiff library.',
+          long_description='''\
 PyLibTiff? is a Python package that provides the following modules:
 
    libtiff - a wrapper of C libtiff library using ctypes.
    tiff - a numpy.memmap view of tiff files.
 ''',
-          platforms = ["All"],
-          #packages = ['libtiff'],
-          #package_dir = {'libtiff': 'libtiff'},
-          configuration = configuration,
+          platforms=["All"],
+          # packages = ['libtiff'],
+          # package_dir = {'libtiff': 'libtiff'},
+          configuration=configuration,
+          ext_modules=[bittools_mod, tif_lzw_mod], requires=['numpy']
           )

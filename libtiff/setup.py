@@ -12,7 +12,7 @@ def configuration(parent_package='',top_path=None):
     package_name = 'libtiff'
     config = Configuration(package_name,parent_package,top_path)
 
-    bitarray_path = 'bitarray-0.3.5-numpy/bitarray'
+    bitarray_path = 'bitarray-a1646c0/bitarray'
 
     # Add subpackages here:
     config.add_subpackage('bitarray', bitarray_path)
@@ -81,7 +81,9 @@ if %(d)r not in sys.path:
                 f = open(target, 'w')
                 f.write(new_text)
                 f.close()
+            print("*****{}".format(target_name))
         config.add_scripts(generate_a_script)
+        
 
     return config
 
