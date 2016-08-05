@@ -74,7 +74,8 @@ def configuration(parent_package='', top_path=None):
 
 
 if __name__ == '__main__':
-    from numpy.distutils.core import setup, Extension
+    #from numpy.distutils.core import setup, Extension
+    from setuptools import setup, Extension
 
     bittools_mod = Extension('bittools',
                              sources=['libtiff/src/bittools.c'])
@@ -88,6 +89,7 @@ if __name__ == '__main__':
 
     setup(name='libtiff',
           # version='0.3-svn',
+          version="0.4.0",
           author='Pearu Peterson',
           author_email='pearu.peterson@gmail.com',
           license='http://pylibtiff.googlecode.com/svn/trunk/LICENSE',
