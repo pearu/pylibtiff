@@ -76,6 +76,7 @@ def configuration(parent_package='', top_path=None):
 if __name__ == '__main__':
     #from numpy.distutils.core import setup, Extension
     from setuptools import setup, Extension
+    import numpy as np    
 
     bittools_mod = Extension('bittools',
                              sources=['libtiff/src/bittools.c'])
@@ -107,5 +108,6 @@ PyLibTiff? is a Python package that provides the following modules:
           # packages = ['libtiff'],
           # package_dir = {'libtiff': 'libtiff'},
           configuration=configuration,
+          include_dirs = [ np.get_include()], 
           ext_modules=[bittools_mod, tif_lzw_mod], requires=['numpy']
           )
