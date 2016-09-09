@@ -105,8 +105,8 @@ PyLibTiff? is a Python package that provides the following modules:
    tiff - a numpy.memmap view of tiff files.
 ''',
           platforms=["All"],
-          # packages = ['libtiff'],
-          # package_dir = {'libtiff': 'libtiff'},
+          packages = ['libtiff'],
+          package_dir = {'libtiff': 'libtiff'},
           configuration=configuration,
           include_dirs = [ np.get_include()], 
           ext_modules=[bittools_mod, tif_lzw_mod], requires=['numpy']
