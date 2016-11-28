@@ -516,21 +516,21 @@ class TIFF(ctypes.c_void_p):
     def read_image(self, verbose=False):
         """ Read image from TIFF and return it as an array.
         """
-        width = self.getfield('ImageWidth')
-        height = self.getfield('ImageLength')
-        samples_pp = self.getfield(
+        width = self.GetField('ImageWidth')
+        height = self.GetField('ImageLength')
+        samples_pp = self.GetField(
             'SamplesPerPixel')  # this number includes extra samples
         if samples_pp is None:  # default is 1
             samples_pp = 1
         # Note: In the TIFF specification, BitsPerSample and SampleFormat are
         # per samples. However, libtiff doesn't support mixed format,
         # so it will always return just one value (or raise an error).
-        bits = self.getfield('BitsPerSample')
-        sample_format = self.getfield('SampleFormat')
-        planar_config = self.getfield('PlanarConfig')
+        bits = self.GetField('BitsPerSample')
+        sample_format = self.GetField('SampleFormat')
+        planar_config = self.GetField('PlanarConfig')
         if planar_config is None:  # default is contig
             planar_config = PLANARCONFIG_CONTIG
-        compression = self.getfield('Compression')
+        compression = self.GetField('Compression')
         if compression is None:  # default is no compression
             compression = COMPRESSION_NONE
         # TODO: rotate according to orientation
@@ -551,13 +551,13 @@ class TIFF(ctypes.c_void_p):
         size = arr.nbytes
 
         if compression == COMPRESSION_NONE:
-            readstrip = self.readrawstrip
+            ReadStrip = self.ReadRawStrip
         else:
-            readstrip = self.readencodedstrip
+            ReadStrip = self.ReadEncodedStrip
 
         pos = 0
-        for strip in range(self.numberofstrips()):
-            elem = readstrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
+        for strip in range(self.NumberOfStrips()):
+            elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
             pos += elem
         return arr
 
@@ -619,21 +619,21 @@ class TIFF(ctypes.c_void_p):
         bits = arr.itemsize * 8
 
         if compression == COMPRESSION_NONE:
-            writestrip = self.writerawstrip
+            WriteStrip = self.WriteRawStrip
         else:
-            writestrip = self.writeencodedstrip
+            WriteStrip = self.WriteEncodedStrip
 
-        self.setfield(TIFFTAG_COMPRESSION, compression)
+        self.SetField(TIFFTAG_COMPRESSION, compression)
         if compression == COMPRESSION_LZW and sample_format in \
                 [SAMPLEFORMAT_INT, SAMPLEFORMAT_UINT]:
             # This field can only be set after compression and before
             # writing data. Horizontal predictor often improves compression,
             # but some rare readers might support LZW only without predictor.
-            self.setfield(TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL)
+            self.SetField(TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL)
 
-        self.setfield(TIFFTAG_BITSPERSAMPLE, bits)
-        self.setfield(TIFFTAG_SAMPLEFORMAT, sample_format)
-        self.setfield(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
+        self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+        self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+        self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
 
         if len(shape) == 1:
             shape = (shape[0], 1)  # Same as 2D with height == 1
@@ -642,12 +642,12 @@ class TIFF(ctypes.c_void_p):
             height, width = shape
             size = width * height * arr.itemsize
 
-            self.setfield(TIFFTAG_IMAGEWIDTH, width)
-            self.setfield(TIFFTAG_IMAGELENGTH, height)
-            self.setfield(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-            self.setfield(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-            writestrip(0, arr.ctypes.data, size)
-            self.writedirectory()
+            self.SetField(TIFFTAG_IMAGEWIDTH, width)
+            self.SetField(TIFFTAG_IMAGELENGTH, height)
+            self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+            self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+            WriteStrip(0, arr.ctypes.data, size)
+            self.WriteDirectory()
 
         elif len(shape) == 3:
             if write_rgb:
@@ -661,54 +661,54 @@ class TIFF(ctypes.c_void_p):
                     depth, height, width = shape
                     size = width * height * arr.itemsize
 
-                self.setfield(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
-                self.setfield(TIFFTAG_IMAGEWIDTH, width)
-                self.setfield(TIFFTAG_IMAGELENGTH, height)
-                self.setfield(TIFFTAG_SAMPLESPERPIXEL, depth)
-                self.setfield(TIFFTAG_PLANARCONFIG, planar_config)
+                self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB)
+                self.SetField(TIFFTAG_IMAGEWIDTH, width)
+                self.SetField(TIFFTAG_IMAGELENGTH, height)
+                self.SetField(TIFFTAG_SAMPLESPERPIXEL, depth)
+                self.SetField(TIFFTAG_PLANARCONFIG, planar_config)
                 if depth == 4:  # RGBA
-                    self.setfield(TIFFTAG_EXTRASAMPLES,
+                    self.SetField(TIFFTAG_EXTRASAMPLES,
                                   [EXTRASAMPLE_UNASSALPHA],
                                   count=1)
                 elif depth > 4:  # No idea...
-                    self.setfield(TIFFTAG_EXTRASAMPLES,
+                    self.SetField(TIFFTAG_EXTRASAMPLES,
                                   [EXTRASAMPLE_UNSPECIFIED] * (depth - 3),
                                   count=(depth - 3))
 
                 if planar_config == PLANARCONFIG_CONTIG:
-                    writestrip(0, arr.ctypes.data, size)
+                    WriteStrip(0, arr.ctypes.data, size)
                 else:
                     for _n in range(depth):
-                        writestrip(_n, arr[_n, :, :].ctypes.data, size)
-                self.writedirectory()
+                        WriteStrip(_n, arr[_n, :, :].ctypes.data, size)
+                self.WriteDirectory()
             else:
                 depth, height, width = shape
                 size = width * height * arr.itemsize
                 for _n in range(depth):
-                    self.setfield(TIFFTAG_IMAGEWIDTH, width)
-                    self.setfield(TIFFTAG_IMAGELENGTH, height)
-                    self.setfield(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
-                    self.setfield(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
+                    self.SetField(TIFFTAG_IMAGEWIDTH, width)
+                    self.SetField(TIFFTAG_IMAGELENGTH, height)
+                    self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
+                    self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
 
-                    writestrip(0, arr[_n].ctypes.data, size)
-                    self.writedirectory()
+                    WriteStrip(0, arr[_n].ctypes.data, size)
+                    self.WriteDirectory()
         else:
             raise NotImplementedError(repr(shape))
 
     def write_tiles(self, arr):
-        num_tcols = self.getfield("TileWidth")
+        num_tcols = self.GetField("TileWidth")
         if num_tcols is None:
             raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
-        num_trows = self.getfield("TileLength")
+        num_trows = self.GetField("TileLength")
         if num_trows is None:
             num_trows = 1
-        num_irows = self.getfield("ImageLength")
+        num_irows = self.GetField("ImageLength")
         if num_irows is None:
             num_irows = 1
-        num_icols = self.getfield("ImageWidth")
+        num_icols = self.GetField("ImageWidth")
         if num_icols is None:
             raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
-        num_idepth = self.getfield("ImageDepth")
+        num_idepth = self.GetField("ImageDepth")
         if num_idepth is None:
             num_idepth = 1
 
@@ -778,19 +778,19 @@ class TIFF(ctypes.c_void_p):
         return status
 
     def read_tiles(self, dtype=np.uint8):
-        num_tcols = self.getfield("TileWidth")
+        num_tcols = self.GetField("TileWidth")
         if num_tcols is None:
             raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
-        num_trows = self.getfield("TileLength")
+        num_trows = self.GetField("TileLength")
         if num_trows is None:
             num_trows = 1
-        num_icols = self.getfield("ImageWidth")
+        num_icols = self.GetField("ImageWidth")
         if num_icols is None:
             raise ValueError("TIFFTAG_TILEWIDTH must be set to write tiles")
-        num_irows = self.getfield("ImageLength")
+        num_irows = self.GetField("ImageLength")
         if num_irows is None:
             num_irows = 1
-        num_idepth = self.getfield("ImageDepth")
+        num_idepth = self.GetField("ImageDepth")
         if num_idepth is None:
             num_idepth = 1
 
@@ -851,70 +851,84 @@ class TIFF(ctypes.c_void_p):
         """ Iterator of all images in a TIFF file.
         """
         yield self.read_image(verbose=verbose)
-        while not self.lastdirectory():
-            self.readdirectory()
+        while not self.LastDirectory():
+            self.ReadDirectory()
             yield self.read_image(verbose=verbose)
-        self.setdirectory(0)
+        self.SetDirectory(0)
 
     def __del__(self):
         self.close()
 
     @debug
-    def filename(self):
+    def FileName(self):
         return libtiff.TIFFFileName(self)
+    filename = FileName
 
     @debug
-    def currentrow(self):
+    def CurrentRow(self):
         return libtiff.TIFFCurrentRow(self)
+    currentrow = CurrentRow
 
     @debug
-    def currentstrip(self):
+    def CurrentStrip(self):
         return libtiff.TIFFCurrentStrip(self)
+    currentstrip = CurrentStrip
 
     @debug
-    def currenttile(self):
+    def CurrentTile(self):
         return libtiff.TIFFCurrentTile(self)
+    currenttile = CurrentTile
 
     @debug
-    def currentdirectory(self):
+    def CurrentDirectory(self):
         return libtiff.TIFFCurrentDirectory(self)
+    currentdirectory = CurrentDirectory
 
     @debug
-    def lastdirectory(self):
+    def LastDirectory(self):
         return libtiff.TIFFLastDirectory(self)
+    lastdirectory = LastDirectory
 
     @debug
-    def readdirectory(self):
+    def ReadDirectory(self):
         return libtiff.TIFFReadDirectory(self)
+    readdirectory = ReadDirectory
 
     @debug
-    def writedirectory(self):
+    def WriteDirectory(self):
         r = libtiff.TIFFWriteDirectory(self)
         assert r == 1, repr(r)
+    writedirectory = WriteDirectory
 
     @debug
-    def setdirectory(self, dirnum):
+    def SetDirectory(self, dirnum):
         return libtiff.TIFFSetDirectory(self, dirnum)
+    setdirectory = SetDirectory
 
     @debug
-    def fileno(self):
+    def Fileno(self):
         return libtiff.TIFFFileno(self)
+    Fileno = fileno
 
     @debug
-    def getmode(self):
+    def GetMode(self):
         return libtiff.TIFFGetMode(self)
+    GetMode = getmode
 
     @debug
-    def istiled(self):
+    def IsTiled(self):
         return libtiff.TIFFIsTiled(self)
+    istiled = IsTiled
 
     @debug
-    def isbyteswapped(self):
+    def IsByteSwapped(self):
         return libtiff.TIFFIsByteSwapped(self)
+    isbyteswapped = IsByteSwapped
 
     @debug
-    def isupsampled(self):
+    def IsUpSampled(self):
         return libtiff.TIFFIsUpSampled(self)
+    isupsampled = IsUpSampled
 
     # noinspection PyPep8Naming
     @debug
@@ -922,31 +936,38 @@ class TIFF(ctypes.c_void_p):
         return libtiff.TIFFIsMSB2LSB(self)
 
     @debug
-    def numberofstrips(self):
+    def NumberOfStrips(self):
         return libtiff.TIFFNumberOfStrips(self).value
+    numberofstrips = NumberOfStrips
 
     # @debug
-    def readrawstrip(self, strip, buf, size):
+    def ReadRawStrip(self, strip, buf, size):
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
+    readrawstrip = ReadRawStrip
 
-    def readencodedstrip(self, strip, buf, size):
+    def ReadEncodedStrip(self, strip, buf, size):
         return libtiff.TIFFReadEncodedStrip(self, strip, buf, size).value
+    readencodedstrip = ReadEncodedStrip
 
-    def stripsize(self):
+    def StripSize(self):
         return libtiff.TIFFStripSize(self).value
+    stripsize = StripSize
 
-    def rawstripsize(self, strip):
-        return libtiff.TIFFStripSize(self, strip).value
+    def RawStripSize(self, strip):
+        return libtiff.TIFFRawStripSize(self, strip).value
+    rawstripsize = RawStripSize
 
     @debug
-    def writerawstrip(self, strip, buf, size):
+    def WriteRawStrip(self, strip, buf, size):
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
         assert r.value == size, repr((r.value, size))
+    writerawstrip = WriteRawStrip
 
     @debug
-    def writeencodedstrip(self, strip, buf, size):
+    def WriteEncodedStrip(self, strip, buf, size):
         r = libtiff.TIFFWriteEncodedStrip(self, strip, buf, size)
         assert r.value == size, repr((r.value, size))
+    writeencodedstrip = WriteEncodedStrip
 
     closed = False
 
@@ -959,14 +980,14 @@ class TIFF(ctypes.c_void_p):
     # def (self): return libtiff.TIFF(self)
 
     @debug
-    def getfield(self, tag, ignore_undefined_tag=True, count=None):
+    def GetField(self, tag, ignore_undefined_tag=True, count=None):
         """ Return TIFF field _value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
         string containing <tagname>.
         """
         if tag in ['PixelSizeX', 'PixelSizeY', 'RelativeTime']:
-            descr = self.getfield('ImageDescription')
+            descr = self.GetField('ImageDescription')
             if not descr:
                 return
             _i = descr.find(tag)
@@ -984,7 +1005,7 @@ class TIFF(ctypes.c_void_p):
         data_type, convert = t
 
         if tag == TIFFTAG_COLORMAP:
-            bps = self.getfield("BitsPerSample")
+            bps = self.GetField("BitsPerSample")
             if bps is None:
                 print(
                     "Warning: BitsPerSample is required to get ColorMap, "
@@ -1031,7 +1052,7 @@ class TIFF(ctypes.c_void_p):
         return convert(data)
 
     # @debug
-    def setfield(self, tag, _value, count=None):
+    def SetField(self, tag, _value, count=None):
         """ Set TIFF field _value with tag.
 
         tag can be numeric constant TIFFTAG_<tagname> or a
@@ -1060,7 +1081,7 @@ class TIFF(ctypes.c_void_p):
             if r_arr is None:
                 return
 
-            bps = self.getfield("BitsPerSample")
+            bps = self.GetField("BitsPerSample")
             if bps is None:
                 print(
                     "Warning: BitsPerSample is required to get ColorMap, "
@@ -1106,7 +1127,7 @@ class TIFF(ctypes.c_void_p):
     def info(self):
         """ Return a string containing <tag name: field value> map.
         """
-        _l = ['filename: %s' % (self.filename())]
+        _l = ['filename: %s' % (self.FileName())]
         for tagname in ['Artist', 'CopyRight', 'DateTime', 'DocumentName',
                         'HostComputer', 'ImageDescription', 'InkNames',
                         'Make', 'Model', 'PageName', 'Software',
@@ -1132,7 +1153,7 @@ class TIFF(ctypes.c_void_p):
                         'PixelSizeX', 'PixelSizeY', 'RelativeTime',
                         'CZ_LSMInfo'
                         ]:
-            v = self.getfield(tagname)
+            v = self.GetField(tagname)
             if v:
                 if isinstance(v, int):
                     v = define_to_name_map.get(tagname, {}).get(v, v)
@@ -1168,17 +1189,17 @@ class TIFF(ctypes.c_void_p):
                 _value = TIFF._fix_sampleformat(_value)
             define_rewrite[define] = _value
         name_define_list = list(name_to_define_map['TiffTag'].items())
-        self.setdirectory(0)
-        self.readdirectory()
+        self.SetDirectory(0)
+        self.ReadDirectory()
         while 1:
-            other.setdirectory(self.currentdirectory())
-            bits = self.getfield('BitsPerSample')
-            sample_format = self.getfield('SampleFormat')
+            other.SetDirectory(self.CurrentDirectory())
+            bits = self.GetField('BitsPerSample')
+            sample_format = self.GetField('SampleFormat')
             assert bits >= 8, repr((bits, sample_format, dtype))
             itemsize = bits // 8
             dtype = self.get_numpy_type(bits, sample_format)
             for _name, define in name_define_list:
-                orig_value = self.getfield(define)
+                orig_value = self.GetField(define)
                 if orig_value is None and define not in define_rewrite:
                     continue
                 if _name.endswith('OFFSETS') or _name.endswith('BYTECOUNTS'):
@@ -1189,24 +1210,24 @@ class TIFF(ctypes.c_void_p):
                     _value = orig_value
                 if _value is None:
                     continue
-                other.setfield(define, _value)
-            new_bits = other.getfield('BitsPerSample')
-            new_sample_format = other.getfield('SampleFormat')
+                other.SetField(define, _value)
+            new_bits = other.GetField('BitsPerSample')
+            new_sample_format = other.GetField('SampleFormat')
             new_dtype = other.get_numpy_type(new_bits, new_sample_format)
             assert new_bits >= 8, repr(
                 (new_bits, new_sample_format, new_dtype))
             new_itemsize = new_bits // 8
-            strip_size = self.stripsize()
+            strip_size = self.StripSize()
             buf = np.zeros(strip_size // itemsize, dtype)
-            for strip in range(self.numberofstrips()):
-                elem = self.readencodedstrip(strip, buf.ctypes.data,
+            for strip in range(self.NumberOfStrips()):
+                elem = self.ReadEncodedStrip(strip, buf.ctypes.data,
                                              strip_size)
                 if elem > 0:
                     new_buf = buf.astype(new_dtype)
-                    other.writeencodedstrip(strip, new_buf.ctypes.data,
+                    other.WriteEncodedStrip(strip, new_buf.ctypes.data,
                                             (elem * new_itemsize) // itemsize)
-            self.readdirectory()
-            if self.lastdirectory():
+            self.ReadDirectory()
+            if self.LastDirectory():
                 break
         other.close()
 
@@ -1263,11 +1284,11 @@ class TIFF3D(TIFF):
             return TIFF.read_image(self, verbose)
 
         # Code is initially copy-paste from TIFF:
-        width = self.getfield('ImageWidth')
-        height = self.getfield('ImageLength')
-        bits = self.getfield('BitsPerSample')
-        sample_format = self.getfield('SampleFormat')
-        compression = self.getfield('Compression')
+        width = self.GetField('ImageWidth')
+        height = self.GetField('ImageLength')
+        bits = self.GetField('BitsPerSample')
+        sample_format = self.GetField('SampleFormat')
+        compression = self.GetField('Compression')
 
         typ = self.get_numpy_type(bits, sample_format)
 
@@ -1288,10 +1309,10 @@ class TIFF3D(TIFF):
         depth = 0
         while True:
             depth += 1
-            if self.lastdirectory():
+            if self.LastDirectory():
                 break
-            self.readdirectory()
-        self.setdirectory(0)
+            self.ReadDirectory()
+        self.SetDirectory(0)
 
         # we proceed assuming all directories have the same properties from
         # above.
@@ -1300,31 +1321,31 @@ class TIFF3D(TIFF):
         arr = np.zeros((depth, height, width), typ)
 
         if compression == COMPRESSION_NONE:
-            readstrip = self.readrawstrip
+            ReadStrip = self.ReadRawStrip
         else:
-            readstrip = self.readencodedstrip
+            ReadStrip = self.ReadEncodedStrip
 
         layer = 0
         while True:
             pos = 0
             elem = None
-            for strip in range(self.numberofstrips()):
+            for strip in range(self.NumberOfStrips()):
                 if elem is None:
-                    elem = readstrip(strip,
+                    elem = ReadStrip(strip,
                                      arr.ctypes.data + layer * layer_size +
                                      pos,
                                      layer_size)
                 elif elem:
-                    elem = readstrip(strip,
+                    elem = ReadStrip(strip,
                                      arr.ctypes.data + layer * layer_size +
                                      pos,
                                      min(layer_size - pos, elem))
                 pos += elem
-            if self.lastdirectory():
+            if self.LastDirectory():
                 break
-            self.readdirectory()
+            self.ReadDirectory()
             layer += 1
-        self.setdirectory(0)
+        self.SetDirectory(0)
         return arr
 
 
@@ -1332,7 +1353,7 @@ class CZ_LSMInfo:
     def __init__(self, tiff):
         self.tiff = tiff
         self.filename = tiff.filename()
-        self.offset = tiff.getfield(TIFFTAG_CZ_LSMINFO)
+        self.offset = tiff.GetField(TIFFTAG_CZ_LSMINFO)
         self.extract_info()
 
     def extract_info(self):
@@ -1341,7 +1362,7 @@ class CZ_LSMInfo:
         _f = libtiff.TIFFFileno(self.tiff)
         fd = os.fdopen(_f, 'r')
         pos = fd.tell()
-        self.offset = self.tiff.getfield(TIFFTAG_CZ_LSMINFO)
+        self.offset = self.tiff.GetField(TIFFTAG_CZ_LSMINFO)
         print(os.lseek(_f, 0, 1))
 
         print(pos)
@@ -1419,7 +1440,7 @@ libtiff.TIFFGetField.argtypes = [TIFF, c_ttag_t, ctypes.c_void_p]
 libtiff.TIFFSetField.restype = ctypes.c_int
 libtiff.TIFFSetField.argtypes = [TIFF, c_ttag_t,
                                  ctypes.c_void_p]  # last item is reset in
-#                                                    TIFF.setfield method
+#                                                    TIFF.SetField method
 
 libtiff.TIFFNumberOfStrips.restype = c_tstrip_t
 libtiff.TIFFNumberOfStrips.argtypes = [TIFF]
@@ -1531,13 +1552,13 @@ def _test_custom_tags():
     def _tag_write():
         a = TIFF.open("/tmp/libtiff_test_custom_tags.tif", "w")
 
-        a.setfield("ARTIST", "MY NAME")
-        a.setfield("LibtiffTestByte", 42)
-        a.setfield("LibtiffTeststr", "FAKE")
-        a.setfield("LibtiffTestuint16", 42)
-        a.setfield("LibtiffTestMultiuint32", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-        a.setfield("XPOSITION", 42.0)
-        a.setfield("PRIMARYCHROMATICITIES", (1.0, 2, 3, 4, 5, 6))
+        a.SetField("ARTIST", "MY NAME")
+        a.SetField("LibtiffTestByte", 42)
+        a.SetField("LibtiffTeststr", "FAKE")
+        a.SetField("LibtiffTestuint16", 42)
+        a.SetField("LibtiffTestMultiuint32", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+        a.SetField("XPOSITION", 42.0)
+        a.SetField("PRIMARYCHROMATICITIES", (1.0, 2, 3, 4, 5, 6))
 
         arr = np.ones((512, 512), dtype=np.uint8)
         arr[:, :] = 255
@@ -1553,21 +1574,21 @@ def _test_custom_tags():
             512,
             512), "Image read was wrong shape (%r instead of (512,512))" % (
             tmp.shape,)
-        tmp = a.getfield("XPOSITION")
+        tmp = a.GetField("XPOSITION")
         assert tmp == 42.0, "XPosition was not read as 42.0"
-        tmp = a.getfield("ARTIST")
+        tmp = a.GetField("ARTIST")
         assert tmp == "MY NAME", "Artist was not read as 'MY NAME'"
-        tmp = a.getfield("LibtiffTestByte")
+        tmp = a.GetField("LibtiffTestByte")
         assert tmp == 42, "LibtiffTestbyte was not read as 42"
-        tmp = a.getfield("LibtiffTestuint16")
+        tmp = a.GetField("LibtiffTestuint16")
         assert tmp == 42, "LibtiffTestuint16 was not read as 42"
-        tmp = a.getfield("LibtiffTestMultiuint32")
+        tmp = a.GetField("LibtiffTestMultiuint32")
         assert tmp == [1, 2, 3, 4, 5, 6, 7, 8, 9,
                        10], "LibtiffTestMultiuint32 was not read as [1,2,3," \
                             "4,5,6,7,8,9,10]"
-        tmp = a.getfield("LibtiffTeststr")
+        tmp = a.GetField("LibtiffTeststr")
         assert tmp == "FAKE", "LibtiffTeststr was not read as 'FAKE'"
-        tmp = a.getfield("PRIMARYCHROMATICITIES")
+        tmp = a.GetField("PRIMARYCHROMATICITIES")
         assert tmp == [1.0, 2.0, 3.0, 4.0, 5.0,
                        6.0], "PrimaryChromaticities was not read as [1.0," \
                              "2.0,3.0,4.0,5.0,6.0]"
@@ -1596,61 +1617,61 @@ def _test_tile_write():
     a = TIFF.open("/tmp/libtiff_test_tile_write.tiff", "w")
 
     # 1D Arrays (doesn't make much sense to tile)
-    assert a.setfield("ImageWidth",
+    assert a.SetField("ImageWidth",
                       3000) == 1, "could not set ImageWidth tag"  # 1D,2D,3D
-    assert a.setfield("ImageLength",
+    assert a.SetField("ImageLength",
                       1) == 1, "could not set ImageLength tag"  # 1D
-    assert a.setfield("ImageDepth",
+    assert a.SetField("ImageDepth",
                       1) == 1, "could not set ImageDepth tag"  # 1D,2D
     # Must be multiples of 16
-    assert a.setfield("TileWidth", 512) == 1, "could not set TileWidth tag"
-    assert a.setfield("TileLength", 528) == 1, "could not set TileLength tag"
-    assert a.setfield("BitsPerSample",
+    assert a.SetField("TileWidth", 512) == 1, "could not set TileWidth tag"
+    assert a.SetField("TileLength", 528) == 1, "could not set TileLength tag"
+    assert a.SetField("BitsPerSample",
                       8) == 1, "could not set BitsPerSample tag"
-    assert a.setfield("Compression",
+    assert a.SetField("Compression",
                       COMPRESSION_NONE) == 1, "could not set Compression tag"
     data_array = np.array(list(range(500)) * 6).astype(np.uint8)
     assert a.write_tiles(data_array) == (
                                             512 * 528) * 6, "could " \
                                                             "not write " \
                                                             "tile images"  # 1D
-    a.writedirectory()
+    a.WriteDirectory()
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     # 2D Arrays
-    assert a.setfield("ImageWidth",
+    assert a.SetField("ImageWidth",
                       3000) == 1, "could not set ImageWidth tag"  # 1D,2D,3D
-    assert a.setfield("ImageLength",
+    assert a.SetField("ImageLength",
                       2500) == 1, "could not set ImageLength tag"  # 2D,3D
-    assert a.setfield("ImageDepth",
+    assert a.SetField("ImageDepth",
                       1) == 1, "could not set ImageDepth tag"  # 1D,2D
     # Must be multiples of 16
-    assert a.setfield("TileWidth", 512) == 1, "could not set TileWidth tag"
-    assert a.setfield("TileLength", 528) == 1, "could not set TileLength tag"
-    assert a.setfield("BitsPerSample",
+    assert a.SetField("TileWidth", 512) == 1, "could not set TileWidth tag"
+    assert a.SetField("TileLength", 528) == 1, "could not set TileLength tag"
+    assert a.SetField("BitsPerSample",
                       8) == 1, "could not set BitsPerSample tag"
-    assert a.setfield("Compression",
+    assert a.SetField("Compression",
                       COMPRESSION_NONE) == 1, "could not set Compression tag"
     data_array = np.tile(list(range(500)), (2500, 6)).astype(np.uint8)
     assert a.write_tiles(data_array) == (
                                             512 * 528) * 5 * 6, "could not " \
                                                                 "write tile " \
                                                                 "images"  # 2D
-    a.writedirectory()
+    a.WriteDirectory()
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     # 3D Arrays
-    assert a.setfield("ImageWidth",
+    assert a.SetField("ImageWidth",
                       3000) == 1, "could not set ImageWidth tag"  # 1D,2D,3D
-    assert a.setfield("ImageLength",
+    assert a.SetField("ImageLength",
                       2500) == 1, "could not set ImageLength tag"  # 2D,3D
-    assert a.setfield("ImageDepth",
+    assert a.SetField("ImageDepth",
                       3) == 1, "could not set ImageDepth tag"  # 3D
-    assert a.setfield("TileWidth", 512) == 1, "could not set TileWidth tag"
-    assert a.setfield("TileLength", 528) == 1, "could not set TileLength tag"
-    assert a.setfield("BitsPerSample",
+    assert a.SetField("TileWidth", 512) == 1, "could not set TileWidth tag"
+    assert a.SetField("TileLength", 528) == 1, "could not set TileLength tag"
+    assert a.SetField("BitsPerSample",
                       8) == 1, "could not set BitsPerSample tag"
-    assert a.setfield("Compression",
+    assert a.SetField("Compression",
                       COMPRESSION_NONE) == 1, "could not set Compression tag"
     data_array = np.tile(list(range(500)), (3, 2500, 6)).astype(np.uint8)
     assert a.write_tiles(data_array) == (512 * 528) * 5 * 6 * 3, "could " \
@@ -1658,7 +1679,7 @@ def _test_tile_write():
                                                                  "write " \
                                                                  "tile " \
                                                                  "images"  # 3D
-    a.writedirectory()
+    a.WriteDirectory()
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     print("Tile Write: SUCCESS")
@@ -1675,21 +1696,21 @@ def _test_tile_read(filename=None):
     a = TIFF.open(filename, "r")
 
     # 1D Arrays (doesn't make much sense to tile)
-    a.setdirectory(0)
-    iwidth = tmp = a.getfield("ImageWidth")
+    a.SetDirectory(0)
+    iwidth = tmp = a.GetField("ImageWidth")
     assert tmp is not None, "ImageWidth tag must be defined for reading tiles"
-    ilength = tmp = a.getfield("ImageLength")
+    ilength = tmp = a.GetField("ImageLength")
     assert tmp is not None, "ImageLength tag must be defined for reading tiles"
-    idepth = tmp = a.getfield("ImageDepth")
+    idepth = tmp = a.GetField("ImageDepth")
     assert tmp is not None, "ImageDepth tag must be defined for reading tiles"
-    tmp = a.getfield("TileWidth")
+    tmp = a.GetField("TileWidth")
     assert tmp is not None, "TileWidth tag must be defined for reading tiles"
-    tmp = a.getfield("TileLength")
+    tmp = a.GetField("TileLength")
     assert tmp is not None, "TileLength tag must be defined for reading tiles"
-    tmp = a.getfield("BitsPerSample")
+    tmp = a.GetField("BitsPerSample")
     assert tmp is not None, "BitsPerSample tag must be defined for reading " \
                             "tiles"
-    tmp = a.getfield("Compression")
+    tmp = a.GetField("Compression")
     assert tmp is not None, "Compression tag must be defined for reading tiles"
 
     data_array = a.read_tiles()
@@ -1701,21 +1722,21 @@ def _test_tile_read(filename=None):
     print("Tile Read: Data is the same as expected from tile write test")
 
     # 2D Arrays (doesn't make much sense to tile)
-    a.setdirectory(1)
-    iwidth = tmp = a.getfield("ImageWidth")
+    a.SetDirectory(1)
+    iwidth = tmp = a.GetField("ImageWidth")
     assert tmp is not None, "ImageWidth tag must be defined for reading tiles"
-    ilength = tmp = a.getfield("ImageLength")
+    ilength = tmp = a.GetField("ImageLength")
     assert tmp is not None, "ImageLength tag must be defined for reading tiles"
-    idepth = tmp = a.getfield("ImageDepth")
+    idepth = tmp = a.GetField("ImageDepth")
     assert tmp is not None, "ImageDepth tag must be defined for reading tiles"
-    tmp = a.getfield("TileWidth")
+    tmp = a.GetField("TileWidth")
     assert tmp is not None, "TileWidth tag must be defined for reading tiles"
-    tmp = a.getfield("TileLength")
+    tmp = a.GetField("TileLength")
     assert tmp is not None, "TileLength tag must be defined for reading tiles"
-    tmp = a.getfield("BitsPerSample")
+    tmp = a.GetField("BitsPerSample")
     assert tmp is not None, "BitsPerSample tag must be defined for reading " \
                             "tiles"
-    tmp = a.getfield("Compression")
+    tmp = a.GetField("Compression")
     assert tmp is not None, "Compression tag must be defined for reading tiles"
 
     data_array = a.read_tiles()
@@ -1729,21 +1750,21 @@ def _test_tile_read(filename=None):
     print("Tile Read: Data is the same as expected from tile write test")
 
     # 3D Arrays (doesn't make much sense to tile)
-    a.setdirectory(2)
-    iwidth = tmp = a.getfield("ImageWidth")
+    a.SetDirectory(2)
+    iwidth = tmp = a.GetField("ImageWidth")
     assert tmp is not None, "ImageWidth tag must be defined for reading tiles"
-    ilength = tmp = a.getfield("ImageLength")
+    ilength = tmp = a.GetField("ImageLength")
     assert tmp is not None, "ImageLength tag must be defined for reading tiles"
-    idepth = tmp = a.getfield("ImageDepth")
+    idepth = tmp = a.GetField("ImageDepth")
     assert tmp is not None, "ImageDepth tag must be defined for reading tiles"
-    tmp = a.getfield("TileWidth")
+    tmp = a.GetField("TileWidth")
     assert tmp is not None, "TileWidth tag must be defined for reading tiles"
-    tmp = a.getfield("TileLength")
+    tmp = a.GetField("TileLength")
     assert tmp is not None, "TileLength tag must be defined for reading tiles"
-    tmp = a.getfield("BitsPerSample")
+    tmp = a.GetField("BitsPerSample")
     assert tmp is not None, "BitsPerSample tag must be defined for reading " \
                             "tiles"
-    tmp = a.getfield("Compression")
+    tmp = a.GetField("Compression")
     assert tmp is not None, "Compression tag must be defined for reading tiles"
 
     data_array = a.read_tiles()
@@ -1760,16 +1781,16 @@ def _test_tile_read(filename=None):
 
 def _test_tags_write():
     tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
-    tmp = tiff.setfield("Artist", "A Name")
+    tmp = tiff.SetField("Artist", "A Name")
     assert tmp == 1, "Tag 'Artist' was not written properly"
-    tmp = tiff.setfield("DocumentName", "")
+    tmp = tiff.SetField("DocumentName", "")
     assert tmp == 1, "Tag 'DocumentName' with empty string was not written " \
                      "properly"
-    tmp = tiff.setfield("PrimaryChromaticities", [1, 2, 3, 4, 5, 6])
+    tmp = tiff.SetField("PrimaryChromaticities", [1, 2, 3, 4, 5, 6])
     assert tmp == 1, "Tag 'PrimaryChromaticities' was not written properly"
-    tmp = tiff.setfield("BitsPerSample", 8)
+    tmp = tiff.SetField("BitsPerSample", 8)
     assert tmp == 1, "Tag 'BitsPerSample' was not written properly"
-    tmp = tiff.setfield("ColorMap", [[x * 256 for x in range(256)]] * 3)
+    tmp = tiff.SetField("ColorMap", [[x * 256 for x in range(256)]] * 3)
     assert tmp == 1, "Tag 'ColorMap' was not written properly"
 
     arr = np.zeros((100, 100), np.uint8)
@@ -1789,23 +1810,23 @@ def _test_tags_read(filename=None):
         else:
             filename = sys.argv[1]
     tiff = TIFF.open(filename)
-    tmp = tiff.getfield("Artist")
+    tmp = tiff.GetField("Artist")
     assert tmp == "A Name", "Tag 'Artist' did not read the correct value (" \
                             "Got '%s'; Expected 'A Name')" % (
         tmp,)
-    tmp = tiff.getfield("DocumentName")
+    tmp = tiff.GetField("DocumentName")
     assert tmp == "", "Tag 'DocumentName' did not read the correct value (" \
                       "Got '%s'; Expected empty string)" % (
         tmp,)
-    tmp = tiff.getfield("PrimaryChromaticities")
+    tmp = tiff.GetField("PrimaryChromaticities")
     assert tmp == [1, 2, 3, 4, 5,
                    6], "Tag 'PrimaryChromaticities' did not read the " \
                        "correct value (Got '%r'; Expected '[1,2,3,4,5,6]'" % (
         tmp,)
-    tmp = tiff.getfield("BitsPerSample")
+    tmp = tiff.GetField("BitsPerSample")
     assert tmp == 8, "Tag 'BitsPerSample' did not read the correct value (" \
                      "Got %s; Expected 8)" % (str(tmp),)
-    tmp = tiff.getfield("ColorMap")
+    tmp = tiff.GetField("ColorMap")
     try:
         assert len(
             tmp) == 3, "Tag 'ColorMap' should be three arrays, found %d" % \
@@ -1892,7 +1913,7 @@ def _test_copy():
             arr[_i, j] = 1 + _i + 10 * j
     # from scipy.stats import poisson
     # arr = poisson.rvs (arr)
-    tiff.setfield('ImageDescription', 'Hey\nyou')
+    tiff.SetField('ImageDescription', 'Hey\nyou')
     tiff.write_image(arr, compression='lzw')
     del tiff
 
