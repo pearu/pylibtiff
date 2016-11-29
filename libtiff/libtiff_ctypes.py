@@ -908,12 +908,12 @@ class TIFF(ctypes.c_void_p):
     @debug
     def Fileno(self):
         return libtiff.TIFFFileno(self)
-    Fileno = fileno
+    fileno = Fileno
 
     @debug
     def GetMode(self):
         return libtiff.TIFFGetMode(self)
-    GetMode = getmode
+    getmode = GetMode
 
     @debug
     def IsTiled(self):
