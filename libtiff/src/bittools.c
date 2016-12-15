@@ -1,6 +1,6 @@
 #include <Python.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
+#define PY_ARRAY_UNIQUE_SYMBOL bittools_PyArray_API
 #include "numpy/arrayobject.h"
 
 #ifndef PyMODINIT_FUNC  /* declarations for DLL import/export */
@@ -140,7 +140,7 @@ static PyObject *setword(PyObject *self, PyObject *args, PyObject *kwds)
 	}
       if ((index+width-1) >= BITS(PyArray_NBYTES((PyArrayObject*)arr)) || width<0)
 	{
-	  printf("index,width,nbits=%d,%d,%d\n", index, width, BITS(PyArray_NBYTES((PyArrayObject*)arr)));
+	  printf("index,width,nbits=%ld,%ld,%ld\n", index, width, BITS(PyArray_NBYTES((PyArrayObject*)arr)));
 	  PyErr_SetString(PyExc_IndexError,"bit index out of range");
 	  return NULL;
 	}
@@ -187,8 +187,12 @@ initbittools(void)
   import_array();
   if (PyErr_Occurred())
     {
-      PyErr_SetString(PyExc_ImportError, "can't initialize module bittools (failed to import numpy)"); 
+      PyErr_SetString(PyExc_ImportError, "can't initialize module bittools (failed to import numpy)");
+#ifdef IS_PY3K
       return NULL;
+#else
+      return;
+#endif
     }
   //m = Py_InitModule3("bittools", module_methods, "");
   #ifdef IS_PY3K
