@@ -835,6 +835,133 @@ class TIFF(ctypes.c_void_p):
 
         return total_written_bytes
 
+
+    def read_one_tile(self, x, y):
+        """
+        Reads one tile from the TIFF image
+
+        Parameters
+        ----------
+        x: int
+            X coordinate of a pixel inside the desired tile
+        y: int
+            Y coordinate of a pixel inside the desired tile
+
+        Returns
+        -------
+        numpy.array
+            If there's only one sample per pixel, it returns a numpy array with 2 dimensions (x, y)
+            if the image has more than one sample per pixel (SamplesPerPixel > 1),
+            it will return a numpy array with 3 dimensions. If PlanarConfig == PLANARCONFIG_CONTIG,
+            the returned dimensions will be (x, y, sample_index). 
+            If PlanarConfig == PLANARCONFIG_SEPARATE, 
+            the returned dimensions will be (sample_index, x, y).
+        """
+
+        num_tcols = self.GetField("TileWidth")
+        if num_tcols is None:
+            raise ValueError("TIFFTAG_TILEWIDTH must be set to read tiles")
+        num_trows = self.GetField("TileLength")
+        if num_trows is None:
+            num_trows = 1
+        num_irows = self.GetField("ImageLength")
+        if num_irows is None:
+            num_irows = 1
+        num_icols = self.GetField("ImageWidth")
+        if num_icols is None:
+            raise ValueError("TIFFTAG_IMAGEWIDTH must be set to read tiles")
+        # this number includes extra samples
+        samples_pp = self.GetField('SamplesPerPixel')
+        if samples_pp is None:  # default is 1
+            samples_pp = 1
+        planar_config = self.GetField('PlanarConfig')
+        if planar_config is None:  # default is contig
+            planar_config = PLANARCONFIG_CONTIG
+        num_idepth = self.GetField("ImageDepth")
+        if num_idepth is None:
+            num_idepth = 1
+        bits = self.GetField('BitsPerSample')
+        sample_format = self.GetField('SampleFormat')
+
+        # TODO: might need special support if bits < 8
+        dtype = self.get_numpy_type(bits, sample_format)
+
+        if y < 0 or y >= num_irows:
+            raise ValueError("Invalid y value")
+        if x < 0 or x >= num_icols:
+            raise ValueError("Invalid x value")
+
+        # make x and y be a multiple of TileWidth and TileLength,
+        # and be compatible with ReadTile
+        x -= x % num_tcols
+        y -= y % num_trows
+
+        # if the tile is in the border, its size should be smaller
+        this_tile_height = min(num_trows, num_irows - y)
+        this_tile_width = min(num_tcols, num_icols - x)
+
+        def read_plane(tile_plane, plane_index=0, depth_index=0):
+            """ Read one plane from TIFF. The TIFF has more than one plane only if
+            it has more than one sample per pixel, and planar_config == PLANARCONFIG_SEPARATE
+            """
+            # the numpy array should be contigous in memory before calling ReadTile
+            tile_plane = np.ascontiguousarray(tile_plane)
+            # even if the tile is on the edge, and the final size will be smaller,
+            # the size of the array passed to the ReadTile function
+            # must be (num_tcols, num_trows)
+            #
+            # The image has only one depth (ImageDepth == 1), so
+            # the z parameter is not read
+            r = self.ReadTile(tile_plane.ctypes.data, x, y, depth_index, plane_index)
+            if not r:
+                raise ValueError(
+                    "Could not read tile x:%d,y:%d,z:%d,sample:%d from file" %
+                    (x, y, depth_index, plane_index))
+
+            # check if the tile is on the edge of the image
+            if this_tile_height < num_trows or this_tile_width < num_tcols:
+                # if the tile is on the edge of the image, generate a smaller tile
+                tile_plane = tile_plane[:this_tile_height, :this_tile_width]
+
+            return tile_plane
+
+        if num_idepth == 1:
+            if samples_pp == 1:
+                # the tile plane has always the size of a full tile
+                tile_plane = np.zeros((num_trows, num_tcols), dtype=dtype)
+                # this tile may be smaller than tile_plane
+                tile = read_plane(tile_plane)
+            else:
+                if planar_config == PLANARCONFIG_CONTIG:
+                    # the tile plane has always the size of a full tile
+                    tile_plane = np.empty((num_trows, num_tcols, samples_pp), dtype=dtype)
+                    # this tile may be smaller than tile_plane,
+                    # if the tile is on the edge of the image
+                    tile = read_plane(tile_plane)
+                else:
+                    # the tile plane has always the size of a full tile
+                    tile_plane = np.empty((samples_pp, num_trows, num_tcols), dtype=dtype)
+                    # this tile may be smaller than tile_plane,
+                    # if the tile is on the edge of the image
+                    tile = np.empty((samples_pp, this_tile_height, this_tile_width), dtype=dtype)
+                    for plane_index in xrange(samples_pp):
+                        tile[plane_index] = read_plane(tile_plane[plane_index], plane_index)
+
+        else:
+            if samples_pp > 1:
+                raise NotImplementedError("ImageDepth > 1 and SamplesPerPixel > 1 not implemented")
+
+            # the tile plane has always the size of a full tile
+            tile_plane = np.zeros((num_idepth, num_trows, num_tcols), dtype=dtype)
+            # this tile may be smaller than tile_plane,
+            # if the tile is on the edge of the image
+            tile = np.empty((num_idepth, this_tile_height, this_tile_width), dtype=dtype)
+            for depth_index in xrange(num_idepth):
+                # As samples_pp == 1, there's only one plane, so the z parameter is not read
+                tile[depth_index] = read_plane(tile_plane[depth_index], 0, depth_index)
+
+        return tile
+
     def read_tiles(self, dtype=np.uint8):
         num_tcols = self.GetField("TileWidth")
         if num_tcols is None:
@@ -1946,6 +2073,68 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
 
     print("Tile Read: SUCCESS")
 
+def _test_read_one_tile():
+    filename = "/tmp/libtiff_test_tile_write.tiff"
+    tiff = TIFF.open(filename, "r")
+
+    # the first image is 1 pixel high
+    tile = tiff.read_one_tile(0, 0)
+    assert tile.shape == (1, 512), repr(tile.shape)
+
+    # second image, 3000 x 2500
+    tiff.SetDirectory(1)
+    tile = tiff.read_one_tile(0, 0)
+    assert tile.shape == (528, 512), repr(tile.shape)
+
+    tile = tiff.read_one_tile(512, 528)
+    assert tile.shape == (528, 512), repr(tile.shape)
+
+    # test tile on the right border
+    tile = tiff.read_one_tile(2560, 528)
+    assert tile.shape == (528, 440), repr(tile.shape)
+
+    # test tile on the bottom border
+    tile = tiff.read_one_tile(512, 2112)
+    assert tile.shape == (388, 512), repr(tile.shape)
+
+    # test tile on the right and bottom borders
+    tile = tiff.read_one_tile(2560, 2112)
+    assert tile.shape == (388, 440), repr(tile.shape)
+
+    # test x and y values not multiples of the tile width and height
+    tile = tiff.read_one_tile(530, 600)
+    assert tile[0][0] == 12, tile[0][0]
+
+    # test negative x
+    try:
+        tiff.read_one_tile(-5, 0)
+        raise AssertionError("An exception must be raised with invalid (x, y) values")
+    except ValueError as inst:
+        assert inst.message == "Invalid x value", repr(inst.message)
+
+    # test y greater than the image height
+    try:
+        tiff.read_one_tile(0, 5000)
+        raise AssertionError("An exception must be raised with invalid (x, y) values")
+    except ValueError as inst:
+        assert inst.message == "Invalid y value", repr(inst.message)
+
+    # RGB image sized 3000 x 2500, PLANARCONFIG_SEPARATE
+    tiff.SetDirectory(3)
+    tile = tiff.read_one_tile(0, 0)
+    assert tile.shape == (3, 528, 512), repr(tile.shape)
+    # get the tile on the lower bottom corner
+    tile = tiff.read_one_tile(2999, 2499)
+    assert tile.shape == (3, 388, 440), repr(tile.shape)
+
+    # Grayscale image sized 3000 x 2500, 3 depths
+    tiff.SetDirectory(4)
+    tile = tiff.read_one_tile(0, 0)
+    assert tile.shape == (3, 528, 512), repr(tile.shape)
+    # get the tile on the lower bottom corner
+    tile = tiff.read_one_tile(2999, 2499)
+    assert tile.shape == (3, 388, 440), repr(tile.shape)
+
 
 def _test_tiled_image_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     """
@@ -2156,6 +2345,7 @@ if __name__ == '__main__':
     _test_custom_tags()
     _test_tile_write()
     _test_tile_read()
+    _test_read_one_tile()
     _test_tiled_image_read()
     _test_tags_write()
     _test_tags_read()
