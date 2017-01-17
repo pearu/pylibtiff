@@ -514,52 +514,57 @@ class TIFF(ctypes.c_void_p):
 
     @debug
     def read_image(self, verbose=False):
-        """ Read image from TIFF and return it as an array.
-        """
-        width = self.GetField('ImageWidth')
-        height = self.GetField('ImageLength')
-        samples_pp = self.GetField(
-            'SamplesPerPixel')  # this number includes extra samples
-        if samples_pp is None:  # default is 1
-            samples_pp = 1
-        # Note: In the TIFF specification, BitsPerSample and SampleFormat are
-        # per samples. However, libtiff doesn't support mixed format,
-        # so it will always return just one value (or raise an error).
-        bits = self.GetField('BitsPerSample')
-        sample_format = self.GetField('SampleFormat')
-        planar_config = self.GetField('PlanarConfig')
-        if planar_config is None:  # default is contig
-            planar_config = PLANARCONFIG_CONTIG
-        compression = self.GetField('Compression')
-        if compression is None:  # default is no compression
-            compression = COMPRESSION_NONE
-        # TODO: rotate according to orientation
-
-        # TODO: might need special support if bits < 8
-        typ = self.get_numpy_type(bits, sample_format)
-
-        if samples_pp == 1:
-            # only 2 dimensions array
-            arr = np.empty((height, width), typ)
+        """ Read image from TIFF and return it as an array. """
+        if self.IsTiled():
+            bits = self.GetField('BitsPerSample')
+            sample_format = self.GetField('SampleFormat')
+            typ = self.get_numpy_type(bits, sample_format)
+            return self.read_tiles(typ)
         else:
-            if planar_config == PLANARCONFIG_CONTIG:
-                arr = np.empty((height, width, samples_pp), typ)
-            elif planar_config == PLANARCONFIG_SEPARATE:
-                arr = np.empty((samples_pp, height, width), typ)
+            width = self.GetField('ImageWidth')
+            height = self.GetField('ImageLength')
+            samples_pp = self.GetField(
+                'SamplesPerPixel')  # this number includes extra samples
+            if samples_pp is None:  # default is 1
+                samples_pp = 1
+            # Note: In the TIFF specification, BitsPerSample and SampleFormat are
+            # per samples. However, libtiff doesn't support mixed format,
+            # so it will always return just one value (or raise an error).
+            bits = self.GetField('BitsPerSample')
+            sample_format = self.GetField('SampleFormat')
+            planar_config = self.GetField('PlanarConfig')
+            if planar_config is None:  # default is contig
+                planar_config = PLANARCONFIG_CONTIG
+            compression = self.GetField('Compression')
+            if compression is None:  # default is no compression
+                compression = COMPRESSION_NONE
+            # TODO: rotate according to orientation
+
+            # TODO: might need special support if bits < 8
+            typ = self.get_numpy_type(bits, sample_format)
+
+            if samples_pp == 1:
+                # only 2 dimensions array
+                arr = np.empty((height, width), typ)
             else:
-                raise IOError("Unexpected PlanarConfig = %d" % planar_config)
-        size = arr.nbytes
+                if planar_config == PLANARCONFIG_CONTIG:
+                    arr = np.empty((height, width, samples_pp), typ)
+                elif planar_config == PLANARCONFIG_SEPARATE:
+                    arr = np.empty((samples_pp, height, width), typ)
+                else:
+                    raise IOError("Unexpected PlanarConfig = %d" % planar_config)
+            size = arr.nbytes
 
-        if compression == COMPRESSION_NONE:
-            ReadStrip = self.ReadRawStrip
-        else:
-            ReadStrip = self.ReadEncodedStrip
+            if compression == COMPRESSION_NONE:
+                ReadStrip = self.ReadRawStrip
+            else:
+                ReadStrip = self.ReadEncodedStrip
 
-        pos = 0
-        for strip in range(self.NumberOfStrips()):
-            elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
-            pos += elem
-        return arr
+            pos = 0
+            for strip in range(self.NumberOfStrips()):
+                elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
+                pos += elem
+            return arr
 
     @staticmethod
     def _fix_compression(_value):
@@ -1942,6 +1947,46 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     print("Tile Read: SUCCESS")
 
 
+def _test_tiled_image_read(filename="/tmp/libtiff_test_tile_write.tiff"):
+    """
+    Tests opening a tiled image
+    """
+
+    def assert_image_tag(tiff, tag_name, expected_value):
+        value = tiff.GetField(tag_name)
+        assert value == expected_value, \
+            '%s expected to be %d, but it\'s %d' % (tag_name, expected_value, value)
+
+    # _test_tile_write is called here just to make sure that the image is saved,
+    # even if the order of the tests changed
+    _test_tile_write()
+    tiff = TIFF.open(filename, "r")
+
+    # sets the current image to the second image
+    tiff.SetDirectory(1)
+    # test tag values
+    assert_image_tag(tiff, 'ImageWidth', 3000)
+    assert_image_tag(tiff, 'ImageLength', 2500)
+    assert_image_tag(tiff, 'TileWidth', 512)
+    assert_image_tag(tiff, 'TileLength', 528)
+    assert_image_tag(tiff, 'BitsPerSample', 8)
+    assert_image_tag(tiff, 'Compression', COMPRESSION_NONE)
+
+    # read the image to a NumPy array
+    arr = tiff.read_image()
+    # test image NumPy array dimensions
+    assert arr.shape[0] == 2500, \
+        'Image width expected to be 2500, but it\'s %d' % (arr.shape[0])
+    assert arr.shape[1] == 3000, \
+        'Image height expected to be 3000, but it\'s %d' % (arr.shape[1])
+
+    # generates the same array that was generated for the image
+    data_array = np.array(list(range(500)) * 6).astype(np.uint8)
+    # tests if the array from the read image is the same of the original image
+    assert (data_array == arr).all(), \
+        'The read tiled image is different from the generated image'
+
+
 def _test_tags_write():
     tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
     tmp = tiff.SetField("Artist", "A Name")
@@ -2111,6 +2156,7 @@ if __name__ == '__main__':
     _test_custom_tags()
     _test_tile_write()
     _test_tile_read()
+    _test_tiled_image_read()
     _test_tags_write()
     _test_tags_read()
     _test_write_float()
