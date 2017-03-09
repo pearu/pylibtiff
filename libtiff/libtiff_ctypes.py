@@ -1017,9 +1017,7 @@ class TIFF(ctypes.c_void_p):
             bdata_ptr = ctypes.byref(bdata)
 
             # ignore count, it's not used for colormap
-            libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[
-                                            :2] + [ctypes.c_void_p] * 3
-            r = libtiff.TIFFGetField(self, tag, rdata_ptr, gdata_ptr,
+            r = libtiff.TIFFGetField(self, c_ttag_t(tag), rdata_ptr, gdata_ptr,
                                      bdata_ptr)
             data = (rdata, gdata, bdata)
         elif isinstance(data_type, tuple):
@@ -1028,9 +1026,7 @@ class TIFF(ctypes.c_void_p):
             count = count_type()
             pdt = ctypes.POINTER(data_type)
             vldata = pdt()
-            libtiff.TIFFGetField.argtypes = (libtiff.TIFFGetField.argtypes[:2] +
-                                             [ctypes.c_void_p] * 2)
-            r = libtiff.TIFFGetField(self, tag, ctypes.byref(count),
+            r = libtiff.TIFFGetField(self, c_ttag_t(tag), ctypes.byref(count),
                                      ctypes.byref(vldata))
             data = (count.value, vldata)
         else:
@@ -1041,15 +1037,10 @@ class TIFF(ctypes.c_void_p):
                 data = data_type()
 
             if count is None:
-                libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[
-                                                :2] + [ctypes.c_void_p]
-                r = libtiff.TIFFGetField(self, tag, ctypes.byref(data))
+                r = libtiff.TIFFGetField(self, c_ttag_t(tag), ctypes.byref(data))
             else:
                 # TODO: is this ever used? Is there any tag that is accessed like that?
-                libtiff.TIFFGetField.argtypes = libtiff.TIFFGetField.argtypes[
-                                                :2] + [ctypes.c_uint,
-                                                       ctypes.c_void_p]
-                r = libtiff.TIFFGetField(self, tag, count, ctypes.byref(data))
+                r = libtiff.TIFFGetField(self, c_ttag_t(tag), count, ctypes.byref(data))
         if not r:  # tag not defined for current directory
             if not ignore_undefined_tag:
                 print(
@@ -1101,9 +1092,7 @@ class TIFF(ctypes.c_void_p):
             r_ptr = data_type(*r_arr)
             g_ptr = data_type(*g_arr)
             b_ptr = data_type(*b_arr)
-            libtiff.TIFFSetField.argtypes = \
-                libtiff.TIFFSetField.argtypes[:2] + [ctypes.POINTER(data_type)] * 3
-            r = libtiff.TIFFSetField(self, tag, r_ptr, g_ptr, b_ptr)
+            r = libtiff.TIFFSetField(self, c_ttag_t(tag), r_ptr, g_ptr, b_ptr)
         else:
             count_type = None
             if isinstance(data_type, tuple):
@@ -1126,13 +1115,9 @@ class TIFF(ctypes.c_void_p):
                 data = data_type(_value)
 
             if count_type is None:
-                libtiff.TIFFSetField.argtypes = \
-                    libtiff.TIFFSetField.argtypes[:2] + [data_type]
-                r = libtiff.TIFFSetField(self, tag, data)
+                r = libtiff.TIFFSetField(self, c_ttag_t(tag), data)
             else:
-                libtiff.TIFFSetField.argtypes = \
-                    libtiff.TIFFSetField.argtypes[:2] + [count_type, data_type]
-                r = libtiff.TIFFSetField(self, tag, count, data)
+                r = libtiff.TIFFSetField(self, c_ttag_t(tag), count, data)
         return r
 
     def info(self):
@@ -1445,13 +1430,10 @@ libtiff.TIFFIsUpSampled.argtypes = [TIFF]
 libtiff.TIFFIsMSB2LSB.restype = ctypes.c_int
 libtiff.TIFFIsMSB2LSB.argtypes = [TIFF]
 
+# GetField and SetField arguments are dependent on the tag
 libtiff.TIFFGetField.restype = ctypes.c_int
-libtiff.TIFFGetField.argtypes = [TIFF, c_ttag_t, ctypes.c_void_p]
 
 libtiff.TIFFSetField.restype = ctypes.c_int
-libtiff.TIFFSetField.argtypes = [TIFF, c_ttag_t,
-                                 ctypes.c_void_p]  # last item is reset in
-#                                                    TIFF.SetField method
 
 libtiff.TIFFNumberOfStrips.restype = c_tstrip_t
 libtiff.TIFFNumberOfStrips.argtypes = [TIFF]
