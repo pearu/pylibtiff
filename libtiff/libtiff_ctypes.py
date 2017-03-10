@@ -1006,6 +1006,13 @@ class TIFF(ctypes.c_void_p):
                     "Warning: BitsPerSample is required to get ColorMap, "
                     "assuming 8 bps...")
                 bps = 8
+            elif bps > 16:
+                # There is no way to check whether a field is present without
+                # passing all the arguments. With more than 16 bits, it'd be a
+                # lot of memory needed (and COLORMAP is very unlikely).
+                print("Not trying to read COLORMAP tag with %d bits" % (bps,))
+                return None
+
             num_cmap_elems = 1 << bps
             data_type *= num_cmap_elems
             pdt = ctypes.POINTER(data_type)
