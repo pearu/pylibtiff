@@ -485,7 +485,19 @@ class TIFF(ctypes.c_void_p):
     def open(cls, filename, mode='r'):
         """ Open tiff file as TIFF.
         """
-        tiff = libtiff.TIFFOpen(filename.encode('ascii'), mode.encode('ascii'))
+        try:
+            try:
+                # Python3: it needs bytes for the arguments of type "c_char_p"
+                filename = os.fsencode(filename)  # no-op if already bytes
+            except AttributeError:
+                # Python2: it needs str for the arguments of type "c_char_p"
+                if isinstance(filename, unicode):
+                    filename = filename.encode(sys.getfilesystemencoding())
+        except Exception as ex:
+            # It's probably going to not work, but let it try
+            print('Warning: filename argument is of wrong type or encoding: %s' % ex)
+
+        tiff = libtiff.TIFFOpen(filename, mode.encode('ascii'))
         if tiff.value is None:
             raise TypeError('Failed to open file ' + repr(filename))
         return tiff
