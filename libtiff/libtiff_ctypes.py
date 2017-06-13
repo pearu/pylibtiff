@@ -58,15 +58,16 @@ assert i != -1, repr(libtiff_version_str.decode())
 libtiff_version = libtiff_version_str.split()[i + 1].decode()
 
 tiff_h_name = 'tiff_h_%s' % (libtiff_version.replace('.', '_'))
-
 try:
     exec(u"import libtiff.{0:s} as tiff_h".format(tiff_h_name))
-    # the following for inspections
-    from libtiff.tiff_h_4_0_6 import *
 except ImportError:
     tiff_h = None
 
 if tiff_h is None:
+    # WARNING: there is not guarantee that the tiff.h found below will
+    # correspond to libtiff version. Although, for clean distros the
+    # probability is high.
+    
     include_tiff_h = os.path.join(os.path.split(lib)[0], '..', 'include',
                                   'tiff.h')
     if not os.path.isfile(include_tiff_h):
@@ -74,19 +75,17 @@ if tiff_h is None:
                                       'tiff.h')
     if not os.path.isfile(include_tiff_h):
         # fix me for windows:
-        include_tiff_h = os.path.join('/usr', 'include', 'tiff.h')
+        include_tiff_h = os.path.join(sys.prefix, 'include', 'tiff.h')
         # print(include_tiff_h)
     if not os.path.isfile(include_tiff_h):
         import glob
-
-        include_tiff_h = (glob.glob(os.path.join('/usr', 'include',
+        include_tiff_h = (glob.glob(os.path.join(sys.prefix, 'include',
                                                  '*linux-gnu', 'tiff.h')) +
                           [include_tiff_h])[0]
     if not os.path.isfile(include_tiff_h):
         # Base it off of the python called
         include_tiff_h = os.path.realpath(os.path.join(os.path.split(
             sys.executable)[0], '..', 'include', 'tiff.h'))
-    # print(include_tiff_h)
     if not os.path.isfile(include_tiff_h):
         raise ValueError('Failed to find TIFF header file (may be need to '
                          'run: sudo apt-get install libtiff4-dev)')
@@ -121,7 +120,7 @@ if tiff_h is None:
 
     fn = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       tiff_h_name + '.py')
-    print('Generating %r' % fn)
+    print('Generating %r from %r' % (fn,include_tiff_h))
     f = open(fn, 'w')
     f.write('\n'.join(l) + '\n')
     f.close()
