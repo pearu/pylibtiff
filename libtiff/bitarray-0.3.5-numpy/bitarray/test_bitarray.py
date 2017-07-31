@@ -16,7 +16,7 @@ if __name__ == '__main__':
     from __init__ import bitarray, bits2bytes
     repr_type = "<class '__init__.bitarray'>"
 else:
-    from bitarray import bitarray, bits2bytes
+    from libtiff.bitarray import bitarray, bits2bytes
     repr_type = "<class 'bitarray.bitarray'>"
 
 
