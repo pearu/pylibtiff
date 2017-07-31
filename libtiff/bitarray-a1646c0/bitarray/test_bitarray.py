@@ -5,7 +5,6 @@ Author: Ilan Schnell
 """
 import os
 import sys
-import unittest
 import tempfile
 import shutil
 from random import randint
@@ -14,9 +13,10 @@ is_py3k = bool(sys.version_info[0] == 3)
 
 if is_py3k:
     from io import StringIO
+    import unittest as ut
 else:
     from io import StringIO
-
+    import unittest2 as ut
 
 from libtiff.bitarray import bitarray, bitdiff, bits2bytes, __version__
 
@@ -24,11 +24,8 @@ from libtiff.bitarray import bitarray, bitdiff, bits2bytes, __version__
 tests = []
 
 if sys.version_info[:2] < (2, 6):
-    is_py_pre_26 = True
     def next(x):
         return x.__next__()
-else:
-    is_py_pre_26 = False
 
 def to_bytes(s):
     if is_py3k:
@@ -39,7 +36,7 @@ def to_bytes(s):
         return s
 
 
-class Util(unittest.TestCase):
+class Util(ut.TestCase):
 
     def randombitarrays(self):
         for n in list(range(25)) + [randint(1000, 2000)]:
@@ -76,11 +73,8 @@ class Util(unittest.TestCase):
     def assertStopIteration(self, it):
         if is_py3k:
             return
-        if is_py_pre_26:
-            self.assertRaises(StopIteration, next(it))
-        else:
-            with self.assertRaises(StopIteration):
-               next(it)
+        with self.assertRaises(StopIteration):
+           next(it)
 
 
 def getIndicesEx(r, length):
@@ -363,7 +357,7 @@ tests.append(ToObjectsTests)
 
 # ---------------------------------------------------------------------------
 
-class MetaDataTests(unittest.TestCase):
+class MetaDataTests(ut.TestCase):
 
     def test_buffer_info1(self):
         a = bitarray('0000111100001', endian='little')
@@ -2020,11 +2014,8 @@ class PrefixCodeTests(Util):
         a = bitarray('1')
         it = a.iterdecode(d)
         if not is_py3k:
-            if is_py_pre_26:
-                self.assertRaises(ValueError, next(it))
-            else:
-                with self.assertRaises(ValueError):
-                    next(it)
+            with self.assertRaises(ValueError):
+                next(it)
         self.assertEqual(a, bitarray('1'))
         self.assertEqual(d, {'a': bitarray('0')})
 
@@ -2039,11 +2030,8 @@ class PrefixCodeTests(Util):
         a = bitarray('1')
         it = a.iterdecode(d)
         if not is_py3k:
-            if is_py_pre_26:
-                self.assrtRaises(ValueError, next(it))
-            else:
-                with self.assertRaises(ValueError):
-                    next(it)
+            with self.assertRaises(ValueError):
+                next(it)
         self.assertEqual(a, bitarray('1'))
 
     def test_decode_ambiguous_code(self):
@@ -2121,7 +2109,7 @@ tests.append(PrefixCodeTests)
 
 # -------------- Buffer Interface (Python 2.7 only for now) ----------------
 
-class BufferInterfaceTests(unittest.TestCase):
+class BufferInterfaceTests(ut.TestCase):
 
     def test_read1(self):
         a = bitarray('01000001' '01000010' '01000011', endian='big')
@@ -2162,12 +2150,12 @@ def run(verbosity=1, repeat=1):
     print(('bitarray version: %s' % __version__))
     print(('Python version: %s' % sys.version))
 
-    suite = unittest.TestSuite()
+    suite = ut.TestSuite()
     for cls in tests:
         for _ in range(repeat):
-            suite.addTest(unittest.makeSuite(cls))
+            suite.addTest(ut.makeSuite(cls))
 
-    runner = unittest.TextTestRunner(verbosity=verbosity)
+    runner = ut.TextTestRunner(verbosity=verbosity)
     return runner.run(suite)
 
 
