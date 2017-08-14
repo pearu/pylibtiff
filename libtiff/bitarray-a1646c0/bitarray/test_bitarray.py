@@ -8,18 +8,16 @@ import sys
 import tempfile
 import shutil
 from random import randint
+from io import StringIO
 
 is_py3k = bool(sys.version_info[0] == 3)
 
-if is_py3k:
-    from io import StringIO
+if sys.version_info[:2] > (2, 6):
     import unittest as ut
 else:
-    from io import StringIO
     import unittest2 as ut
 
 from libtiff.bitarray import bitarray, bitdiff, bits2bytes, __version__
-
 
 tests = []
 
