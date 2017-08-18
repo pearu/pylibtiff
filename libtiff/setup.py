@@ -81,7 +81,7 @@ if %(d)r not in sys.path:
                 f = open(target, 'w')
                 f.write(new_text)
                 f.close()
-            print("*****{}".format(target_name))
+            print("*****{0}".format(target_name))
         config.add_scripts(generate_a_script)
         
 

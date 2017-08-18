@@ -5,28 +5,25 @@ Author: Ilan Schnell
 """
 import os
 import sys
-import unittest
 import tempfile
 import shutil
 from random import randint
+from io import StringIO
 
 is_py3k = bool(sys.version_info[0] == 3)
 
-if is_py3k:
-    from io import StringIO
+if sys.version_info[:2] > (2, 6):
+    import unittest as ut
 else:
-    from io import StringIO
+    import unittest2 as ut
 
-
-from bitarray import bitarray, bitdiff, bits2bytes, __version__
-
+from libtiff.bitarray import bitarray, bitdiff, bits2bytes, __version__
 
 tests = []
 
 if sys.version_info[:2] < (2, 6):
     def next(x):
         return x.__next__()
-
 
 def to_bytes(s):
     if is_py3k:
@@ -37,7 +34,7 @@ def to_bytes(s):
         return s
 
 
-class Util(object):
+class Util(ut.TestCase):
 
     def randombitarrays(self):
         for n in list(range(25)) + [randint(1000, 2000)]:
@@ -60,7 +57,7 @@ class Util(object):
         return getIndicesEx(r, length)[-1]
 
     def check_obj(self, a):
-        self.assertEqual(repr(type(a)), "<class 'bitarray.bitarray'>")
+        self.assertEqual(repr(type(a)), "<class 'libtiff.bitarray.bitarray'>")
         unused = 8 * a.buffer_info()[1] - len(a)
         self.assertTrue(0 <= unused < 8)
         self.assertEqual(unused, a.buffer_info()[3])
@@ -74,7 +71,8 @@ class Util(object):
     def assertStopIteration(self, it):
         if is_py3k:
             return
-        self.assertRaises(StopIteration, it.__next__)
+        with self.assertRaises(StopIteration):
+           next(it)
 
 
 def getIndicesEx(r, length):
@@ -124,7 +122,7 @@ def getIndicesEx(r, length):
 
 # ---------------------------------------------------------------------------
 
-class TestsModuleFunctions(unittest.TestCase, Util):
+class TestsModuleFunctions(Util):
 
     def test_bitdiff(self):
         a = bitarray('0011')
@@ -173,7 +171,7 @@ tests.append(TestsModuleFunctions)
 
 # ---------------------------------------------------------------------------
 
-class CreateObjectTests(unittest.TestCase, Util):
+class CreateObjectTests(Util):
 
     def test_noInitializer(self):
         a = bitarray()
@@ -328,7 +326,7 @@ tests.append(CreateObjectTests)
 
 # ---------------------------------------------------------------------------
 
-class ToObjectsTests(unittest.TestCase, Util):
+class ToObjectsTests(Util):
 
     def test_int(self):
         a = bitarray()
@@ -357,7 +355,7 @@ tests.append(ToObjectsTests)
 
 # ---------------------------------------------------------------------------
 
-class MetaDataTests(unittest.TestCase):
+class MetaDataTests(ut.TestCase):
 
     def test_buffer_info1(self):
         a = bitarray('0000111100001', endian='little')
@@ -412,7 +410,7 @@ tests.append(MetaDataTests)
 
 # ---------------------------------------------------------------------------
 
-class SliceTests(unittest.TestCase, Util):
+class SliceTests(Util):
 
     def test_getitem1(self):
         a = bitarray()
@@ -593,7 +591,7 @@ tests.append(SliceTests)
 
 # ---------------------------------------------------------------------------
 
-class MiscTests(unittest.TestCase, Util):
+class MiscTests(Util):
 
     def test_instancecheck(self):
         a = bitarray('011')
@@ -754,7 +752,7 @@ tests.append(MiscTests)
 
 # ---------------------------------------------------------------------------
 
-class SpecialMethodTests(unittest.TestCase, Util):
+class SpecialMethodTests(Util):
 
     def test_all(self):
         a = bitarray()
@@ -850,7 +848,7 @@ tests.append(SpecialMethodTests)
 
 # ---------------------------------------------------------------------------
 
-class NumberTests(unittest.TestCase, Util):
+class NumberTests(Util):
 
     def test_add(self):
         c = bitarray('001') + bitarray('110')
@@ -945,7 +943,7 @@ tests.append(NumberTests)
 
 # ---------------------------------------------------------------------------
 
-class BitwiseTests(unittest.TestCase, Util):
+class BitwiseTests(Util):
 
     def test_misc(self):
         for a in self.randombitarrays():
@@ -1032,7 +1030,7 @@ tests.append(BitwiseTests)
 
 # ---------------------------------------------------------------------------
 
-class SequenceTests(unittest.TestCase, Util):
+class SequenceTests(Util):
 
     def test_contains1(self):
         a = bitarray()
@@ -1093,7 +1091,7 @@ tests.append(SequenceTests)
 
 # ---------------------------------------------------------------------------
 
-class ExtendTests(unittest.TestCase, Util):
+class ExtendTests(Util):
 
     def test_wrongArgs(self):
         a = bitarray()
@@ -1216,7 +1214,7 @@ tests.append(ExtendTests)
 
 # ---------------------------------------------------------------------------
 
-class MethodTests(unittest.TestCase, Util):
+class MethodTests(Util):
 
     def test_append(self):
         a = bitarray()
@@ -1582,7 +1580,7 @@ tests.append(MethodTests)
 
 # ---------------------------------------------------------------------------
 
-class StringTests(unittest.TestCase, Util):
+class StringTests(Util):
 
     def randombytes(self):
         for n in range(1, 20):
@@ -1695,7 +1693,7 @@ tests.append(StringTests)
 
 # ---------------------------------------------------------------------------
 
-class FileTests(unittest.TestCase, Util):
+class FileTests(Util):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -1903,7 +1901,7 @@ tests.append(FileTests)
 
 # ---------------------------------------------------------------------------
 
-class PrefixCodeTests(unittest.TestCase, Util):
+class PrefixCodeTests(Util):
 
     def test_encode_errors(self):
         a = bitarray()
@@ -2014,7 +2012,8 @@ class PrefixCodeTests(unittest.TestCase, Util):
         a = bitarray('1')
         it = a.iterdecode(d)
         if not is_py3k:
-            self.assertRaises(ValueError, it.__next__)
+            with self.assertRaises(ValueError):
+                next(it)
         self.assertEqual(a, bitarray('1'))
         self.assertEqual(d, {'a': bitarray('0')})
 
@@ -2029,7 +2028,8 @@ class PrefixCodeTests(unittest.TestCase, Util):
         a = bitarray('1')
         it = a.iterdecode(d)
         if not is_py3k:
-            self.assertRaises(ValueError, it.__next__)
+            with self.assertRaises(ValueError):
+                next(it)
         self.assertEqual(a, bitarray('1'))
 
     def test_decode_ambiguous_code(self):
@@ -2107,7 +2107,7 @@ tests.append(PrefixCodeTests)
 
 # -------------- Buffer Interface (Python 2.7 only for now) ----------------
 
-class BufferInterfaceTests(unittest.TestCase):
+class BufferInterfaceTests(ut.TestCase):
 
     def test_read1(self):
         a = bitarray('01000001' '01000010' '01000011', endian='big')
@@ -2148,12 +2148,12 @@ def run(verbosity=1, repeat=1):
     print(('bitarray version: %s' % __version__))
     print(('Python version: %s' % sys.version))
 
-    suite = unittest.TestSuite()
+    suite = ut.TestSuite()
     for cls in tests:
         for _ in range(repeat):
-            suite.addTest(unittest.makeSuite(cls))
+            suite.addTest(ut.makeSuite(cls))
 
-    runner = unittest.TextTestRunner(verbosity=verbosity)
+    runner = ut.TextTestRunner(verbosity=verbosity)
     return runner.run(suite)
 
 
