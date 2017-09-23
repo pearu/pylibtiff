@@ -16,8 +16,8 @@ Operating System :: MacOS
 
 MAJOR = 0
 MINOR = 4
-MICRO = 1
-ISRELEASED = not True
+MICRO = 2
+ISRELEASED = False
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 if os.path.exists('MANIFEST'): 

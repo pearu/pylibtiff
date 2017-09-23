@@ -1,4 +1,3 @@
-
 =================================
 PyLibTiff - a Python tiff library
 =================================
@@ -9,7 +8,7 @@ PyLibTiff - a Python tiff library
 
 :Website:
 
-  http://pylibtiff.googlecode.com/
+  https://github.com/pearu/pylibtiff/
 
 :License:
 
@@ -29,8 +28,8 @@ The latest release can be downloaded from pylibtiff website.
 The latest development code is available via SVN. To check it out,
 run::
 
-  svn checkout http://pylibtiff.googlecode.com/svn/trunk/ pylibtiff-svn
-  cd pylibtiff-svn
+  svn checkout https://github.com/pearu/pylibtiff.git pylibtiff-svn
+  cd pylibtiff-svn/trunk
 
 Installation
 ============
@@ -75,7 +74,23 @@ Help and bug reports
 
 You can report bugs at the pylibtiff issue tracker:
 
-  http://code.google.com/p/pylibtiff/issues/list
-
+  https://github.com/pearu/pylibtiff/issues
+  
 Any comments and questions can be sent also to the authors.
+
+For developers
+==============
+
+To make a release [you must be pearu],
+
+  1. Make sure the version numbers are correct and ISRELEASED=True in
+     setup.py
+
+  2. Run
+       python setup.py sdist # to see that everything works
+       python setup.py upload
+
+  3. Reset ISRELEASED to False and increase version numbers in
+     setup.py, rerun setup.py (to update libtiff/version.py) and
+     commit changes to development repository.
 
