@@ -87,8 +87,8 @@ To make a release [you must be pearu],
      setup.py
 
   2. Run
-       python setup.py sdist # to see that everything works
-       python setup.py upload
+
+       python setup.py sdist upload -r pypi
 
   3. Reset ISRELEASED to False and increase version numbers in
      setup.py, rerun setup.py (to update libtiff/version.py) and
