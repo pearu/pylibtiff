@@ -581,16 +581,10 @@ class TIFF(ctypes.c_void_p):
                     raise IOError("Unexpected PlanarConfig = %d"
                                   % planar_config)
             size = arr.nbytes
-
-            if compression == COMPRESSION_NONE:
-                ReadStrip = self.ReadRawStrip
-            else:
-                ReadStrip = self.ReadEncodedStrip
-
+            data = arr.ctypes.data  # Saves a little bit of time in the loop
             pos = 0
             for strip in range(self.NumberOfStrips()):
-                elem = ReadStrip(strip, arr.ctypes.data + pos,
-                                 max(size - pos, 0))
+                elem = self.ReadEncodedStrip(strip, data + pos, max(size - pos, 0))
                 if elem <= 0:
                     raise IOError("Failed to read strip")
                 pos += elem
@@ -653,11 +647,6 @@ class TIFF(ctypes.c_void_p):
         shape = arr.shape
         bits = arr.itemsize * 8
 
-        if compression == COMPRESSION_NONE:
-            WriteStrip = self.WriteRawStrip
-        else:
-            WriteStrip = self.WriteEncodedStrip
-
         self.SetField(TIFFTAG_COMPRESSION, compression)
         if compression == COMPRESSION_LZW and sample_format in \
                 [SAMPLEFORMAT_INT, SAMPLEFORMAT_UINT]:
@@ -681,7 +670,7 @@ class TIFF(ctypes.c_void_p):
             self.SetField(TIFFTAG_IMAGELENGTH, height)
             self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
             self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
-            WriteStrip(0, arr.ctypes.data, size)
+            self.WriteEncodedStrip(0, arr.ctypes.data, size)
             self.WriteDirectory()
 
         elif len(shape) == 3:
@@ -709,10 +698,10 @@ class TIFF(ctypes.c_void_p):
                                   [EXTRASAMPLE_UNSPECIFIED] * (depth - 3))
 
                 if planar_config == PLANARCONFIG_CONTIG:
-                    WriteStrip(0, arr.ctypes.data, size)
+                    self.WriteEncodedStrip(0, arr.ctypes.data, size)
                 else:
                     for _n in range(depth):
-                        WriteStrip(_n, arr[_n, :, :].ctypes.data, size)
+                        self.WriteEncodedStrip(_n, arr[_n, :, :].ctypes.data, size)
                 self.WriteDirectory()
             else:
                 depth, height, width = shape
@@ -723,7 +712,7 @@ class TIFF(ctypes.c_void_p):
                     self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
                     self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
 
-                    WriteStrip(0, arr[_n].ctypes.data, size)
+                    self.WriteEncodedStrip(0, arr[_n].ctypes.data, size)
                     self.WriteDirectory()
         else:
             raise NotImplementedError(repr(shape))
@@ -1698,26 +1687,17 @@ class TIFF3D(TIFF):
         # total_size = layer_size * depth
         arr = np.zeros((depth, height, width), typ)
 
-        if compression == COMPRESSION_NONE:
-            ReadStrip = self.ReadRawStrip
-        else:
-            ReadStrip = self.ReadEncodedStrip
-
         layer = 0
         while True:
             pos = 0
             elem = None
+            datal = arr.ctypes.data + layer * layer_size
             for strip in range(self.NumberOfStrips()):
                 if elem is None:
-                    elem = ReadStrip(strip,
-                                     arr.ctypes.data + layer * layer_size +
-                                     pos,
-                                     layer_size)
+                    elem = self.ReadEncodedStrip(strip, datal + pos, layer_size)
                 elif elem:
-                    elem = ReadStrip(strip,
-                                     arr.ctypes.data + layer * layer_size +
-                                     pos,
-                                     min(layer_size - pos, elem))
+                    elem = self.ReadEncodedStrip(strip, datal + pos,
+                                                 min(layer_size - pos, elem))
                 pos += elem
             if self.LastDirectory():
                 break
