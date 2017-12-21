@@ -1,8 +1,8 @@
 
 # THIS FILE IS GENERATED FROM libtiff/setup.py
-short_version='0.4.1'
-version='0.4.1'
-release=True
+short_version='0.4.3'
+version='0.4.3'
+release=False
 
 if not release:
     version += '.dev'
