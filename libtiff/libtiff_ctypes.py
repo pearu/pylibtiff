@@ -571,6 +571,8 @@ class TIFF(ctypes.c_void_p):
             pos = 0
             for strip in range(self.NumberOfStrips()):
                 elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
+                if elem <= 0:
+                    raise IOError("Failed to read strip")
                 pos += elem
             return arr
 
@@ -2415,4 +2417,3 @@ if __name__ == '__main__':
     _test_write()
     _test_read()
     _test_copy()
-    
