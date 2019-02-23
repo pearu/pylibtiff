@@ -1,0 +1,9 @@
+name: pylibtiff
+channels:
+  - conda-forge
+dependencies:
+  - setuptools
+  - pip
+  - numpy
+  - pytest
+

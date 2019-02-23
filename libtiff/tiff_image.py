@@ -9,7 +9,7 @@ import os
 import sys
 import time
 import numpy
-import tif_lzw
+from . import tif_lzw
 
 from .utils import bytes2str
 from .tiff_data import tag_name2value, tag_value2type, tag_value2name, \

@@ -46,7 +46,7 @@
 
 #include <Python.h>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#define PY_ARRAY_UNIQUE_SYMBOL PyArray_API
+#define PY_ARRAY_UNIQUE_SYMBOL tif_lzw_PyArray_API
 #include "numpy/arrayobject.h"
 
 #ifndef PyMODINIT_FUNC  /* declarations for DLL import/export */
@@ -1320,8 +1320,12 @@ inittif_lzw(void)
   import_array();
   if (PyErr_Occurred())
     {
-      PyErr_SetString(PyExc_ImportError, "can't initialize module tif_lzw (failed to import numpy)"); 
+      PyErr_SetString(PyExc_ImportError, "can't initialize module tif_lzw (failed to import numpy)");
+#ifdef IS_PY3K
       return NULL;
+#else
+      return;
+#endif
     }
 #ifdef IS_PY3K
   m = PyModule_Create(&moduledef);

@@ -8,7 +8,17 @@ Please find a description of this package at:
 
 Author: Ilan Schnell
 """
-from bitarray._bitarray import _bitarray, bitdiff, bits2bytes, _sysinfo
+import sys
+
+try:
+    import pytest
+except ImportError:
+    pass
+else:
+    #pytest.importorskip('libtiff.bitarray')
+    pass
+
+from ._bitarray import _bitarray, bitdiff, bits2bytes, _sysinfo
 
 __version__ = '0.8.2'
 

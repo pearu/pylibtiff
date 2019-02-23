@@ -16,6 +16,7 @@ Module content
 """
 #Author: Pearu Peterson
 #Created: September 2009
+from __future__ import division, print_function
 
 __all__ = ['OptionParser', 'Option']
 
