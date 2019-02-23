@@ -6,7 +6,6 @@ from glob import glob
 from numpy.distutils import log
 from distutils.dep_util import newer
 
-
 def configuration(parent_package='',top_path=None):
     from numpy.distutils.misc_util import Configuration
     package_name = 'libtiff'
@@ -23,8 +22,6 @@ def configuration(parent_package='',top_path=None):
     config.add_extension('bittools', join('src','bittools.c'))
     config.add_extension('tif_lzw', join('src','tif_lzw.c'))
     # eof add.
-
-    config.make_svn_version_py()
 
     wininst = 'bdist_wininst' in sys.argv
 
@@ -83,10 +80,5 @@ if %(d)r not in sys.path:
                 f.close()
             print("*****{0}".format(target_name))
         config.add_scripts(generate_a_script)
-        
 
     return config
-
-if __name__ == '__main__':
-    from numpy.distutils.core import setup
-    setup (configuration=configuration)

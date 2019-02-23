@@ -24,8 +24,7 @@ install:
   - export PREFIX=$CONDA_PREFIX
 
 before_script:
-  - python setup.py install  # [py27]
-  - python setup.py develop  # [py>27]
+  - python setup.py develop
 
 script:
-  - pytest -v libtiff/
+  - pytest -v -r s libtiff/
