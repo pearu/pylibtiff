@@ -23,7 +23,7 @@ from .tiff_sample_plane import TiffSamplePlane
 from .tiff_array import TiffArray
 
 from . import lsm
-import tif_lzw
+from . import tif_lzw
 
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []

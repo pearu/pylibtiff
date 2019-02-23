@@ -5,7 +5,7 @@
 
 
 import numpy
-import tif_lzw
+from . import tif_lzw
 
 __all__ = ['TiffSamplePlane']
 

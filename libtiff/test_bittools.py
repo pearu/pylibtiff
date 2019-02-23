@@ -1,12 +1,13 @@
 
 import numpy
-import bittools
+from . import bittools
+
 
 def tobinary(arr):
     return ''.join([str(bittools.getbit (arr,i)) for i in range (arr.nbytes*8)])
 
-def test_setgetbit():
 
+def test_setgetbit():
     # bit-wise copy
     arr = numpy.array(list(range(256)), dtype=numpy.float64)
     arr2 = numpy.zeros(arr.shape, dtype=arr.dtype)
@@ -15,7 +16,6 @@ def test_setgetbit():
         bittools.setbit(arr2, i, b)
     assert (arr==arr2).all(),repr((arr,arr2))
 
-    print('ok')
 
 def test_setgetword():
     for dtype in [numpy.ubyte, numpy.int32, numpy.float64]:
@@ -25,7 +25,7 @@ def test_setgetword():
             word, next = bittools.getword (arr,i*8,8)
             bittools.setword (arr2,i*8,8,word)
         assert (arr==arr2).all(),repr((arr,arr2))
-    print('ok')
+
 
 def test_wordbits ():
     for width in range (1,64+1):

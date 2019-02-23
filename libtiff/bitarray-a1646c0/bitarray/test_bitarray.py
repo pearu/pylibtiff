@@ -57,7 +57,7 @@ class Util(ut.TestCase):
         return getIndicesEx(r, length)[-1]
 
     def check_obj(self, a):
-        self.assertEqual(repr(type(a)), "<class 'libtiff.bitarray.bitarray'>")
+        self.assertEqual(repr(type(a)), str(bitarray))
         unused = 8 * a.buffer_info()[1] - len(a)
         self.assertTrue(0 <= unused < 8)
         self.assertEqual(unused, a.buffer_info()[3])
@@ -2107,6 +2107,7 @@ tests.append(PrefixCodeTests)
 
 # -------------- Buffer Interface (Python 2.7 only for now) ----------------
 
+@ut.skipIf(sys.version_info[:1] == (3,), "support for Python 3 buffer interface not implemented")
 class BufferInterfaceTests(ut.TestCase):
 
     def test_read1(self):

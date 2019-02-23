@@ -2,6 +2,14 @@
 import numpy
 from tempfile import mktemp
 from libtiff import TIFFfile, TIFF
+
+try:
+    import pytest
+except ImportError:
+    pass
+else:
+    pytest.importorskip('libtiff.tif_lzw')  # when runnin inside source directory
+
 from libtiff.tif_lzw import encode as c_encode, decode as c_decode
 
 #def TIFFencode(arr):
