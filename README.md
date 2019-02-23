@@ -1,6 +1,8 @@
 
 [![Build Status](https://travis-ci.org/pearu/pylibtiff.svg?branch=master)](https://travis-ci.org/pearu/pylibtiff)
 
+[![Build status](https://ci.appveyor.com/api/projects/status/4u5dr1ccpabwrgd1?svg=true)](https://ci.appveyor.com/project/pearu/pylibtiff)
+[![Build status](https://ci.appveyor.com/api/projects/status/4u5dr1ccpabwrgd1/branch/master?svg=true)](https://ci.appveyor.com/project/pearu/pylibtiff/branch/master)
 
 PyLibTiff is a package that provides:
   * a wrapper to the [libtiff](http://www.remotesensing.org/libtiff/) library to [Python](http://www.python.org) using [ctypes](http://docs.python.org/library/ctypes.html).
