@@ -29,13 +29,13 @@ def test_setgetword():
 
 def test_wordbits ():
     for width in range (1,64+1):
-        arr = numpy.array([131,17,235], dtype=numpy.int64)
+        arr = numpy.array([17,131,235], dtype=numpy.int64)
         arr2 = numpy.zeros((1+width//8), dtype=arr.dtype)
         bstr = tobinary(arr)
         word, next = bittools.getword(arr, 0, width)
         if width > 7:
-            assert word==arr[0],repr((word, arr[0], bstr))
-        bittools.setword (arr2, 0, width, word)
+            assert word==arr[0],repr((width, word, arr[0], bstr))
+        bittools.setword(arr2, 0, width, word)
         assert bittools.getword (arr2, 0, width)[0]==word
         assert tobinary(arr2)[:width] == bstr[:width],repr((tobinary(arr2)[:width], bstr[:width]))
 
