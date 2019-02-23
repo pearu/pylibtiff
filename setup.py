@@ -235,7 +235,7 @@ def setup_package():
                           else [])
 
     metadata = dict(
-        name='libtiff',
+        name='pylibtiff',
         author='Pearu Peterson',
         author_email='pearu.peterson@gmail.com',
         license='https://github.com/pearu/pylibtiff/blob/master/LICENSE',
