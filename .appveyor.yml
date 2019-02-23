@@ -16,9 +16,6 @@ environment:
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
 
-before_build:
-  "\"C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\vcvarsall.bat\" %PLATFORM%"
-
 install:
   - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
   - conda config --set always_yes yes --set changeps1 no
