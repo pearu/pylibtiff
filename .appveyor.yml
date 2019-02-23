@@ -30,4 +30,5 @@ build: off
 
 
 test_script:
+  - activate pylibtiff-dev
   - pytest -sv libtiff
