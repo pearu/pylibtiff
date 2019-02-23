@@ -244,6 +244,7 @@ def setup_package():
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         description='PyLibTiff: a Python tiff library.',
         long_description='''\
+
 PyLibTiff? is a Python package that provides the following modules:
 
    libtiff - a wrapper of C libtiff library using ctypes.

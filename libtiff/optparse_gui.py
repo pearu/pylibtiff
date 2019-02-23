@@ -1,3 +1,4 @@
+from __future__ import print_function
 """A drop-in replacement for :pythonlib:`optparse` ("import iocbio.optparse_gui as optparse")
 
 Provides an identical interface to
