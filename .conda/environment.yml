@@ -1,0 +1,7 @@
+name: pylibtiff
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pytest
+
