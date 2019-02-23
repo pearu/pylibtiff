@@ -10,7 +10,6 @@ environment:
     - PLATFORM: "x64"
       VCBUILD: "vcbuild64.bat"
       RUNTEST: "runtest64.bat"
-      PYTHON: "C:\\Python36-x64"
       MINICONDA: C:\\Miniconda3
       PYTHON_VERSION: 3.7
 
@@ -26,8 +25,8 @@ install:
   - conda update -q conda
   - conda info -a
   - conda config --add channels conda-forge
-  - "conda create -q -n pylibtiff-dev python=%PYTHON_VERSION% numpy pytest pip"
-  - conda activate pylibtiff-dev
+  - "conda create -q -n pylibtiff-dev python=%PYTHON_VERSION% numpy pytest pip libtiff"
+  - activate pylibtiff-dev
   - pip install .
 
 test_script:
