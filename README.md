@@ -1,3 +1,7 @@
+
+[![Build Status](https://travis-ci.org/pearu/pylibtiff.svg?branch=master)](https://travis-ci.org/pearu/pylibtiff)
+
+
 PyLibTiff is a package that provides:
   * a wrapper to the [libtiff](http://www.remotesensing.org/libtiff/) library to [Python](http://www.python.org) using [ctypes](http://docs.python.org/library/ctypes.html).
   * a pure Python module for reading and writing TIFF and LSM files. The images are read as numpy.memmap objects so that it is possible to open images that otherwise would not fit to computers RAM. Both TIFF strips and tiles are supported for low-level data storage.
