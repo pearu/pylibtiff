@@ -24,9 +24,7 @@ install:
   - export PREFIX=$CONDA_PREFIX
 
 before_script:
-  - echo "CONDA_PREFIX=$CONDA_PREFIX"
   - python setup.py develop
 
 script:
-  - pytest --version
-  - pytest -v -r s .
+  - pytest -v -r s libtiff/
