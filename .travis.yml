@@ -1,10 +1,10 @@
 language: python
 python:
   - 2.7
-  - 3.7
+  - 3.6
 
 before_install:
-  - sudo apt-get install -y git
+  - sudo apt-get install -y git wget
 
 install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -24,7 +24,8 @@ install:
   - export PREFIX=$CONDA_PREFIX
 
 before_script:
-  - python setup.py develop
+  - python setup.py install [py==27]
+  - python setup.py develop [py>27]
 
 script:
   - pytest -v libtiff/
