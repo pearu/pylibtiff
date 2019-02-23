@@ -827,7 +827,7 @@ class TIFF(ctypes.c_void_p):
                 else:
                     # multiple samples per pixel, each sample in one plane
                     tile_arr = np.zeros((tile_height, tile_width), dtype=arr.dtype)
-                    for plane_index in xrange(depth):
+                    for plane_index in range(depth):
                         total_written_bytes += \
                             write_plane(arr[plane_index], tile_arr, width, height, plane_index)
 
@@ -959,7 +959,7 @@ class TIFF(ctypes.c_void_p):
                     # this tile may be smaller than tile_plane,
                     # if the tile is on the edge of the image
                     tile = np.empty((samples_pp, this_tile_height, this_tile_width), dtype=dtype)
-                    for plane_index in xrange(samples_pp):
+                    for plane_index in range(samples_pp):
                         tile[plane_index] = read_plane(tile_plane[plane_index], plane_index)
 
         else:
@@ -971,7 +971,7 @@ class TIFF(ctypes.c_void_p):
             # this tile may be smaller than tile_plane,
             # if the tile is on the edge of the image
             tile = np.empty((num_idepth, this_tile_height, this_tile_width), dtype=dtype)
-            for depth_index in xrange(num_idepth):
+            for depth_index in range(num_idepth):
                 # As samples_pp == 1, there's only one plane, so the z parameter is not read
                 tile[depth_index] = read_plane(tile_plane[depth_index], 0, depth_index)
 
@@ -1002,8 +1002,8 @@ class TIFF(ctypes.c_void_p):
             planar_config = PLANARCONFIG_CONTIG
 
         def read_plane(plane, tmp_tile, plane_index=0, depth_index=0):
-            for y in xrange(0, num_irows, num_trows):
-                for x in xrange(0, num_icols, num_tcols):
+            for y in range(0, num_irows, num_trows):
+                for x in range(0, num_icols, num_tcols):
                     r = self.ReadTile(tmp_tile.ctypes.data, x, y, depth_index, plane_index)
                     if not r:
                         raise ValueError(
@@ -1026,7 +1026,7 @@ class TIFF(ctypes.c_void_p):
             else:
                 full_image = np.empty((num_depths, num_irows, num_icols), dtype=dtype, order='C')
                 tmp_tile = np.empty((num_trows, num_tcols), dtype=dtype, order='C')
-                for depth_index in xrange(num_depths):
+                for depth_index in range(num_depths):
                     read_plane(full_image[depth_index], tmp_tile, 0, depth_index)
         else:
             if planar_config == PLANARCONFIG_CONTIG:
@@ -1039,7 +1039,7 @@ class TIFF(ctypes.c_void_p):
                 # multiple samples per pixel, each sample in one plane
                 full_image = np.empty((samples_pp, num_irows, num_icols), dtype=dtype, order='C')
                 tmp_tile = np.empty((num_trows, num_tcols), dtype=dtype, order='C')
-                for plane_index in xrange(samples_pp):
+                for plane_index in range(samples_pp):
                     read_plane(full_image[plane_index], tmp_tile, plane_index)
             else:
                 raise IOError("Unexpected PlanarConfig = %d" % planar_config)
