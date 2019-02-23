@@ -45,4 +45,5 @@ def test_simple_slicing():
                         for i2 in _indices:
                             sl = (_i0, i1, i2)
                             assert (arr[sl] == image[sl]).all(),repr(sl)
+                tif.close()
                 atexit.register(os.remove, fn)

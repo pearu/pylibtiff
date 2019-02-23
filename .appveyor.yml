@@ -1,3 +1,5 @@
+version: 0.4.4.dev0
+
 skip_tags: true
 
 matrix:
@@ -30,4 +32,4 @@ build: off
 
 test_script:
   - activate pylibtiff-dev
-  - pytest -sv libtiff
+  - pytest -sv -r s libtiff

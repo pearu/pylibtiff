@@ -20,7 +20,7 @@ def test_rw_rgb():
 
     tif = TIFFfile(fn)
     data, names = tif.get_samples()
-    #os.remove(fn)
+    tif.close()
     atexit.register(os.remove, fn)
     print(image)
     print(data)
@@ -45,7 +45,7 @@ def test_write_read():
             
             tif = TIFFfile(fn)
             data, names = tif.get_samples()
-            #os.remove(fn)
+            tif.close()
             atexit.register(os.remove, fn)
             assert names==['sample0'],repr(names)
             assert len(data)==1, repr(len(data))
@@ -71,7 +71,6 @@ def test_write_lzw():
         tif = TIFF.open(fn,'r')
         image2 = tif.read_image()
         tif.close()
-        #os.remove(fn)
         atexit.register(os.remove, fn)
         for i in range(image.size):
             if image.flat[i] != image2.flat[i]:

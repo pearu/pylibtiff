@@ -31,6 +31,5 @@ def test_write_read():
             assert len(data)==1, repr(len(data))
             assert image.dtype==data[0].dtype, repr((image.dtype, data[0].dtype))
             assert (image==data[0]).all()
-            
-            #os.remove(fn)
+            tif.close()
             atexit.register(os.remove, fn)
