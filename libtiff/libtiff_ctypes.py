@@ -10,44 +10,51 @@ from __future__ import print_function
 import os
 import sys
 import numpy as np
-# from numpy import ctypeslib
 import ctypes
 import ctypes.util
 import struct
 import collections
 
-__author__ = 'Pearu Peterson'
-__date__ = 'April 2009'
-__license__ = 'BSD'
-__version__ = '0.3-svn'
 __all__ = ['libtiff', 'TIFF']
 
-if os.name == 'nt':
-    # assume that the directory of libtiff3.dll is in PATH.
-    lib = ctypes.util.find_library('libtiff3')
-    if lib is None:
-        lib = ctypes.util.find_library('libtiff.dll')
-    if lib is None:
-        # try default installation path:
-        lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
-        if os.path.isfile(lib):
-            print('You should add %r to PATH environment variable and '
-                  'reboot.' % (os.path.dirname(lib)))
-        else:
-            lib = None
-else:
-    if hasattr(sys, 'frozen') and sys.platform == 'darwin' and \
-            os.path.exists('../Frameworks/libtiff.dylib'):
-        # py2app support, see Issue 8.
-        lib = '../Frameworks/libtiff.dylib'
+cwd = os.getcwd()
+try:
+    os.chdir(os.path.dirname(__file__))
+    if os.name=='nt':
+        # assume that the directory of libtiff3.dll is in PATH.
+        lib = ctypes.util.find_library('libtiff3')
+        if lib is None:
+            lib = ctypes.util.find_library('libtiff.dll')
+        if lib is None:
+            # try default installation path:
+            lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
+            if os.path.isfile (lib):
+                print('You should add %r to PATH environment variable and reboot.' % (os.path.dirname (lib)))
+            else:
+                lib = None
     else:
-        lib = ctypes.util.find_library('tiff')
-if lib is None:
-    raise ImportError('Failed to find TIFF library. Make sure that libtiff '
-                      'is installed and its location is listed in '
-                      'PATH|LD_LIBRARY_PATH|..')
+        if hasattr(sys, 'frozen') and sys.platform == 'darwin' and \
+                os.path.exists('../Frameworks/libtiff.dylib'):
+            # py2app support, see Issue 8.
+            lib = '../Frameworks/libtiff.dylib'
+        else:
+            lib = ctypes.util.find_library('tiff')
 
-libtiff = ctypes.cdll.LoadLibrary(lib)
+    libtiff = None if lib is None else ctypes.cdll.LoadLibrary(lib)
+    if libtiff is None:
+        try:
+            if sys.platform == "darwin":
+                libtiff = ctypes.cdll.LoadLibrary("libtiff.dylib")
+            elif "win" in sys.platform:
+                libtiff = ctypes.cdll.LoadLibrary("libtiff.dll")
+            else:
+                libtiff = ctypes.cdll.LoadLibrary("libtiff.so")
+        except OSError:
+            raise ImportError('Failed to find TIFF library. Make sure that libtiff '
+                              'is installed and its location is listed in '
+                              'PATH|LD_LIBRARY_PATH|..')
+finally:
+    os.chdir(cwd)
 
 libtiff.TIFFGetVersion.restype = ctypes.c_char_p
 libtiff.TIFFGetVersion.argtypes = []
