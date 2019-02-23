@@ -29,7 +29,7 @@ try:
             # try default installation path:
             lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
             if os.path.isfile (lib):
-                print 'You should add %r to PATH environment variable and reboot.' % (os.path.dirname (lib))
+                print('You should add %r to PATH environment variable and reboot.' % (os.path.dirname (lib)))
             else:
                 lib = None
     else:
