@@ -255,9 +255,9 @@ class TIFFimage:
             length, width = image.shape
             bytes_per_row = width * image.dtype.itemsize
             rows_per_strip = min(length,
-                                 int(numpy.ceil(strip_size / bytes_per_row)))
+                                 int(numpy.ceil(float(strip_size) / bytes_per_row)))
             strips_per_image = int(
-                numpy.floor((length + rows_per_strip - 1) / rows_per_strip))
+                numpy.floor(float(length + rows_per_strip - 1) / rows_per_strip))
             assert bytes_per_row * rows_per_strip * \
                 strips_per_image >= image.nbytes
             d = dict(ImageWidth=width,
@@ -325,7 +325,7 @@ class TIFFimage:
         def tif_write(_tif, _offset, _data):
             end = _offset + _data.nbytes
             if end > _tif.size:
-                size_incr = int((end - _tif.size) / 1024 ** 2 + 1) * 1024 ** 2
+                size_incr = int(float(end - _tif.size) / 1024 ** 2 + 1) * 1024 ** 2
                 new_size = _tif.size + size_incr
                 assert end <= new_size, repr(
                     (end, _tif.size, size_incr, new_size))
@@ -421,7 +421,7 @@ class TIFFimage:
                 sys.stdout.write(
                     '\r  filling records: %5s%% done (%s/s)%s' %
                     (int(100.0 * (i + 1) / len(image_directories)),
-                     bytes2str(int((image_data_offset -
+                     bytes2str(int(float(image_data_offset -
                                     first_image_data_offset) /
                                    (time.time() - start_time))), ' ' * 2))
                 if (i + 1) == len(image_directories):
@@ -431,7 +431,7 @@ class TIFFimage:
         # last offset must be 0
         tif[offset - 4:offset].view(dtype=numpy.uint32)[0] = 0
 
-        compression = 1 / (compressed_data_size / image_data_size)
+        compression = 1 / (float(compressed_data_size) / image_data_size)
 
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size

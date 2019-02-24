@@ -2,7 +2,6 @@
 import os
 import sys
 import subprocess
-import builtins
 import textwrap
 import warnings
 
@@ -33,8 +32,6 @@ VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 if os.path.exists('MANIFEST'):
     os.remove('MANIFEST')
-
-builtins.__PYLIBTIFF_SETUP__ = True
 
 
 def git_version():
@@ -270,8 +267,6 @@ PyLibTiff? is a Python package that provides the following modules:
         metadata['version'] = get_version_info()[0]
 
     setup(**metadata)
-
-    builtins.__PYLIBTIFF_SETUP__ = False
 
 
 if __name__ == '__main__':

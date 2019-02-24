@@ -17,6 +17,7 @@ requirements:
   build:
     - numpy
     - pytest
+    - libtiff  # used for testing
   host:
   run:
     - numpy
