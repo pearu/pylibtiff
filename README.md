@@ -2,17 +2,35 @@
 [![Build Status](https://travis-ci.org/pearu/pylibtiff.svg?branch=master)](https://travis-ci.org/pearu/pylibtiff)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/4u5dr1ccpabwrgd1?svg=true)](https://ci.appveyor.com/project/pearu/pylibtiff)
-[![Build status](https://ci.appveyor.com/api/projects/status/4u5dr1ccpabwrgd1/branch/master?svg=true)](https://ci.appveyor.com/project/pearu/pylibtiff/branch/master)
 
 PyLibTiff is a package that provides:
-  * a wrapper to the [libtiff](http://www.remotesensing.org/libtiff/) library to [Python](http://www.python.org) using [ctypes](http://docs.python.org/library/ctypes.html).
-  * a pure Python module for reading and writing TIFF and LSM files. The images are read as numpy.memmap objects so that it is possible to open images that otherwise would not fit to computers RAM. Both TIFF strips and tiles are supported for low-level data storage.
 
-There exists many Python packages such as [PIL](http://www.pythonware.com/products/pil/), [FreeImagePy](http://freeimagepy.sourceforge.net/) that support reading and writing TIFF files. The PyLibTiff project was started to have an efficient and direct way to read and write TIFF files using the libtiff library without the need to install any unnecessary packages or libraries. The pure Python module was created for reading "broken" TIFF files such as LSM files that in some places use different interpretation of TIFF tags than what specified in the TIFF specification document. The libtiff library would just fail reading such files. In addition, the pure Python module is more memory efficient as the arrays are returned as memory maps. Support for compressed files is not implemented yet.
+* a wrapper to the [libtiff](http://www.simplesystems.org/libtiff/)
+    library to [Python](http://www.python.org) using
+    [ctypes](http://docs.python.org/library/ctypes.html).
 
-[tifffile.py](http://www.lfd.uci.edu/~gohlke/code/tifffile.py.html) by Christoph Gohlke
-is an excellent module for reading TIFF as well as LSM files,
-it is as fast as libtiff.py by using numpy.
+* a pure Python module for reading and writing TIFF and LSM files. The
+  images are read as `numpy.memmap` objects so that it is possible to
+  open images that otherwise would not fit to computers RAM. Both TIFF
+  strips and tiles are supported for low-level data storage.
+
+There exists many Python packages such as
+[PIL](http://www.pythonware.com/products/pil/),
+[FreeImagePy](http://freeimagepy.sourceforge.net/) that support
+reading and writing TIFF files. The PyLibTiff project was started to
+have an efficient and direct way to read and write TIFF files using
+the libtiff library without the need to install any unnecessary
+packages or libraries. The pure Python module was created for reading
+"broken" TIFF files such as LSM files that in some places use
+different interpretation of TIFF tags than what specified in the TIFF
+specification document. The libtiff library would just fail reading
+such files. In addition, the pure Python module is more memory
+efficient as the arrays are returned as memory maps. Support for
+compressed files is not implemented yet.
+
+[tifffile.py](http://www.lfd.uci.edu/~gohlke/code/tifffile.py.html) by
+Christoph Gohlke is an excellent module for reading TIFF as well as
+LSM files, it is as fast as libtiff.py by using numpy.
 
 
 # Usage example (libtiff wrapper) #
