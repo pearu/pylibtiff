@@ -3,6 +3,7 @@ Tests for bitarray
 
 Author: Ilan Schnell
 """
+# flake8: noqa
 import os
 import sys
 import tempfile

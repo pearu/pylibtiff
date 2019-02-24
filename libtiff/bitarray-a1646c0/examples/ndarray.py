@@ -2,6 +2,7 @@
 # This example illusatrates how binary data can be efficiently be passed
 # between a bitarray object and an ndarray with dtype bool
 #
+# flake8: noqa
 import bitarray
 import numpy
 

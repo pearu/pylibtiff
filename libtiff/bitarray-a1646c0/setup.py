@@ -1,3 +1,6 @@
+
+# flake8: noqa
+
 import re
 from os.path import join
 from distutils.core import setup, Extension

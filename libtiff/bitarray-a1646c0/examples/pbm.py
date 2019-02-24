@@ -1,3 +1,4 @@
+# flake8: noqa
 from bitarray import bitarray, bits2bytes
 
 class PBM: # Portable Bitmap

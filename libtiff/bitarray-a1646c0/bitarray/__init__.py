@@ -8,6 +8,7 @@ Please find a description of this package at:
 
 Author: Ilan Schnell
 """
+# flake8: noqa
 import sys
 
 try:

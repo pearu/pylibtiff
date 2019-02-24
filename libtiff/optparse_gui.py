@@ -1,10 +1,10 @@
-from __future__ import print_function
-"""A drop-in replacement for :pythonlib:`optparse` ("import iocbio.optparse_gui as optparse")
+"""A drop-in replacement for :pythonlib:`optparse` ("import
+iocbio.optparse_gui as optparse")
 
-Provides an identical interface to
-:pythonlib:`optparse`.OptionParser, in addition, it displays an
-automatically generated `wx <http://www.wxpython.org>`_ dialog in order to enter the
-options/args, instead of parsing command line arguments.
+Provides an identical interface to :pythonlib:`optparse`.OptionParser,
+in addition, it displays an automatically generated `wx
+<http://www.wxpython.org>`_ dialog in order to enter the options/args,
+instead of parsing command line arguments.
 
 This code is based on `optparse_gui module
 <http://code.google.com/p/optparse-gui/>`_. Unfortunately the owner of
@@ -13,9 +13,13 @@ group. By now this module has become more complete with more features.
 
 Module content
 --------------
+
 """
-#Author: Pearu Peterson
-#Created: September 2009
+# Author: Pearu Peterson
+# Created: September 2009
+
+# flake8: noqa
+
 from __future__ import division, print_function
 
 __all__ = ['OptionParser', 'Option']
@@ -29,6 +33,7 @@ import tempfile
 import optparse
 import wx
 import subprocess as std_subprocess
+
 if os.name=='nt':
     from . import killableprocess as subprocess
 else:
@@ -48,13 +53,6 @@ except ImportError as e:
 
 from .utils import splitcommandline
 
-#try:
-#    import matplotlib
-#except ImportError:
-#    matplotlib = None
-#if matplotlib is not None:
-#    matplotlib.use('Agg') # to avoid crashes with other backends
-
 __version__ = 0.9
 
 debug = 1
@@ -69,6 +67,7 @@ for n,v in list(signal.__dict__.items ()):
     if isinstance(v, int):
         signal_map[v] = n
 
+
 def pretty_signal (s):
     r = signal_map.get(s)
     if r is None:
@@ -77,20 +76,26 @@ def pretty_signal (s):
             return str(s)
     return '%s[%s]' % (s,r)
 
+
 def fix_float_string(s):
     if not s: return '0'
     if s[-1] in 'eE+-': return s + '0'
     return s
 
+
 def fix_int_string (s):
     if s in ['+','-']: return s + '0'
     return s
 
+
 def get_fixed_option_value (option, s):
-    if option.type=='float': return fix_float_string(s)
-    if option.type=='int': return fix_int_string(s)
-    if option.type=='long': return fix_int_string(s)
-    if option.type=='choice':
+    if option.type == 'float':
+        return fix_float_string(s)
+    if option.type == 'int':
+        return fix_int_string(s)
+    if option.type == 'long':
+        return fix_int_string(s)
+    if option.type == 'choice':
         choices = list(map(str, option.choices))
         try:
             return option.choices[choices.index(str(s))]
@@ -98,13 +103,14 @@ def get_fixed_option_value (option, s):
             pass
     return s
 
+
 def os_kill(pid, s):
-    if os.name=='nt':
-        if s==signal.SIGTERM or s==signal.SIGINT:
+    if os.name == 'nt':
+        if s == signal.SIGTERM or s == signal.SIGINT:
             import win32api
             handle = win32api.OpenProcess(1, 0, pid)
             return (0 != win32api.TerminateProcess(handle, 127))
-        if s==signal.SIGINT:
+        if s == signal.SIGINT:
             import ctypes
             return (0 != ctypes.windll.kernel32.GenerateConsoleCtrlEvent (1, pid))
     return os.kill (pid, s)
@@ -276,7 +282,7 @@ class OptionPanel( wx.Panel ):
                 ctrl = wx.CheckBox( self, -1, option.get_opt_string())
                 #ctrl = wx.ToggleButton( self, -1, option.get_opt_string())
                 if option.default not in [None, optparse.NO_DEFAULT]:
-                    if option.action=='store_false':
+                    if option.action == 'store_false':
                         ctrl.SetValue(not option.default)
                     else:
                         ctrl.SetValue(option.default)
@@ -571,9 +577,9 @@ that contain spaces must be entered like so: "arg with space"\
                     v = self.log_queue.get_nowait()
                 except queue.Empty:
                     break
-                if v=='@STDERR START@':
+                if v == '@STDERR START@':
                     is_stderr_message = True
-                elif v=='@STDERR END@':
+                elif v == '@STDERR END@':
                     is_stderr_message = False
                 else:
                     # todo: use is_stderr_message to switch styles
@@ -587,11 +593,11 @@ that contain spaces must be entered like so: "arg with space"\
 
         if self.process_list:
             for index, (process, method) in enumerate(self.process_list):
-                if method=='subprocess':
+                if method == 'subprocess':
                     if not process.is_alive():
                         self._cleanup_process(process, method)
                         del self.process_list[index]
-                elif method=='subcommand':
+                elif method == 'subcommand':
                     if process.poll() is not None:
                         self._cleanup_process(process, method)
                         del self.process_list[index]
@@ -626,13 +632,13 @@ that contain spaces must be entered like so: "arg with space"\
         self.set_result()
         values, args = self.option_parser.parse_options_args
         new_options, new_args = self.option_parser.get_result (values)
-        if method=='subprocess':
+        if method == 'subprocess':
             process = multiprocessing.Process(target=FunctionWrapper(self.option_parser.runner,
                                                                      self.log_queue), 
                                               args=(self.option_parser, new_options, new_args))
             process.start ()
             return process
-        elif method=='subcommand':
+        elif method == 'subcommand':
             if multiprocessing is None:
                 print('Using multiprocessing package is disabled.')
                 if sys.version[:3]<='2.5':
@@ -660,16 +666,16 @@ that contain spaces must be entered like so: "arg with space"\
     def _cleanup_process (self, process, method):
         if process is None:
             return
-        if method=='subprocess':
+        if method == 'subprocess':
             if process.exitcode is None:
                 pid = process.pid
                 print('Runner %s (PID=%s) still running, trying to terminate' % (method, pid))
                 process.terminate()
                 process.join()
             print('Runner %s has finished with exitcode=%s' % (method,  pretty_signal(process.exitcode)))
-        elif method=='subcommand':
+        elif method == 'subcommand':
             s = process.wait()
-            if os.name=='nt':
+            if os.name == 'nt':
                 print('Runner %s has finished with returncode=%s' % (method,  pretty_signal (s)))
             else:
                 pid = process.pid
@@ -678,15 +684,15 @@ that contain spaces must be entered like so: "arg with space"\
             raise NotImplementedError (repr(method))
 
     def _interrupt_process (self, process, method):
-        if method=='subprocess':
+        if method == 'subprocess':
             if process.is_alive():
                 pid = process.pid
                 os_kill(pid, signal.SIGINT)
                 print()
                 print('SIGINT signal has been sent to runner %s (PID=%s)' % (method, pid))
-        elif method=='subcommand':
+        elif method == 'subcommand':
             if process.poll () is None:
-                if os.name=='nt':
+                if os.name == 'nt':
                     process.kill(True, s=signal.SIGINT)
                     print()
                     print('SIGINT signal has been sent to runner %s' % (method))
@@ -699,19 +705,19 @@ that contain spaces must be entered like so: "arg with space"\
             raise NotImplementedError (repr(method))
 
     def _terminate_process (self, process, method):
-        if method=='subprocess':
+        if method == 'subprocess':
             if prosess.is_alive():
                 print()
                 print('Terminating runner %s' % (method))
                 process.terminate()
-        elif method=='subcommand':
+        elif method == 'subcommand':
             if process.poll() is None:
                 if sys.version[:3]>='2.6':
                     print()
                     print('Terminating runner %s' % (method))
                     process.terminate ()
                 else:
-                    if os.name=='nt':
+                    if os.name == 'nt':
                         process.kill (True, s = signal.SIGTERM)
                     else:
                         os_kill (process.pid, signal.SIGTERM)
@@ -753,7 +759,7 @@ that contain spaces must be entered like so: "arg with space"\
         self.cleanup_runner()
 
     def OnExit(self, event):
-        if self.exit_b.GetLabel()=='Stop':
+        if self.exit_b.GetLabel() == 'Stop':
             self.interrupt_runner()
             return
 
@@ -833,8 +839,10 @@ that contain spaces must be entered like so: "arg with space"\
                 ctrl.SetValue(value)
         self.args_ctrl.SetValue(' '.join(args))
 
-class UserCancelledError( Exception ):
+
+class UserCancelledError(Exception):
     pass
+
 
 def check_file(option, opt, value):
     try:
@@ -846,6 +854,7 @@ def check_file(option, opt, value):
     #    print 'Warning: path %r is not a file' % (value)
     return value
 
+
 def check_directory(option, opt, value):
     try:
         value = str(value)
@@ -856,6 +865,7 @@ def check_directory(option, opt, value):
     #    print 'Warning: path %r is not a directory' % (value)
     return value
 
+
 class Option(optparse.Option):
     """Extends optparse.Option with file, directory and multiline types.
     """
@@ -865,14 +875,15 @@ class Option(optparse.Option):
     TYPE_CHECKER.update (file=check_file, directory=check_directory)
 
 
-class OptionParser( optparse.OptionParser ):
+
+class OptionParser(optparse.OptionParser):
     """Extends optparse.OptionParser with GUI support.
     """
     _SUPER = optparse.OptionParser
     """Holds base class.
     """
     
-    def __init__( self, *args, **kwargs ):
+    def __init__(self, *args, **kwargs):
         if 'option_class' not in kwargs:
             kwargs['option_class'] = Option
         self.runner = None
@@ -959,9 +970,9 @@ class OptionParser( optparse.OptionParser ):
                 except Exception as msg:
                     print('optparse_gui.load_options: failed parsing options file, line=%r: %s' % (line, msg))
                     continue
-                if dest=='#args':
+                if dest == '#args':
                     h_args = value
-                elif dest=='#cwd':
+                elif dest == '#cwd':
                     h_cwd = value
                 else:
                     self._set_dest_value(dest, value, h_cwd)
@@ -1027,11 +1038,11 @@ class OptionParser( optparse.OptionParser ):
         option_values, args = self.result
          
         for option, value in option_values.items():
-            if option.action=='store_true':
+            if option.action == 'store_true':
                 if isinstance(value, bool):
                     setattr( values, option.dest, value )
                 continue
-            if option.action=='store_false':
+            if option.action == 'store_false':
                 if isinstance(value, bool):
                     setattr( values, option.dest, not value )
                 continue
@@ -1042,7 +1053,9 @@ class OptionParser( optparse.OptionParser ):
             option.process( option, value, values, self )
         return values, args
 
+
 ################################################################################
+
 
 def sample_parse_args():
     usage = "usage: %prog [options] args"
@@ -1068,6 +1081,7 @@ def sample_parse_args():
     
     (options, args) = parser.parse_args()
     return options, args
+
 
 def sample_parse_args_issue1():
     usage = "usage: %prog [options] args"
@@ -1100,10 +1114,12 @@ def sample_parse_args_issue1():
     (options, args) = parser.parse_args()
     return options, args
 
+
 def main():
     options, args = sample_parse_args_issue1()
     print('args: %s' % repr( args ))
     print('options: %s' % repr( options ))
-    
+
+
 if '__main__' == __name__:
     main()

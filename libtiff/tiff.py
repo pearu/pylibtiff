@@ -19,14 +19,13 @@ __all__ = ['TIFFfile', 'TIFFimage', 'TiffArray']
 
 import os
 import sys
-import time
-import numpy
 
 from .tiff_file import TIFFfile
 from .tiff_image import TIFFimage
 from .tiff_array import TiffArray
 
-def main ():
+
+def main():
     filename = sys.argv[1]
     if not os.path.isfile(filename):
         raise ValueError('File %r does not exists' % (filename))
@@ -40,10 +39,10 @@ def main ():
     from . import lsm
     print(lsm.lsmblock(e))
     print(lsm.lsminfo(e, 0))
-    #print lsm.filestructure(e)
-    #print lsm.timestamps(e)
-    #print lsm.channelwavelength(e)
+    # print lsm.filestructure(e)
+    # print lsm.timestamps(e)
+    # print lsm.channelwavelength(e)
+
 
 if __name__ == '__main__':
     main()
-

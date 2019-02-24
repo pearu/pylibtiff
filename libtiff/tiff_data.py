@@ -10,7 +10,7 @@ __all__ = ['type2name', 'name2type', 'type2bytes', 'type2dtype',
 
 import numpy
 
-#<TagName> <Hex> <Type> <Number of values>
+# <TagName> <Hex> <Type> <Number of values>
 tag_info = '''
 # standard tags:
 NewSubfileType FE LONG 1
@@ -89,7 +89,7 @@ TileLength 143 SHORT|LONG 1
 TileOffsets 144 LONG TilesPerImage
 TileByteCounts 145 SHORT|LONG TilesPerImage
 InkSet 14C SHORT 1
-InkNames 14D ASCII <total number of chars in all ink name strings, including zeros>
+InkNames 14D ASCII <total number of chars in all ink name strings, including zeros>  # noqa: E501
 NumberOfInks 14E SHORT 1
 DotRange 150 BYTE|SHORT 2|2*NumberOfInks
 TargetPrinter 151 ASCII any
@@ -116,7 +116,8 @@ Copyright 8298 ASCII Any
 # non-standard tags:
 CZ_LSMInfo 866C CZ_LSM
 
-# EXIF tags, see http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif.html
+# EXIF tags, see
+# http://www.awaresystems.be/imaging/tiff/tifftags/privateifd/exif.html
 EXIF_IFDOffset 8769 SHORT 1
 EXIF_ExposureTime 829a RATIONAL 1
 EXIF_FNumber 829d RATIONAL 1
@@ -179,60 +180,67 @@ EXIF_ImageUniqueID a420 ASCII 33
 
 default_tag_values = dict(BitsPerSample=8, SampleFormat=1,
                           RowsPerStrip=2**32-1,
-                          SamplesPerPixel=1, ExtraSamples = None,
+                          SamplesPerPixel=1, ExtraSamples=None,
                           PlanarConfiguration=1,
-                          Compression=1, Predictor = 1, 
+                          Compression=1, Predictor=1,
                           NewSubfileType=0,
-                          Orientation = 1,
-                          MaxSampleValue = None, MinSampleValue = None,
-                          DateTime = None,
-                          Artist = None,
-                          HostComputer = None,
-                          Software = None,
-                          ImageDescription = None,
-                          DocumentName = None,
-                          ResolutionUnit = 2, XResolution = 1, YResolution = 1,
-                          FillOrder = 1,
-                          XPosition = None, YPosition = None,
-                          Make = None, Model = None, Copyright=None,)
+                          Orientation=1,
+                          MaxSampleValue=None, MinSampleValue=None,
+                          DateTime=None,
+                          Artist=None,
+                          HostComputer=None,
+                          Software=None,
+                          ImageDescription=None,
+                          DocumentName=None,
+                          ResolutionUnit=2, XResolution=1, YResolution=1,
+                          FillOrder=1,
+                          XPosition=None, YPosition=None,
+                          Make=None, Model=None, Copyright=None,)
 
 rational = numpy.dtype([('numer', numpy.uint32), ('denom', numpy.uint32)])
 srational = numpy.dtype([('numer', numpy.int32), ('denom', numpy.int32)])
 
-type2name = {1:'BYTE', 2:'ASCII', 3:'SHORT', 4:'LONG', 5:'RATIONAL', # two longs, lsm uses it for float64
-             6:'SBYTE', 7:'UNDEFINED', 8:'SSHORT', 9:'SLONG', 10:'SRATIONAL',
-             11:'FLOAT', 12:'DOUBLE',
+type2name = {1: 'BYTE', 2: 'ASCII', 3: 'SHORT', 4: 'LONG', 5: 'RATIONAL',
+             # two longs, lsm uses it for float64
+             6: 'SBYTE', 7: 'UNDEFINED', 8: 'SSHORT', 9: 'SLONG',
+             10: 'SRATIONAL',
+             11: 'FLOAT', 12: 'DOUBLE',
              }
-name2type = dict((v,k) for k,v in list(type2name.items()))
+name2type = dict((v, k) for k, v in list(type2name.items()))
 name2type['SHORT|LONG'] = name2type['LONG']
 name2type['LONG|SHORT'] = name2type['LONG']
-type2bytes = {1:1, 2:1, 3:2, 4:4, 5:8, 6:1, 7:1, 8:2, 9:4, 10:8, 11:4, 12:8}
-type2dtype = {1:numpy.uint8, 2:numpy.uint8, 3:numpy.uint16, 4:numpy.uint32, 5:rational,
-              6:numpy.int8, 8:numpy.int16, 9:numpy.int32,10:srational,
-              11:numpy.float32, 12:numpy.float64}
+type2bytes = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4,
+              10: 8, 11: 4, 12: 8}
+type2dtype = {1: numpy.uint8, 2: numpy.uint8, 3: numpy.uint16, 4: numpy.uint32,
+              5: rational, 6: numpy.int8, 8: numpy.int16, 9: numpy.int32,
+              10: srational, 11: numpy.float32, 12: numpy.float64}
 
 tag_value2name = {}
 tag_name2value = {}
 tag_value2type = {}
 for line in tag_info.split('\n'):
-    if not line or line.startswith('#'): continue
-    if line[0]==' ':
+    if not line or line.startswith('#'):
+        continue
+    if line[0] == ' ':
         pass
     else:
-        n,h,t = line.split()[:3]
+        n, h, t = line.split()[:3]
         h = eval('0x'+h)
-        tag_value2name[h]=n
-        tag_value2type[h]=t
-        tag_name2value[n]=h
+        tag_value2name[h] = n
+        tag_value2type[h] = t
+        tag_name2value[n] = h
 
-sample_format_map = {1:'uint', 2:'int', 3:'float', None:'uint', 6:'complex'}
+sample_format_map = {1: 'uint', 2: 'int', 3: 'float', None:
+                     'uint', 6: 'complex'}
+
 
 class NumpyDTypes:
 
     def get_dtype(self, sample_format, bits_per_sample):
         format = sample_format_map[sample_format]
         dtypename = '%s%s' % (format, bits_per_sample)
-        return getattr (self, dtypename)
+        return getattr(self, dtypename)
+
 
 class LittleEndianNumpyDTypes(NumpyDTypes):
     uint8 = numpy.dtype('<u1')
@@ -250,11 +258,12 @@ class LittleEndianNumpyDTypes(NumpyDTypes):
 
     @property
     def type2dt(self):
-        return dict((k,numpy.dtype(v).newbyteorder('<')) for k,v in list(type2dtype.items()))
-
+        return dict((k, numpy.dtype(v).newbyteorder('<'))
+                    for k, v in list(type2dtype.items()))
 
 
 LittleEndianNumpyDTypes = LittleEndianNumpyDTypes()
+
 
 class BigEndianNumpyDTypes(NumpyDTypes):
     uint8 = numpy.dtype('>u1')
@@ -272,6 +281,8 @@ class BigEndianNumpyDTypes(NumpyDTypes):
 
     @property
     def type2dt(self):
-        return dict((k,numpy.dtype(v).newbyteorder('>')) for k,v in list(type2dtype.items()))
+        return dict((k, numpy.dtype(v).newbyteorder('>'))
+                    for k, v in list(type2dtype.items()))
+
 
 BigEndianNumpyDTypes = BigEndianNumpyDTypes()

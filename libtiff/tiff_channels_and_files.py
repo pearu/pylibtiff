@@ -1,24 +1,28 @@
 
 from .tiff_base import TiffBase
 
-class TiffChannelsAndFiles (TiffBase):
-    """ Represent a collection of TIFF files as a single TIFF source object.
+
+class TiffChannelsAndFiles(TiffBase):
+    """Represent a collection of TIFF files as a single TIFF source
+    object.
 
     See also
     --------
     TiffFile, TiffFiles
+
     """
 
     def __init__(self, channels_files_map):
-        """
-        Parameters
+        """Parameters
         ----------
         channels_files_map : dict
-          A dictionary of channel names and TIFF files (``TiffFiles`` instances)
+          A dictionary of channel names and TIFF files (``TiffFiles``
+          instances)
         """
         self.channels_files_map = channels_files_map
-    
-    def get_tiff_array (self, channel, sample_index=0, subfile_type=0, assume_one_image_per_file=False):
+
+    def get_tiff_array(self, channel, sample_index=0,
+                       subfile_type=0, assume_one_image_per_file=False):
         """ Return an array of images for given channel.
 
         Parameters
@@ -42,17 +46,18 @@ class TiffChannelsAndFiles (TiffBase):
         tiff_array : TiffArray
           Array of sample images. The array has rank equal to 3.
         """
-        return self.channels_files_map[channel].get_tiff_array(sample_index=sample_index,
-                                                               subfile_type=subfile_type,
-                                                               assume_one_image_per_file=assume_one_image_per_file)
+        return self.channels_files_map[channel].get_tiff_array(
+            sample_index=sample_index,
+            subfile_type=subfile_type,
+            assume_one_image_per_file=assume_one_image_per_file)
 
     def get_info(self):
-        l = []
-        for channel, tiff in list(self.channels_files_map.items ()):
-            l.append ('Channel %s:' % (channel))
-            l.append ('-'*len(l[-1]))
-            l.append (tiff.get_info())
-        return '\n'.join(l)
+        lst = []
+        for channel, tiff in list(self.channels_files_map.items()):
+            lst.append('Channel %s:' % (channel))
+            lst.append('-'*len(lst[-1]))
+            lst.append(tiff.get_info())
+        return '\n'.join(lst)
 
     def close(self):
         for channel, tiff in list(self.channels_files_map.items()):
