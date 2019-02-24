@@ -1,3 +1,4 @@
+import os
 import pytest
 from tempfile import mktemp
 import atexit
@@ -15,3 +16,4 @@ def test_issue69():
     del tif
     tif = lt.TIFF3D.open(fn)
     tif.close()
+    atexit.register(os.remove, fn)
