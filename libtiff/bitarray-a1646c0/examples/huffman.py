@@ -4,6 +4,7 @@ http://en.literateprograms.org/Huffman_coding_(Python)
 
 The link also contains a good description of the algorithm.
 """
+# flake8: noqa
 import os, sys
 from collections import defaultdict
 from bitarray import bitarray

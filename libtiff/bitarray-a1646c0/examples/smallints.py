@@ -1,6 +1,7 @@
 #
 # Thanks to David Kammeyer for the idea to apply a bitarray in this way.
 #
+# flake8: noqa
 from bitarray import bitarray
 
 class SmallIntArray(object):

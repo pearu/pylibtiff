@@ -12,9 +12,7 @@ import sys
 import shutil
 import numpy
 import mmap
-from numpy.testing.utils import memusage
-from .tiff_data import type2name, name2type, type2bytes, type2dtype, \
-    tag_value2name, tag_name2value
+from .tiff_data import type2name, name2type, type2bytes, tag_value2name
 from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, \
     default_tag_values, sample_format_map
 from .utils import bytes2str, isindisk
@@ -66,12 +64,13 @@ class TIFFfile(TiffBase):
     def close(self):
         if hasattr(self, 'data'):
             if self.verbose:
-                sys.stdout.write('Closing TIFF file %r\n' % (self.filename));
+                sys.stdout.write('Closing TIFF file %r\n' % (self.filename))
                 sys.stdout.flush()
             for ifd in self.IFD:
                 ifd.close()
             if self.use_memmap:
-                # self.data.base.close() # newer numpy does not have memmap.close anymore [May 2012]
+                # newer numpy does not have memmap.close anymore [May 2012]
+                # self.data.base.close()
                 pass
             del self.data
 
@@ -101,7 +100,7 @@ class TIFFfile(TiffBase):
                     shutil.copyfile(filename, cache_filename)
                     filename = cache_filename
             if verbose:
-                sys.stdout.write('Opening file %r\n' % (filename));
+                sys.stdout.write('Opening file %r\n' % (filename))
                 sys.stdout.flush()
             if mode != 'r':
                 raise NotImplementedError(repr(mode))
@@ -136,8 +135,8 @@ class TIFFfile(TiffBase):
 
         self.memory_usage = [(self.data.nbytes, self.data.nbytes, 'eof')]
 
-        byteorder = \
-        self.data[first_byte:first_byte + 2].view(dtype=numpy.uint16)[0]
+        byteorder = self.data[first_byte:first_byte + 2].view(
+            dtype=numpy.uint16)[0]
 
         if byteorder == 0x4949:
             self.endian = 'little'
@@ -169,20 +168,20 @@ class TIFFfile(TiffBase):
             ifd.finalize()
             IFD_list.append(ifd)
             self.memory_usage.append((IFD_offset, IFD_offset + 2 + n * 12 + 4,
-                                      'IFD%s entries (%s)' % (
-                                      len(IFD_list), len(ifd))))
+                                      'IFD%s entries(%s)' % (
+                                          len(IFD_list), len(ifd))))
             IFD_offset = self.get_uint32(IFD_offset + 2 + n * 12)
             if IFD_offset == 0 and exif_offset != 0:
                 IFD_offset = exif_offset
                 exif_offset = 0
             if verbose:
                 sys.stdout.write(
-                    '\rIFD information read: %s..' % (len(IFD_list)));
+                    '\rIFD information read: %s..' % (len(IFD_list)))
                 sys.stdout.flush()
 
         self.IFD = IFD_list
         if verbose:
-            sys.stdout.write(' done\n');
+            sys.stdout.write(' done\n')
             sys.stdout.flush()
 
         self.time = None
@@ -237,8 +236,9 @@ class TIFFfile(TiffBase):
             bytes = type2bytes.get(typ)
             if dtype is None or bytes is None:
                 sys.stderr.write(
-                    'get_values: incomplete info for type=%r [%r]: dtype=%s, bytes=%s\n' % (
-                    typ, ntyp, dtype, bytes))
+                    'get_values: incomplete info for type=%r [%r]:'
+                    ' dtype=%s, bytes=%s\n' % (
+                        typ, ntyp, dtype, bytes))
                 return
         return self.data[offset:offset + bytes * count].view(dtype=dtype)
 
@@ -252,21 +252,24 @@ class TIFFfile(TiffBase):
         return string
 
     def check_memory_usage(self, verbose=True):
-        ''' Check memory usage of TIFF fields and blocks.
+        '''Check memory usage of TIFF fields and blocks.
 
         Returns
         -------
         ok : bool
-          Return False if unknown or overlapping memory areas have been detected.
+
+          Return False if unknown or overlapping memory areas have
+          been detected.
+
         '''
-        l = []
-        l.extend(self.memory_usage)
+        lst = []
+        lst.extend(self.memory_usage)
         for ifd in self.IFD:
-            l.extend(ifd.memory_usage)
-        l.sort()
+            lst.extend(ifd.memory_usage)
+        lst.sort()
         last_end = None
         ok = True
-        for start, end, resource in l:
+        for start, end, resource in lst:
             if last_end:
                 if last_end != start:
                     if verbose:
@@ -276,11 +279,12 @@ class TIFFfile(TiffBase):
                         print('--- overlapping memory area')
             if verbose:
                 print('%s..%s[%s] contains %s' % (
-                start, end, end - start, resource))
+                    start, end, end - start, resource))
             last_end = end
         return ok
 
     def is_contiguous(self):
+        end = None
         for i, ifd in enumerate(self.IFD):
             strip_offsets = ifd.get('StripOffsets').value
             strip_nbytes = ifd.get('StripByteCounts').value
@@ -313,22 +317,22 @@ class TIFFfile(TiffBase):
         assert width == ifd1.get('ImageWidth').value
         assert length == ifd1.get('ImageLength').value
         depth = len(self.IFD)
-        compression = ifd.get('Compression').value
+        compression = ifd0.get('Compression').value
         if compression != 1:
             raise ValueError(
                 'Unable to get contiguous image stack from compressed data')
         bits_per_sample = ifd0.get('BitsPerSample').value
-        photo_interp = ifd0.get('PhotometricInterpretation').value
-        planar_config = ifd0.get('PlanarConfiguration').value
+        # photo_interp = ifd0.get('PhotometricInterpretation').value
+        # planar_config = ifd0.get('PlanarConfiguration').value
         strip_offsets0 = ifd0.get('StripOffsets').value
-        strip_nbytes0 = ifd0.get('StripByteCounts').value
+        # strip_nbytes0 = ifd0.get('StripByteCounts').value
         strip_offsets1 = ifd1.get('StripOffsets').value
         strip_nbytes1 = ifd1.get('StripByteCounts').value
         samples_per_pixel = ifd1.get('SamplesPerPixel').value
         assert samples_per_pixel == 1, repr(samples_per_pixel)
 
         if isinstance(bits_per_sample, numpy.ndarray):
-            dtype = getattr(self.dtypes, 'uint%s' % (bits_per_sample[i]))
+            dtype = getattr(self.dtypes, 'uint%s' % (bits_per_sample[0]))
         else:
             dtype = getattr(self.dtypes, 'uint%s' % (bits_per_sample))
 
@@ -339,7 +343,7 @@ class TIFFfile(TiffBase):
             start = strip_offsets0
             end = strip_offsets1 + strip_nbytes1
         return self.data[start:end].view(dtype=dtype).reshape(
-            (depth, width, length))
+           (depth, width, length))
 
     def get_subfile_types(self):
         """ Return a list of subfile types.
@@ -357,16 +361,19 @@ class TIFFfile(TiffBase):
         return depth
 
     def get_first_ifd(self, subfile_type=0):
-        """ Return the first IFD entry with given subfile type.
+        """Return the first IFD entry with given subfile type.
 
         Parameters
         ----------
         subfile_type : {0, 1, 2, 4}
-          Specify subfile type. 0: image, 1: reduced image, 2: single page, 4: transparency mask.
-          
+
+          Specify subfile type. 0: image, 1: reduced image, 2: single
+          page, 4: transparency mask.
+
         Returns
         -------
         ifd : IFDEntry
+
         """
         for ifd in self.IFD:
             if ifd.get_value('NewSubfileType') == subfile_type:
@@ -392,7 +399,8 @@ class TIFFfile(TiffBase):
         time_lst = self.time
         for ifd in self.IFD:
             if ifd.get_value('NewSubfileType', subfile_type) != subfile_type:
-                # subfile_type: 0: image, 1: reduced image, 2: single page, 4: transparency mask
+                # subfile_type: 0: image, 1: reduced image,
+                # 2: single page, 4: transparency mask
                 continue
             plane = TiffSamplePlane(ifd, sample_index=sample_index)
             if time_lst is not None:
@@ -403,13 +411,13 @@ class TIFFfile(TiffBase):
         return tiff_array
 
     def get_samples(self, subfile_type=0, verbose=False):
-        """
-        Return samples and sample names.
+        """Return samples and sample names.
 
         Parameters
         ----------
         subfile_type : {0, 1}
-          Specify subfile type. Subfile type 1 corresponds to reduced resolution image.
+          Specify subfile type. Subfile type 1 corresponds to reduced
+          resolution image.
         verbose : bool
           When True the print out information about samples
 
@@ -419,8 +427,9 @@ class TIFFfile(TiffBase):
           List of numpy.memmap arrays of samples
         sample_names : list
           List of the corresponding sample names
+
         """
-        l = []
+        lst = []
         i = 0
         step = 0
         can_return_memmap = True
@@ -435,7 +444,8 @@ class TIFFfile(TiffBase):
 
             strip_offsets = ifd.get_value('StripOffsets')
             strip_nbytes = ifd.get_value('StripByteCounts')
-            l.append((strip_offsets[0], strip_offsets[-1] + strip_nbytes[-1]))
+            lst.append(
+                (strip_offsets[0], strip_offsets[-1] + strip_nbytes[-1]))
             for off, nb in zip(strip_offsets, strip_nbytes):
                 full_l.append((off, off + nb))
 
@@ -443,7 +453,6 @@ class TIFFfile(TiffBase):
                 compression = ifd.get_value('Compression')
                 if compression != 1:
                     can_return_memmap = False
-                    # raise ValueError('Unable to get contiguous samples from compressed data (compression=%s)' % (compression))
                 width = ifd.get_value('ImageWidth')
                 length = ifd.get_value('ImageLength')
                 samples_per_pixel = ifd.get_value('SamplesPerPixel')
@@ -459,8 +468,9 @@ class TIFFfile(TiffBase):
                 format = sample_format_map.get(sample_format)
                 if format is None:
                     print(
-                        'Warning(TIFFfile.get_samples): unsupported sample_format=%s is mapped to uint' % (
-                        sample_format))
+                        'Warning(TIFFfile.get_samples): unsupported'
+                        ' sample_format=%s is mapped to uint' % (
+                            sample_format))
                     format = 'uint'
 
                 dtype_lst = []
@@ -474,12 +484,12 @@ class TIFFfile(TiffBase):
                 assert 8 * bytes_per_pixel == bits_per_pixel, repr(
                     bits_per_pixel)
                 bytes_per_row = width * bytes_per_pixel
-                strip_length = l[-1][1] - l[-1][0]
+                strip_length = lst[-1][1] - lst[-1][0]
                 strip_length_str = bytes2str(strip_length)
                 bytes_per_image = length * bytes_per_row
 
                 rows_per_strip = bytes_per_image // (
-                bytes_per_row * strips_per_image)
+                    bytes_per_row * strips_per_image)
                 if bytes_per_image % (bytes_per_row * strips_per_image):
                     rows_per_strip += 1
                 assert rows_per_strip == ifd.get_value('RowsPerStrip',
@@ -494,30 +504,30 @@ class TIFFfile(TiffBase):
                 assert width == ifd.get_value('ImageWidth', width), repr(
                     (width, ifd.get_value('ImageWidth')))
                 assert length == ifd.get_value('ImageLength', length), repr(
-                    (length, ifd.get_value('ImageLength')))
+                   (length, ifd.get_value('ImageLength')))
                 # assert samples_per_pixel == ifd.get(
                 # 'SamplesPerPixel').value, `samples_per_pixel, ifd.get(
                 # 'SamplesPerPixel').value`
                 assert planar_config == ifd.get_value('PlanarConfiguration',
                                                       planar_config)
                 if can_return_memmap:
-                    assert strip_length == l[-1][1] - l[-1][0], repr(
-                        (strip_length, l[-1][1] - l[-1][0]))
+                    assert strip_length == lst[-1][1] - lst[-1][0], repr(
+                       (strip_length, lst[-1][1] - lst[-1][0]))
                 else:
-                    strip_length = max(strip_length, l[-1][1] - l[-1][0])
+                    strip_length = max(strip_length, lst[-1][1] - lst[-1][0])
                     strip_length_str = ' < ' + bytes2str(strip_length)
 
-                assert (bits_per_sample == ifd.get_value('BitsPerSample',
-                                                         bits_per_sample)).all(), repr(
-                    (bits_per_sample, ifd.get_value('BitsPerSample')))
+                assert(bits_per_sample == ifd.get_value(
+                    'BitsPerSample',
+                    bits_per_sample)).all(), repr(
+                        (bits_per_sample, ifd.get_value('BitsPerSample')))
             if i > 0:
                 if i == 1:
-                    step = l[-1][0] - l[-2][1]
-                    assert step >= 0, repr((step, l[-2], l[-1]))
+                    step = lst[-1][0] - lst[-2][1]
+                    assert step >= 0, repr((step, lst[-2], lst[-1]))
                 else:
-                    if step != l[-1][0] - l[-2][1]:
+                    if step != lst[-1][0] - lst[-2][1]:
                         can_return_memmap = False
-                        # assert step == l[-1][0] - l[-2][1],`step, l[-2], l[-1], (l[-1][0] - l[-2][1]), i`
             i += 1
 
         if verbose:
@@ -556,7 +566,6 @@ strip_length : %(strip_length_str)s
                                       dtype=self.dtypes.uint8)
                     bytes_per_strip = rows_per_strip * bytes_per_row
                     for start, end in full_l:
-                        # sys.stdout.write ("%s:%s," % (start, end)); sys.stdout.flush ()
                         if compression == 1:  # none
                             d = self.data[start:end]
                         elif compression == 5:  # lzw
@@ -565,7 +574,7 @@ strip_length : %(strip_length_str)s
                         arr[i:i + d.nbytes] = d
                         i += d.nbytes
                     arr = arr.view(dtype=dtype_lst[0]).reshape(
-                        (depth, length, width))
+                       (depth, length, width))
                     return [arr], sample_names
                 else:
                     i = 0
@@ -573,7 +582,7 @@ strip_length : %(strip_length_str)s
                                       dtype=self.dtypes.uint8)
                     bytes_per_strip = rows_per_strip * bytes_per_row
                     for start, end in full_l:
-                        sys.stdout.write("%s:%s," % (start, end));
+                        sys.stdout.write("%s:%s," % (start, end))
                         sys.stdout.flush()
                         if compression == 1:  # none
                             d = self.data[start:end]
@@ -591,15 +600,15 @@ strip_length : %(strip_length_str)s
             else:
                 raise NotImplementedError(repr(planar_config))
 
-        start = l[0][0]
-        end = l[-1][1]
+        start = lst[0][0]
+        end = lst[-1][1]
         if start > step:
             arr = self.data[start - step: end].reshape(
-                (depth, strip_length + step))
+               (depth, strip_length + step))
             k = step
         elif end <= self.data.size - step:
             arr = self.data[start: end + step].reshape(
-                (depth, strip_length + step))
+               (depth, strip_length + step))
             k = 0
         else:
             raise NotImplementedError(repr((start, end, step)))
@@ -646,15 +655,15 @@ strip_length : %(strip_length_str)s
     def get_info(self):
         """ Return basic information about the file.
         """
-        l = []
+        lst = []
         subfile_types = self.get_subfile_types()
-        l.append('Number of subfile types: %s' % (len(subfile_types)))
+        lst.append('Number of subfile types: %s' % (len(subfile_types)))
         for subfile_type in subfile_types:
             ifd = self.get_first_ifd(subfile_type=subfile_type)
-            l.append('-' * 50)
-            l.append('Subfile type: %s' % (subfile_type))
-            l.append('Number of images: %s' % (
-            self.get_depth(subfile_type=subfile_type)))
+            lst.append('-' * 50)
+            lst.append('Subfile type: %s' % (subfile_type))
+            lst.append('Number of images: %s' % (
+                self.get_depth(subfile_type=subfile_type)))
             for tag in ['ImageLength',
                         'ImageWidth',
                         'SamplesPerPixel', 'ExtraSamples',
@@ -684,18 +693,18 @@ strip_length : %(strip_length_str)s
                             tree = lxml.etree.fromstring(v)
                             v = lxml.etree.tostring(tree, pretty_print=True)
                         except Exception as msg:
-                            print(
-                                '%s.get_info: failed to parse xml in ImageDescription: %s' % (
-                                self.__class__.__name__, msg))
-                        l.append('%s:\n"""%s"""' % (tag, v))
+                            print('%s.get_info: failed to parse xml in'
+                                  ' ImageDescription: %s' % (
+                                      self.__class__.__name__, msg))
+                        lst.append('%s:\n"""%s"""' % (tag, v))
                     else:
-                        l.append('%s:\n"""%s"""' % (tag, v))
+                        lst.append('%s:\n"""%s"""' % (tag, v))
                 else:
-                    l.append('%s: %s' % (tag, v))
+                    lst.append('%s: %s' % (tag, v))
             if self.is_lsm and subfile_types == 0:
-                l.append('LSM info:\n"""%s"""' % (self.lsminfo))
+                lst.append('LSM info:\n"""%s"""' % (self.lsminfo))
 
-        return '\n'.join(l)
+        return '\n'.join(lst)
 
 
 TiffFile = TIFFfile
@@ -729,22 +738,22 @@ class IFD:
 
     @property
     def memory_usage(self):
-        l = []
+        lst = []
         for entry in self.entries:
-            l.extend(entry.memory_usage)
-        return l
+            lst.extend(entry.memory_usage)
+        return lst
 
     def __str__(self):
-        l = []
+        lst = []
         for entry in self.entries:
-            l.append(str(entry))
-        return '\n'.join(l)
+            lst.append(str(entry))
+        return '\n'.join(lst)
 
     def human(self):
-        l = []
+        lst = []
         for entry in self.entries:
-            l.append(entry.human())
-        return '\n'.join(l)
+            lst.append(entry.human())
+        return '\n'.join(lst)
 
     def get(self, tag_name):
         """Return IFD entry with given tag name.
@@ -911,15 +920,14 @@ class IFD:
                     dtype = getattr(self.dtypes,
                                     'uint%s' % (bits_per_sample[i]))
                     r[channel_names[i]] = self.tiff.data[
-                                          strip_offsets[i]:strip_offsets[i] +
-                                                           strip_nbytes[
-                                                               i]].view(
-                        dtype=dtype).reshape((width, length))
+                        strip_offsets[i]:strip_offsets[i] +
+                        strip_nbytes[i]].view(
+                            dtype=dtype).reshape((width, length))
                 else:
                     dtype = getattr(self.dtypes, 'uint%s' % (bits_per_sample))
                     r[channel_names[i]] = self.tiff.data[
-                                          strip_offsets:strip_offsets + strip_nbytes].view(
-                        dtype=dtype).reshape((width, length))
+                        strip_offsets:strip_offsets + strip_nbytes].view(
+                            dtype=dtype).reshape((width, length))
             return r
         else:
             raise NotImplementedError(repr(self.tiff))
@@ -1041,10 +1049,10 @@ class IFDEntry:
             value = tiff.get_values(self.offset, self.type, self.count)
         if value is not None:
             self.value = value
-        tag_name = self.tag_name = tag_value2name.get(self.tag, 'TAG%s' % (
-        hex(self.tag),))
+        self.tag_name = tag_value2name.get(self.tag, 'TAG%s'
+                                           % (hex(self.tag), ))
 
-        self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type,))
+        self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type, ))
 
         self.memory_usage = []
 
@@ -1072,11 +1080,13 @@ class IFDEntry:
             if isinstance(r, str):
                 return r
         if hasattr(self, 'value'):
-            return 'IFDEntry(tag=%(tag_name)s, value=%(value)r, count=%(count)s, offset=%(offset)s)' % (
-            self.__dict__)
+            return ('IFDEntry(tag=%(tag_name)s, value=%(value)r,'
+                    ' count=%(count)s, offset=%(offset)s)' % (
+                        self.__dict__))
         else:
-            return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (
-            self.__dict__)
+            return ('IFDEntry(tag=%(tag_name)s, type=%(type_name)s,'
+                    ' count=%(count)s, offset=%(offset)s)' % (
+                        self.__dict__))
 
     def human(self):
         if hasattr(self, 'str_hook'):
@@ -1086,14 +1096,17 @@ class IFDEntry:
         if hasattr(self, 'value'):
             self.value_str = self._value_str
             if self.tag_name == 'ImageDescription':
-                return 'IFDEntry(tag=%(tag_name)s, value="%(value_str)s", count=%(count)s, offset=%(offset)s)' % (
-                self.__dict__)
+                return ('IFDEntry(tag=%(tag_name)s, value="%(value_str)s",'
+                        ' count=%(count)s, offset=%(offset)s)' % (
+                            self.__dict__))
             else:
-                return 'IFDEntry(tag=%(tag_name)s, value=%(value_str)r, count=%(count)s, offset=%(offset)s)' % (
-                self.__dict__)
+                return ('IFDEntry(tag=%(tag_name)s, value=%(value_str)r,'
+                        ' count=%(count)s, offset=%(offset)s)' % (
+                            self.__dict__))
         else:
-            return 'IFDEntry(tag=%(tag_name)s, type=%(type_name)s, count=%(count)s, offset=%(offset)s)' % (
-            self.__dict__)
+            return ('IFDEntry(tag=%(tag_name)s, type=%(type_name)s,'
+                    ' count=%(count)s, offset=%(offset)s)' % (
+                        self.__dict__))
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.tiff, self.offset)

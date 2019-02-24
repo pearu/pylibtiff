@@ -2,6 +2,7 @@
 Demonstrates the implementation of a Bloom filter, see:
 http://en.wikipedia.org/wiki/Bloom_filter
 """
+# flake8: noqa
 import hashlib
 from math import exp, log
 

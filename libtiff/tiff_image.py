@@ -255,9 +255,11 @@ class TIFFimage:
             length, width = image.shape
             bytes_per_row = width * image.dtype.itemsize
             rows_per_strip = min(length,
-                                 int(numpy.ceil(float(strip_size) / bytes_per_row)))
+                                 int(numpy.ceil(
+                                     float(strip_size) / bytes_per_row)))
             strips_per_image = int(
-                numpy.floor(float(length + rows_per_strip - 1) / rows_per_strip))
+                numpy.floor(float(
+                    length + rows_per_strip - 1) / rows_per_strip))
             assert bytes_per_row * rows_per_strip * \
                 strips_per_image >= image.nbytes
             d = dict(ImageWidth=width,
@@ -325,7 +327,8 @@ class TIFFimage:
         def tif_write(_tif, _offset, _data):
             end = _offset + _data.nbytes
             if end > _tif.size:
-                size_incr = int(float(end - _tif.size) / 1024 ** 2 + 1) * 1024 ** 2
+                size_incr = int(
+                    float(end - _tif.size) / 1024 ** 2 + 1) * 1024 ** 2
                 new_size = _tif.size + size_incr
                 assert end <= new_size, repr(
                     (end, _tif.size, size_incr, new_size))
@@ -357,7 +360,8 @@ class TIFFimage:
         start_time = time.time()
         compressed_data_size = 0
         for i, (entries, strip_info, image) in enumerate(image_directories):
-            strip_offsets, strip_byte_counts, strips_per_image, rows_per_strip, bytes_per_row = strip_info
+            strip_offsets, strip_byte_counts, strips_per_image,\
+                rows_per_strip, bytes_per_row = strip_info
 
             # write the nof IFD entries
             tif[offset:offset + 2].view(dtype=numpy.uint16)[0] = len(entries)
@@ -422,7 +426,7 @@ class TIFFimage:
                     '\r  filling records: %5s%% done (%s/s)%s' %
                     (int(100.0 * (i + 1) / len(image_directories)),
                      bytes2str(int(float(image_data_offset -
-                                    first_image_data_offset) /
+                                         first_image_data_offset) /
                                    (time.time() - start_time))), ' ' * 2))
                 if (i + 1) == len(image_directories):
                     sys.stdout.write('\n')

@@ -1,7 +1,5 @@
-
 # Author: Pearu Peterson
 # Created: June 2010
-
 
 __all__ = ['bytes2str', 'isindisk']
 
@@ -10,38 +8,43 @@ import optparse
 
 VERBOSE = False
 
+
 def isindisk(path):
     """ Return True if path is stored in a local disk.
     """
-    return os.major(os.stat(path).st_dev) in [3, # HD 
-                                              8, # SCSI
+    return os.major(os.stat(path).st_dev) in [3,  # HD
+                                              8,  # SCSI
                                               ]
 
+
 def bytes2str(bytes):
-    l = []
+    lst = []
     Pbytes = bytes//1024**5
     if Pbytes:
-        l.append('%sPi' % (Pbytes))
+        lst.append('%sPi' % (Pbytes))
         bytes = bytes - 1024**5 * Pbytes
     Tbytes = bytes//1024**4
     if Tbytes:
-        l.append('%sTi' % (Tbytes))
+        lst.append('%sTi' % (Tbytes))
         bytes = bytes - 1024**4 * Tbytes
     Gbytes = bytes//1024**3
     if Gbytes:
-        l.append('%sGi' % (Gbytes))
+        lst.append('%sGi' % (Gbytes))
         bytes = bytes - 1024**3 * Gbytes
     Mbytes = bytes//1024**2
     if Mbytes:
-        l.append('%sMi' % (Mbytes))
+        lst.append('%sMi' % (Mbytes))
         bytes = bytes - 1024**2 * Mbytes
     kbytes = bytes//1024
     if kbytes:
-        l.append('%sKi' % (kbytes))
+        lst.append('%sKi' % (kbytes))
         bytes = bytes - 1024*kbytes
-    if bytes: l.append('%s' % (bytes))
-    if not l: return '0 bytes'
-    return '+'.join(l) + ' bytes'
+    if bytes:
+        lst.append('%s' % (bytes))
+    if not lst:
+        return '0 bytes'
+    return '+'.join(lst) + ' bytes'
+
 
 class Options(optparse.Values):
     """Holds option keys and values.
@@ -68,11 +71,12 @@ class Options(optparse.Values):
     --------
     __init__
     """
+
     def __init__(self, *args, **kws):
         """Construct Options instance.
 
         The following constructions are supported:
-        
+
         + construct Options instance from keyword arguments::
 
             Options(key1 = value1, key2 = value2, ...)
@@ -83,18 +87,18 @@ class Options(optparse.Values):
             Options(<Values instance>, key1 = value1, ...)
 
         + construct Options instance from Options instance::
-        
+
             Options(<Options instance>, key1 = value1, ...)
-        
+
           Note that both Options instances will share options data.
 
         See also
         --------
         Options
         """
-        if len(args)==0:
+        if len(args) == 0:
             optparse.Values.__init__(self, kws)
-        elif len (args)==1:
+        elif len(args) == 1:
             arg = args[0]
             if isinstance(arg, Options):
                 self.__dict__ = arg.__dict__
@@ -102,12 +106,13 @@ class Options(optparse.Values):
             elif isinstance(arg, optparse.Values):
                 optparse.Values.__init__(self, arg.__dict__)
                 self.__dict__.update(**kws)
-            elif isinstance(arg, type (None)):
+            elif isinstance(arg, type(None)):
                 optparse.Values.__init__(self, kws)
             else:
                 raise NotImplementedError(repr(arg))
         else:
             raise NotImplementedError(repr(args))
+
     def get(self, **kws):
         """Return option value.
 
@@ -119,7 +124,7 @@ class Options(optparse.Values):
         Parameters
         ----------
         key = default_value
-          Specify option key and its default value. 
+          Specify option key and its default value.
 
         Returns
         -------
@@ -130,7 +135,7 @@ class Options(optparse.Values):
         --------
         Options
         """
-        assert len (kws)==1,repr(kws)
+        assert len(kws) == 1, repr(kws)
         key, default = list(kws.items())[0]
         if key not in self.__dict__:
             if VERBOSE:
@@ -141,17 +146,19 @@ class Options(optparse.Values):
             value = self.__dict__[key] = default
         return value
 
+
 def splitcommandline(line):
-    items, stopchar = splitquote (line)
+    items, stopchar = splitquote(line)
     result = []
     for item in items:
-        if item[0]==item[-1] and item[0] in '\'"':
-            result.append (item[1:-1])
+        if item[0] == item[-1] and item[0] in '\'"':
+            result.append(item[1:-1])
         else:
-            result.extend (item.split())
+            result.extend(item.split())
     return result
 
-def splitquote(line, stopchar=None, lower=False, quotechars = '"\''):
+
+def splitquote(line, stopchar=None, lower=False, quotechars='"\''):
     """
     Fast LineSplitter.
 
@@ -161,11 +168,12 @@ def splitquote(line, stopchar=None, lower=False, quotechars = '"\''):
     i = 0
     while 1:
         try:
-            char = line[i]; i += 1
+            char = line[i]
+            i += 1
         except IndexError:
             break
-        l = []
-        l_append = l.append
+        lst = []
+        l_append = lst.append
         nofslashes = 0
         if stopchar is None:
             # search for string start
@@ -174,46 +182,51 @@ def splitquote(line, stopchar=None, lower=False, quotechars = '"\''):
                     stopchar = char
                     i -= 1
                     break
-                if char=='\\':
+                if char == '\\':
                     nofslashes += 1
                 else:
                     nofslashes = 0
                 l_append(char)
                 try:
-                    char = line[i]; i += 1
+                    char = line[i]
+                    i += 1
                 except IndexError:
                     break
-            if not l: continue
-            item = ''.join(l)
-            if lower: item = item.lower()
+            if not lst:
+                continue
+            item = ''.join(lst)
+            if lower:
+                item = item.lower()
             items.append(item)
             continue
-        if char==stopchar:
+        if char == stopchar:
             # string starts with quotechar
             l_append(char)
             try:
-                char = line[i]; i += 1
+                char = line[i]
+                i += 1
             except IndexError:
-                if l:
-                    item = str(''.join(l))
+                if lst:
+                    item = str(''.join(lst))
                     items.append(item)
                 break
         # else continued string
         while 1:
-            if char==stopchar and not nofslashes % 2:
+            if char == stopchar and not nofslashes % 2:
                 l_append(char)
                 stopchar = None
                 break
-            if char=='\\':
+            if char == '\\':
                 nofslashes += 1
             else:
                 nofslashes = 0
             l_append(char)
             try:
-                char = line[i]; i += 1
+                char = line[i]
+                i += 1
             except IndexError:
                 break
-        if l:
-            item = str(''.join(l))
+        if lst:
+            item = str(''.join(lst))
             items.append(item)
     return items, stopchar

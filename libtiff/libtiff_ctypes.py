@@ -6,6 +6,8 @@ See TIFF.__doc__ for usage information.
 
 Homepage:  http://pylibtiff.googlecode.com/
 """
+# flake8: noqa for F821
+
 from __future__ import print_function
 import os
 import sys
@@ -20,7 +22,7 @@ __all__ = ['libtiff', 'TIFF']
 cwd = os.getcwd()
 try:
     os.chdir(os.path.dirname(__file__))
-    if os.name=='nt':
+    if os.name == 'nt':
         # assume that the directory of libtiff3.dll is in PATH.
         lib = ctypes.util.find_library('libtiff3')
         if lib is None:
@@ -28,8 +30,10 @@ try:
         if lib is None:
             # try default installation path:
             lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
-            if os.path.isfile (lib):
-                print('You should add %r to PATH environment variable and reboot.' % (os.path.dirname (lib)))
+            if os.path.isfile(lib):
+                print('You should add %r to PATH environment'
+                      ' variable and reboot.'
+                      % (os.path.dirname(lib)))
             else:
                 lib = None
     else:
@@ -50,9 +54,9 @@ try:
             else:
                 libtiff = ctypes.cdll.LoadLibrary("libtiff.so")
         except OSError:
-            raise ImportError('Failed to find TIFF library. Make sure that libtiff '
-                              'is installed and its location is listed in '
-                              'PATH|LD_LIBRARY_PATH|..')
+            raise ImportError('Failed to find TIFF library. Make sure that'
+                              ' libtiff is installed and its location is'
+                              ' listed in PATH|LD_LIBRARY_PATH|..')
 finally:
     os.chdir(cwd)
 
@@ -74,7 +78,7 @@ if tiff_h is None:
     # WARNING: there is not guarantee that the tiff.h found below will
     # correspond to libtiff version. Although, for clean distros the
     # probability is high.
-    
+
     include_tiff_h = os.path.join(os.path.split(lib)[0], '..', 'include',
                                   'tiff.h')
     if not os.path.isfile(include_tiff_h):
@@ -98,7 +102,7 @@ if tiff_h is None:
                          'run: sudo apt-get install libtiff4-dev)')
     # Read TIFFTAG_* constants for the header file:
     f = open(include_tiff_h, 'r')
-    l = []
+    lst = []
     d = {}
     for line in f.readlines():
         if not line.startswith('#define'):
@@ -118,18 +122,18 @@ if tiff_h is None:
         else:
             try:
                 value = eval(value)
-            except:
-                print(repr((value, line)))
+            except Exception as msg:
+                print(repr((value, line)), msg)
                 raise
         d[name] = value
-        l.append('%s = %s' % (name, value))
+        lst.append('%s = %s' % (name, value))
     f.close()
 
     fn = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       tiff_h_name + '.py')
-    print('Generating %r from %r' % (fn,include_tiff_h))
+    print('Generating %r from %r' % (fn, include_tiff_h))
     f = open(fn, 'w')
-    f.write('\n'.join(l) + '\n')
+    f.write('\n'.join(lst) + '\n')
     f.close()
 else:
     d = tiff_h.__dict__
@@ -341,7 +345,7 @@ tifftags = {
     # TIFFTAG_ICCPROFILE              2      uint32*,void**   count,
     #                                                         profile data
 
-    # TIFFTAG: type, conversion  
+    # TIFFTAG: type, conversion
     # 3 uint16* for Set, 3 uint16** for Get; size:(1<<BitsPerSample arrays)
     TIFFTAG_COLORMAP: (ctypes.c_uint16, lambda _d: (
         _d[0].contents[:], _d[1].contents[:], _d[2].contents[:])),
@@ -380,8 +384,11 @@ tifftags = {
         ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
     TIFFTAG_TILEOFFSETS: (
         ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
-    # Contrarily to the libtiff documentation, in libtiff 4.0, the SubIFD array is always 64-bits
-    TIFFTAG_SUBIFD: ((ctypes.c_uint16, ctypes.c_uint64), lambda d:d[1][:d[0]]),  # uint16*,uint64**  count & IFD arrays
+    # Contrarily to the libtiff documentation, in libtiff 4.0, the
+    # SubIFD array is always 64-bits
+    TIFFTAG_SUBIFD: (
+        (ctypes.c_uint16, ctypes.c_uint64),
+        lambda d: d[1][:d[0]]),  # uint16*, uint64**  count & IFD arrays
     TIFFTAG_BITSPERSAMPLE: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_CLEANFAXDATA: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_COMPRESSION: (ctypes.c_uint16, lambda _d: _d.value),
@@ -396,7 +403,9 @@ tifftags = {
     TIFFTAG_PLANARCONFIG: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_PREDICTOR: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_RESOLUTIONUNIT: (ctypes.c_uint16, lambda _d: _d.value),
-    TIFFTAG_EXTRASAMPLES: ((ctypes.c_uint16, ctypes.c_uint16), lambda d:d[1][:d[0]]),  # uint16*,uint16**  count & types array
+    TIFFTAG_EXTRASAMPLES: (
+        (ctypes.c_uint16, ctypes.c_uint16),
+        lambda d: d[1][:d[0]]),  # uint16*, uint16**  count & types array
     TIFFTAG_SAMPLEFORMAT: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_YCBCRPOSITIONING: (ctypes.c_uint16, lambda _d: _d.value),
 
@@ -444,7 +453,7 @@ class TIFF(ctypes.c_void_p):
     To open a tiff file for reading, use
 
       tiff = TIFF.open (filename, more='r')
-      
+
     To read an image from a tiff file, use
 
       image = tiff.read_image()
@@ -497,11 +506,12 @@ class TIFF(ctypes.c_void_p):
                 filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
                 # Python2: it needs str for the arguments of type "c_char_p"
-                if isinstance(filename, unicode):
+                if isinstance(filename, unicode):  # noqa: F821
                     filename = filename.encode(sys.getfilesystemencoding())
         except Exception as ex:
             # It's probably going to not work, but let it try
-            print('Warning: filename argument is of wrong type or encoding: %s' % ex)
+            print('Warning: filename argument is of wrong type or encoding: %s'
+                  % ex)
 
         tiff = libtiff.TIFFOpen(filename, mode.encode('ascii'))
         if tiff.value is None:
@@ -542,9 +552,10 @@ class TIFF(ctypes.c_void_p):
                 'SamplesPerPixel')  # this number includes extra samples
             if samples_pp is None:  # default is 1
                 samples_pp = 1
-            # Note: In the TIFF specification, BitsPerSample and SampleFormat are
-            # per samples. However, libtiff doesn't support mixed format,
-            # so it will always return just one value (or raise an error).
+            # Note: In the TIFF specification, BitsPerSample and
+            # SampleFormat are per samples. However, libtiff doesn't
+            # support mixed format, so it will always return just one
+            # value (or raise an error).
             bits = self.GetField('BitsPerSample')
             sample_format = self.GetField('SampleFormat')
             planar_config = self.GetField('PlanarConfig')
@@ -567,7 +578,8 @@ class TIFF(ctypes.c_void_p):
                 elif planar_config == PLANARCONFIG_SEPARATE:
                     arr = np.empty((samples_pp, height, width), typ)
                 else:
-                    raise IOError("Unexpected PlanarConfig = %d" % planar_config)
+                    raise IOError("Unexpected PlanarConfig = %d"
+                                  % planar_config)
             size = arr.nbytes
 
             if compression == COMPRESSION_NONE:
@@ -577,7 +589,8 @@ class TIFF(ctypes.c_void_p):
 
             pos = 0
             for strip in range(self.NumberOfStrips()):
-                elem = ReadStrip(strip, arr.ctypes.data + pos, max(size - pos, 0))
+                elem = ReadStrip(strip, arr.ctypes.data + pos,
+                                 max(size - pos, 0))
                 if elem <= 0:
                     raise IOError("Failed to read strip")
                 pos += elem
@@ -759,7 +772,8 @@ class TIFF(ctypes.c_void_p):
         if len(shape) == 1:
             shape = (shape[0], 1)  # Same as 2D with height == 1
 
-        def write_plane(arr, tile_arr, width, height, plane_index=0, depth_index=0):
+        def write_plane(arr, tile_arr, width, height,
+                        plane_index=0, depth_index=0):
             """ Write all tiles of one plane
             """
             written_bytes = 0
@@ -778,7 +792,8 @@ class TIFF(ctypes.c_void_p):
                     tile_arr[:this_tile_height, :this_tile_width] = \
                         arr[y:y + this_tile_height, x:x + this_tile_width]
 
-                    r = self.WriteTile(tile_arr.ctypes.data, x, y, depth_index, plane_index)
+                    r = self.WriteTile(tile_arr.ctypes.data, x, y,
+                                       depth_index, plane_index)
                     written_bytes += r.value
 
             return written_bytes
@@ -820,16 +835,21 @@ class TIFF(ctypes.c_void_p):
                                   count=(depth - 3))
 
                 if planar_config == PLANARCONFIG_CONTIG:
-                    # if there is more than one sample per pixel and it's contiguous in memory,
-                    # there is only one plane
-                    tile_arr = np.zeros((tile_height, tile_width, depth), dtype=arr.dtype)
-                    total_written_bytes = write_plane(arr, tile_arr, width, height)
+                    # if there is more than one sample per pixel and
+                    # it's contiguous in memory, there is only one
+                    # plane
+                    tile_arr = np.zeros((tile_height, tile_width, depth),
+                                        dtype=arr.dtype)
+                    total_written_bytes = write_plane(arr, tile_arr,
+                                                      width, height)
                 else:
                     # multiple samples per pixel, each sample in one plane
-                    tile_arr = np.zeros((tile_height, tile_width), dtype=arr.dtype)
+                    tile_arr = np.zeros((tile_height, tile_width),
+                                        dtype=arr.dtype)
                     for plane_index in range(depth):
                         total_written_bytes += \
-                            write_plane(arr[plane_index], tile_arr, width, height, plane_index)
+                            write_plane(arr[plane_index], tile_arr,
+                                        width, height, plane_index)
 
                 self.WriteDirectory()
             else:
@@ -840,9 +860,12 @@ class TIFF(ctypes.c_void_p):
                 self.SetField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG)
                 self.SetField(TIFFTAG_IMAGEDEPTH, depth)
                 for depth_index in range(depth):
-                    # if there's only one sample per pixel, there is only one plane
-                    tile_arr = np.zeros((tile_height, tile_width), dtype=arr.dtype)
-                    total_written_bytes += write_plane(arr[depth_index], tile_arr, width, height,
+                    # if there's only one sample per pixel, there is
+                    # only one plane
+                    tile_arr = np.zeros((tile_height, tile_width),
+                                        dtype=arr.dtype)
+                    total_written_bytes += write_plane(arr[depth_index],
+                                                       tile_arr, width, height,
                                                        0, depth_index)
                 self.WriteDirectory()
         else:
@@ -850,10 +873,8 @@ class TIFF(ctypes.c_void_p):
 
         return total_written_bytes
 
-
     def read_one_tile(self, x, y):
-        """
-        Reads one tile from the TIFF image
+        """Reads one tile from the TIFF image
 
         Parameters
         ----------
@@ -865,12 +886,16 @@ class TIFF(ctypes.c_void_p):
         Returns
         -------
         numpy.array
-            If there's only one sample per pixel, it returns a numpy array with 2 dimensions (x, y)
-            if the image has more than one sample per pixel (SamplesPerPixel > 1),
-            it will return a numpy array with 3 dimensions. If PlanarConfig == PLANARCONFIG_CONTIG,
-            the returned dimensions will be (x, y, sample_index). 
-            If PlanarConfig == PLANARCONFIG_SEPARATE, 
-            the returned dimensions will be (sample_index, x, y).
+            If there's only one sample per pixel, it returns a numpy
+            array with 2 dimensions (x, y)
+
+            If the image has more than one sample per pixel
+            (SamplesPerPixel > 1), it will return a numpy array with 3
+            dimensions. If PlanarConfig == PLANARCONFIG_CONTIG, the
+            returned dimensions will be (x, y, sample_index).
+
+            If PlanarConfig == PLANARCONFIG_SEPARATE, the returned
+            dimensions will be (sample_index, x, y).
         """
 
         num_tcols = self.GetField("TileWidth")
@@ -916,18 +941,23 @@ class TIFF(ctypes.c_void_p):
         this_tile_width = min(num_tcols, num_icols - x)
 
         def read_plane(tile_plane, plane_index=0, depth_index=0):
-            """ Read one plane from TIFF. The TIFF has more than one plane only if
-            it has more than one sample per pixel, and planar_config == PLANARCONFIG_SEPARATE
+            """Read one plane from TIFF.
+
+            The TIFF has more than one plane only if it has more than
+            one sample per pixel, and planar_config ==
+            PLANARCONFIG_SEPARATE
             """
-            # the numpy array should be contigous in memory before calling ReadTile
+            # the numpy array should be contigous in memory before
+            # calling ReadTile
             tile_plane = np.ascontiguousarray(tile_plane)
-            # even if the tile is on the edge, and the final size will be smaller,
-            # the size of the array passed to the ReadTile function
-            # must be (num_tcols, num_trows)
+            # even if the tile is on the edge, and the final size will
+            # be smaller, the size of the array passed to the ReadTile
+            # function must be (num_tcols, num_trows)
             #
             # The image has only one depth (ImageDepth == 1), so
             # the z parameter is not read
-            r = self.ReadTile(tile_plane.ctypes.data, x, y, depth_index, plane_index)
+            r = self.ReadTile(tile_plane.ctypes.data, x, y,
+                              depth_index, plane_index)
             if not r:
                 raise ValueError(
                     "Could not read tile x:%d,y:%d,z:%d,sample:%d from file" %
@@ -935,7 +965,8 @@ class TIFF(ctypes.c_void_p):
 
             # check if the tile is on the edge of the image
             if this_tile_height < num_trows or this_tile_width < num_tcols:
-                # if the tile is on the edge of the image, generate a smaller tile
+                # if the tile is on the edge of the image, generate a
+                # smaller tile
                 tile_plane = tile_plane[:this_tile_height, :this_tile_width]
 
             return tile_plane
@@ -949,31 +980,40 @@ class TIFF(ctypes.c_void_p):
             else:
                 if planar_config == PLANARCONFIG_CONTIG:
                     # the tile plane has always the size of a full tile
-                    tile_plane = np.empty((num_trows, num_tcols, samples_pp), dtype=dtype)
+                    tile_plane = np.empty((num_trows, num_tcols, samples_pp),
+                                          dtype=dtype)
                     # this tile may be smaller than tile_plane,
                     # if the tile is on the edge of the image
                     tile = read_plane(tile_plane)
                 else:
                     # the tile plane has always the size of a full tile
-                    tile_plane = np.empty((samples_pp, num_trows, num_tcols), dtype=dtype)
+                    tile_plane = np.empty((samples_pp, num_trows, num_tcols),
+                                          dtype=dtype)
                     # this tile may be smaller than tile_plane,
                     # if the tile is on the edge of the image
-                    tile = np.empty((samples_pp, this_tile_height, this_tile_width), dtype=dtype)
+                    tile = np.empty((samples_pp, this_tile_height,
+                                     this_tile_width), dtype=dtype)
                     for plane_index in range(samples_pp):
-                        tile[plane_index] = read_plane(tile_plane[plane_index], plane_index)
+                        tile[plane_index] = read_plane(
+                            tile_plane[plane_index], plane_index)
 
         else:
             if samples_pp > 1:
-                raise NotImplementedError("ImageDepth > 1 and SamplesPerPixel > 1 not implemented")
+                raise NotImplementedError(
+                    "ImageDepth > 1 and SamplesPerPixel > 1 not implemented")
 
             # the tile plane has always the size of a full tile
-            tile_plane = np.zeros((num_idepth, num_trows, num_tcols), dtype=dtype)
+            tile_plane = np.zeros((num_idepth, num_trows, num_tcols),
+                                  dtype=dtype)
             # this tile may be smaller than tile_plane,
             # if the tile is on the edge of the image
-            tile = np.empty((num_idepth, this_tile_height, this_tile_width), dtype=dtype)
+            tile = np.empty((num_idepth, this_tile_height, this_tile_width),
+                            dtype=dtype)
             for depth_index in range(num_idepth):
-                # As samples_pp == 1, there's only one plane, so the z parameter is not read
-                tile[depth_index] = read_plane(tile_plane[depth_index], 0, depth_index)
+                # As samples_pp == 1, there's only one plane, so the z
+                # parameter is not read
+                tile[depth_index] = read_plane(
+                    tile_plane[depth_index], 0, depth_index)
 
         return tile
 
@@ -1004,10 +1044,12 @@ class TIFF(ctypes.c_void_p):
         def read_plane(plane, tmp_tile, plane_index=0, depth_index=0):
             for y in range(0, num_irows, num_trows):
                 for x in range(0, num_icols, num_tcols):
-                    r = self.ReadTile(tmp_tile.ctypes.data, x, y, depth_index, plane_index)
+                    r = self.ReadTile(tmp_tile.ctypes.data, x, y,
+                                      depth_index, plane_index)
                     if not r:
                         raise ValueError(
-                            "Could not read tile x:%d,y:%d,z:%d,sample:%d from file" %
+                            "Could not read tile x:%d,y:%d,z:%d,sample:%d"
+                            " from file" %
                             (x, y, plane_index, depth_index))
 
                     # if the tile is on the edge, it is smaller
@@ -1019,26 +1061,36 @@ class TIFF(ctypes.c_void_p):
 
         if samples_pp == 1:
             if num_depths == 1:
-                # if there's only one sample per pixel there is only one plane
-                full_image = np.empty((num_irows, num_icols), dtype=dtype, order='C')
-                tmp_tile = np.empty((num_trows, num_tcols), dtype=dtype, order='C')
+                # if there's only one sample per pixel there is only
+                # one plane
+                full_image = np.empty((num_irows, num_icols),
+                                      dtype=dtype, order='C')
+                tmp_tile = np.empty((num_trows, num_tcols),
+                                    dtype=dtype, order='C')
                 read_plane(full_image, tmp_tile)
             else:
-                full_image = np.empty((num_depths, num_irows, num_icols), dtype=dtype, order='C')
-                tmp_tile = np.empty((num_trows, num_tcols), dtype=dtype, order='C')
+                full_image = np.empty((num_depths, num_irows, num_icols),
+                                      dtype=dtype, order='C')
+                tmp_tile = np.empty((num_trows, num_tcols),
+                                    dtype=dtype, order='C')
                 for depth_index in range(num_depths):
-                    read_plane(full_image[depth_index], tmp_tile, 0, depth_index)
+                    read_plane(full_image[depth_index], tmp_tile, 0,
+                               depth_index)
         else:
             if planar_config == PLANARCONFIG_CONTIG:
-                # if there is more than one sample per pixel and it's contiguous in memory,
-                # there is only one plane
-                full_image = np.empty((num_irows, num_icols, samples_pp), dtype=dtype, order='C')
-                tmp_tile = np.empty((num_trows, num_tcols, samples_pp), dtype=dtype, order='C')
+                # if there is more than one sample per pixel and it's
+                # contiguous in memory, there is only one plane
+                full_image = np.empty((num_irows, num_icols, samples_pp),
+                                      dtype=dtype, order='C')
+                tmp_tile = np.empty((num_trows, num_tcols, samples_pp),
+                                    dtype=dtype, order='C')
                 read_plane(full_image, tmp_tile)
             elif planar_config == PLANARCONFIG_SEPARATE:
                 # multiple samples per pixel, each sample in one plane
-                full_image = np.empty((samples_pp, num_irows, num_icols), dtype=dtype, order='C')
-                tmp_tile = np.empty((num_trows, num_tcols), dtype=dtype, order='C')
+                full_image = np.empty((samples_pp, num_irows, num_icols),
+                                      dtype=dtype, order='C')
+                tmp_tile = np.empty((num_trows, num_tcols),
+                                    dtype=dtype, order='C')
                 for plane_index in range(samples_pp):
                     read_plane(full_image[plane_index], tmp_tile, plane_index)
             else:
@@ -1342,10 +1394,13 @@ class TIFF(ctypes.c_void_p):
                 data = data_type()
 
             if count is None:
-                r = libtiff.TIFFGetField(self, c_ttag_t(tag), ctypes.byref(data))
+                r = libtiff.TIFFGetField(self, c_ttag_t(tag),
+                                         ctypes.byref(data))
             else:
-                # TODO: is this ever used? Is there any tag that is accessed like that?
-                r = libtiff.TIFFGetField(self, c_ttag_t(tag), count, ctypes.byref(data))
+                # TODO: is this ever used? Is there any tag that is
+                # accessed like that?
+                r = libtiff.TIFFGetField(self, c_ttag_t(tag),
+                                         count, ctypes.byref(data))
         if not r:  # tag not defined for current directory
             if not ignore_undefined_tag:
                 print(
@@ -1408,7 +1463,8 @@ class TIFF(ctypes.c_void_p):
 
             if issubclass(data_type, (ctypes.Array, tuple, list)):
                 data = data_type(*_value)
-            elif issubclass(data_type, ctypes._Pointer):  # does not include c_char_p
+            elif issubclass(data_type,
+                            ctypes._Pointer):  # does not include c_char_p
                 # convert to the base type, ctypes will take care of actually
                 # sending it by reference
                 base_type = data_type._type_
@@ -1496,7 +1552,7 @@ class TIFF(ctypes.c_void_p):
             other.SetDirectory(self.CurrentDirectory())
             bits = self.GetField('BitsPerSample')
             sample_format = self.GetField('SampleFormat')
-            assert bits >= 8, repr((bits, sample_format, dtype))
+            assert bits >= 8, repr((bits, sample_format))
             itemsize = bits // 8
             dtype = self.get_numpy_type(bits, sample_format)
             for _name, define in name_define_list:
@@ -1534,24 +1590,27 @@ class TIFF(ctypes.c_void_p):
 
 
 class TIFF3D(TIFF):
-    """ subclass of TIFF for handling import of 3D (multi-directory) files.
-    
-    like TIFF, but TIFF3D.read_image() will attempt to restore a 3D numpy array
-    when given a multi-image TIFF file; performing the inverse of
-    
-    TIFF_instance.write(numpy.zeros((40, 200, 200)))
-    
+    """subclass of TIFF for handling import of 3D (multi-directory) files.
+
+    like TIFF, but TIFF3D.read_image() will attempt to restore a 3D
+    numpy array when given a multi-image TIFF file; performing the
+    inverse of
+
+      TIFF_instance.write(numpy.zeros((40, 200, 200)))
+
     like so:
-    
-    arr = TIFF3D_instance.read_image()
-    arr.shape # gives (40, 200, 200)
-    
+
+      arr = TIFF3D_instance.read_image()
+      arr.shape # gives (40, 200, 200)
+
     if you tried this with a normal TIFF instance, you would get this:
-    
-    arr = TIFF_instance.read_image()
-    arr.shape # gives (200, 200)
-    
-    and you would have to loop over each image by hand with TIFF.iter_images().
+
+      arr = TIFF_instance.read_image()
+      arr.shape # gives (200, 200)
+
+    and you would have to loop over each image by hand with
+    TIFF.iter_images().
+
     """
 
     @classmethod
@@ -1564,11 +1623,12 @@ class TIFF3D(TIFF):
                 filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
                 # Python2: it needs str for the arguments of type "c_char_p"
-                if isinstance(filename, unicode):
+                if isinstance(filename, unicode):  # noqa: F821
                     filename = filename.encode(sys.getfilesystemencoding())
         except Exception as ex:
             # It's probably going to not work, but let it try
-            print('Warning: filename argument is of wrong type or encoding: %s' % ex)
+            print('Warning: filename argument is of wrong type or encoding: %s'
+                  % ex)
         if isinstance(mode, str):
             mode = mode.encode()
 
@@ -1578,7 +1638,7 @@ class TIFF3D(TIFF):
         try:
             # actually call the library function:
             tiff = libtiff.TIFFOpen(filename, mode)
-        except Exception as ex:
+        except Exception:
             raise
         finally:
             # restore the old restype:
@@ -1925,8 +1985,8 @@ def _test_custom_tags():
     ]
 
     # Add tags to the libtiff library
-    test_extender = add_tags(
-        test_tags)  # Keep pointer to extender object, no gc
+    # Keep pointer to extender object, no gc:
+    test_extender = add_tags(test_tags)  # noqa: F841
     _tag_write()
     _tag_read()
 
@@ -1950,19 +2010,24 @@ def _test_tile_write():
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     # 3D Arrays, 3rd dimension as last dimension
-    data_array = np.array(range(2500 * 3000 * 3)).reshape(2500, 3000, 3).astype(np.uint8)
-    assert a.write_tiles(data_array, 512, 528, None, True) == (512 * 528) * 5 * 6 * 3,\
+    data_array = np.array(range(2500 * 3000 * 3)).reshape(
+        2500, 3000, 3).astype(np.uint8)
+    assert a.write_tiles(data_array, 512, 528, None, True) \
+        == (512 * 528) * 5 * 6 * 3,\
         "could not write tile images"  # 3D
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     # 3D Arrays, 3rd dimension as first dimension
-    data_array = np.array(range(2500 * 3000 * 3)).reshape(3, 2500, 3000).astype(np.uint8)
-    assert a.write_tiles(data_array, 512, 528, None, True) == (512 * 528) * 5 * 6 * 3,\
+    data_array = np.array(range(2500 * 3000 * 3)).reshape(
+        3, 2500, 3000).astype(np.uint8)
+    assert a.write_tiles(data_array, 512, 528, None, True)\
+        == (512 * 528) * 5 * 6 * 3,\
         "could not write tile images"  # 3D
     print("Tile Write: Wrote array of shape %r" % (data_array.shape,))
 
     # Grayscale image with 3 depths
-    data_array = np.array(range(2500 * 3000 * 3)).reshape(3, 2500, 3000).astype(np.uint8)
+    data_array = np.array(range(2500 * 3000 * 3)).reshape(
+        3, 2500, 3000).astype(np.uint8)
     written_bytes = a.write_tiles(data_array, 512, 528)
     assert written_bytes == 512 * 528 * 5 * 6 * 3,\
         "could not write tile images, written_bytes: %s" % (written_bytes,)
@@ -1996,7 +2061,8 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     # assert tag values
     for tag in tags:
         field_value = a.GetField(tag['tag'])
-        assert field_value == tag['exp_value'], repr((tag['tag'], tag['exp_value'], field_value))
+        assert field_value == tag['exp_value'],\
+            repr((tag['tag'], tag['exp_value'], field_value))
 
     data_array = a.read_tiles()
     print("Tile Read: Read array of shape %r" % (data_array.shape,))
@@ -2021,12 +2087,15 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     # assert tag values
     for tag in tags:
         field_value = a.GetField(tag['tag'])
-        assert field_value == tag['exp_value'], repr((tag['tag'], tag['exp_value'], field_value))
+        assert field_value == tag['exp_value'],\
+            repr((tag['tag'], tag['exp_value'], field_value))
 
     data_array = a.read_tiles()
     print("Tile Read: Read array of shape %r" % (data_array.shape,))
-    assert data_array.shape == (2500, 3000), "tile data read was the wrong shape"
-    test_array = np.tile(list(range(500)), (2500, 6)).astype(np.uint8).flatten()
+    assert data_array.shape == (2500, 3000),\
+        "tile data read was the wrong shape"
+    test_array = np.tile(list(range(500)),
+                         (2500, 6)).astype(np.uint8).flatten()
     assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,\
         "tile data read was not the same as the expected data"
     print("Tile Read: Data is the same as expected from tile write test")
@@ -2046,13 +2115,16 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     # assert tag values
     for tag in tags:
         field_value = a.GetField(tag['tag'])
-        assert field_value == tag['exp_value'], repr(tag['tag'], tag['exp_value'], field_value)
+        assert field_value == tag['exp_value'],\
+            repr(tag['tag'], tag['exp_value'], field_value)
 
     data_array = a.read_tiles()
     print("Tile Read: Read array of shape %r" % (data_array.shape,))
-    assert data_array.shape == (2500, 3000, 3), "tile data read was the wrong shape"
-    test_array = np.array(range(2500 * 3000 * 3)).reshape(2500, 3000, 3).astype(np.uint8).flatten()
-    assert np.nonzero(data_array.flatten() != test_array)[0].shape[ 0] == 0,\
+    assert data_array.shape == (2500, 3000, 3),\
+        "tile data read was the wrong shape"
+    test_array = np.array(range(2500 * 3000 * 3)).reshape(
+        2500, 3000, 3).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,\
         "tile data read was not the same as the expected data"
     print("Tile Read: Data is the same as expected from tile write test")
 
@@ -2071,13 +2143,16 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     # assert tag values
     for tag in tags:
         field_value = a.GetField(tag['tag'])
-        assert field_value == tag['exp_value'], repr(tag['tag'], tag['exp_value'], field_value)
+        assert field_value == tag['exp_value'],\
+            repr(tag['tag'], tag['exp_value'], field_value)
 
     data_array = a.read_tiles()
     print("Tile Read: Read array of shape %r" % (data_array.shape,))
-    assert data_array.shape == (3, 2500, 3000), "tile data read was the wrong shape"
-    test_array = np.array(range(2500 * 3000 * 3)).reshape(3, 2500, 3000).astype(np.uint8).flatten()
-    assert np.nonzero(data_array.flatten() != test_array)[0].shape[ 0] == 0,\
+    assert data_array.shape == (3, 2500, 3000),\
+        "tile data read was the wrong shape"
+    test_array = np.array(range(2500 * 3000 * 3)).reshape(
+        3, 2500, 3000).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,\
         "tile data read was not the same as the expected data"
     print("Tile Read: Data is the same as expected from tile write test")
 
@@ -2098,17 +2173,21 @@ def _test_tile_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     # assert tag values
     for tag in tags:
         field_value = a.GetField(tag['tag'])
-        assert field_value == tag['exp_value'], repr([tag['tag'], tag['exp_value'], field_value])
+        assert field_value == tag['exp_value'],\
+            repr([tag['tag'], tag['exp_value'], field_value])
 
     data_array = a.read_tiles()
     print("Tile Read: Read array of shape %r" % (data_array.shape,))
-    assert data_array.shape == (3, 2500, 3000), "tile data read was the wrong shape"
-    test_array = np.array(range(2500 * 3000 * 3)).reshape(3, 2500, 3000).astype(np.uint8).flatten()
-    assert np.nonzero(data_array.flatten() != test_array)[0].shape[ 0] == 0,\
+    assert data_array.shape == (3, 2500, 3000),\
+        "tile data read was the wrong shape"
+    test_array = np.array(range(2500 * 3000 * 3)).reshape(
+        3, 2500, 3000).astype(np.uint8).flatten()
+    assert np.nonzero(data_array.flatten() != test_array)[0].shape[0] == 0,\
         "tile data read was not the same as the expected data"
     print("Tile Read: Data is the same as expected from tile write test")
 
     print("Tile Read: SUCCESS")
+
 
 def _test_read_one_tile():
     filename = "/tmp/libtiff_test_tile_write.tiff"
@@ -2145,14 +2224,16 @@ def _test_read_one_tile():
     # test negative x
     try:
         tiff.read_one_tile(-5, 0)
-        raise AssertionError("An exception must be raised with invalid (x, y) values")
+        raise AssertionError(
+            "An exception must be raised with invalid (x, y) values")
     except ValueError as inst:
         assert inst.message == "Invalid x value", repr(inst.message)
 
     # test y greater than the image height
     try:
         tiff.read_one_tile(0, 5000)
-        raise AssertionError("An exception must be raised with invalid (x, y) values")
+        raise AssertionError(
+            "An exception must be raised with invalid (x, y) values")
     except ValueError as inst:
         assert inst.message == "Invalid y value", repr(inst.message)
 
@@ -2180,11 +2261,12 @@ def _test_tiled_image_read(filename="/tmp/libtiff_test_tile_write.tiff"):
 
     def assert_image_tag(tiff, tag_name, expected_value):
         value = tiff.GetField(tag_name)
-        assert value == expected_value, \
-            '%s expected to be %d, but it\'s %d' % (tag_name, expected_value, value)
+        assert value == expected_value,\
+            ('%s expected to be %d, but it\'s %d'
+             % (tag_name, expected_value, value))
 
-    # _test_tile_write is called here just to make sure that the image is saved,
-    # even if the order of the tests changed
+    # _test_tile_write is called here just to make sure that the image
+    # is saved, even if the order of the tests changed
     _test_tile_write()
     tiff = TIFF.open(filename, "r")
 
@@ -2196,7 +2278,7 @@ def _test_tiled_image_read(filename="/tmp/libtiff_test_tile_write.tiff"):
     assert_image_tag(tiff, 'TileWidth', 512)
     assert_image_tag(tiff, 'TileLength', 528)
     assert_image_tag(tiff, 'BitsPerSample', 8)
-    assert_image_tag(tiff, 'Compression', COMPRESSION_NONE)
+    assert_image_tag(tiff, 'Compression', COMPRESSION_NONE)  # noqa: F821
 
     # read the image to a NumPy array
     arr = tiff.read_image()
@@ -2246,12 +2328,10 @@ def _test_tags_read(filename=None):
     tiff = TIFF.open(filename)
     tmp = tiff.GetField("Artist")
     assert tmp == "A Name", "Tag 'Artist' did not read the correct value (" \
-                            "Got '%s'; Expected 'A Name')" % (
-        tmp,)
+        "Got '%s'; Expected 'A Name')" % (tmp,)
     tmp = tiff.GetField("DocumentName")
     assert tmp == "", "Tag 'DocumentName' did not read the correct value (" \
-                      "Got '%s'; Expected empty string)" % (
-        tmp,)
+        "Got '%s'; Expected empty string)" % (tmp,)
     tmp = tiff.GetField("PrimaryChromaticities")
     assert tmp == [1, 2, 3, 4, 5,
                    6], "Tag 'PrimaryChromaticities' did not read the " \
