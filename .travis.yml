@@ -21,6 +21,9 @@ install:
   - conda info -a
   - conda env create --quiet --name pylibtiff-dev --file .conda/environment.yml
   - conda activate pylibtiff-dev
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      conda install --yes --quite python=2.7 -c conda-forge
+    fi
   - export PREFIX=$CONDA_PREFIX
 
 before_script:

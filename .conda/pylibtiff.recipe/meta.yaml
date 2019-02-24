@@ -19,6 +19,8 @@ requirements:
     - pytest
   host:
   run:
+    - numpy
+    - libtiff
 
 about:
   home: https://github.com/pearu/pylibtiff
