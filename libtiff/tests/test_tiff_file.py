@@ -52,9 +52,7 @@ def test_issue19():
             return
         else:
             raise
-    finally:
-        del tif
-
+    del tif
     tif = TIFFfile(fn)
     arr = tif.get_tiff_array()[:]  # expected failure
     tif.close()
