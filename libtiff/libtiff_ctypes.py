@@ -1558,15 +1558,32 @@ class TIFF3D(TIFF):
     def open(cls, filename, mode='r'):
         """ just like TIFF.open, except returns a TIFF3D instance.
         """
+        try:
+            try:
+                # Python3: it needs bytes for the arguments of type "c_char_p"
+                filename = os.fsencode(filename)  # no-op if already bytes
+            except AttributeError:
+                # Python2: it needs str for the arguments of type "c_char_p"
+                if isinstance(filename, unicode):
+                    filename = filename.encode(sys.getfilesystemencoding())
+        except Exception as ex:
+            # It's probably going to not work, but let it try
+            print('Warning: filename argument is of wrong type or encoding: %s' % ex)
+        if isinstance(mode, str):
+            mode = mode.encode()
+
         # monkey-patch the restype:
         old_restype = libtiff.TIFFOpen.restype
         libtiff.TIFFOpen.restype = TIFF3D
+        try:
+            # actually call the library function:
+            tiff = libtiff.TIFFOpen(filename, mode)
+        except Exception as ex:
+            raise
+        finally:
+            # restore the old restype:
+            libtiff.TIFFOpen.restype = old_restype
 
-        # actually call the library function:
-        tiff = libtiff.TIFFOpen(filename, mode)
-
-        # restore the old restype:
-        libtiff.TIFFOpen.restype = old_restype
         if tiff.value is None:
             raise TypeError('Failed to open file ' + repr(filename))
         return tiff
