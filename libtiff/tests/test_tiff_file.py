@@ -33,3 +33,27 @@ def test_write_read():
             assert (image==data[0]).all()
             tif.close()
             atexit.register(os.remove, fn)
+
+
+def test_issue19():
+    size = 1024*32  # 1GB
+    #size = 1024*63  # almost 4GB, test takes about 60 seconds but succeeds
+    image = ones((size, size), dtype=uint8)
+    print('image size:',image.nbytes/1024**2, 'MB')
+    fn = mktemp('issue19.tif')
+    tif = TIFFimage(image)
+    try:
+        tif.write_file(fn)
+    except OSError as msg:
+        if 'Not enough storage is available to process this command' in str(msg):
+            # Happens in Appveyour CI
+            del tif
+            atexit.register(os.remove, fn)
+            return
+        else:
+            raise
+    del tif
+    tif = TIFFfile(fn)
+    arr = tif.get_tiff_array()[:]  # expected failure
+    tif.close()
+    atexit.register(os.remove, fn)
