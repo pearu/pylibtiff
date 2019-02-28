@@ -1211,13 +1211,13 @@ class TIFF(ctypes.c_void_p):
     numberofstrips = NumberOfStrips
 
     @debug
-    def WriteScanline(self, buf, row):
-        return libtiff.TIFFWriteScanline(self, buf, row, 0)
+    def WriteScanline(self, buf, row, sample=0):
+        return libtiff.TIFFWriteScanline(self, buf, row, sample)
     writescanline = WriteScanline
     
     @debug
-    def ReadScanline(self, buf, row): 
-        return libtiff.TIFFReadScanline(self, buf, row, 0)
+    def ReadScanline(self, buf, sample=0): 
+        return libtiff.TIFFReadScanline(self, buf, row, sample)
     readscanline = ReadScanline
     
     def ScanlineSize(self): 
