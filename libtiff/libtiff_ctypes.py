@@ -1210,6 +1210,20 @@ class TIFF(ctypes.c_void_p):
         return libtiff.TIFFNumberOfStrips(self).value
     numberofstrips = NumberOfStrips
 
+    @debug
+    def WriteScanline(self, buf, row, sample=0):
+        return libtiff.TIFFWriteScanline(self, buf, row, sample)
+    writescanline = WriteScanline
+    
+    @debug
+    def ReadScanline(self, buf, row, sample=0): 
+        return libtiff.TIFFReadScanline(self, buf, row, sample)
+    readscanline = ReadScanline
+    
+    def ScanlineSize(self): 
+        return libtiff.TIFFScanlineSize(self).value
+    scanlinesize = ScanlineSize
+    
     # @debug
     def ReadRawStrip(self, strip, buf, size):
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
@@ -1803,6 +1817,15 @@ libtiff.TIFFSetField.restype = ctypes.c_int
 libtiff.TIFFNumberOfStrips.restype = c_tstrip_t
 libtiff.TIFFNumberOfStrips.argtypes = [TIFF]
 
+libtiff.TIFFWriteScanline.restype = ctypes.c_int
+libtiff.TIFFWriteScanline.argtypes = [TIFF, c_tdata_t, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFReadScanline.restype = ctypes.c_int
+libtiff.TIFFReadScanline.argtypes = [TIFF, c_tdata_t, ctypes.c_uint32, c_tsample_t]
+
+libtiff.TIFFScanlineSize.restype = c_tsize_t
+libtiff.TIFFScanlineSize.argtypes = [TIFF]
+
 libtiff.TIFFReadRawStrip.restype = c_tsize_t
 libtiff.TIFFReadRawStrip.argtypes = [TIFF, c_tstrip_t, c_tdata_t, c_tsize_t]
 
@@ -1823,7 +1846,7 @@ libtiff.TIFFStripSize.argtypes = [TIFF]
 libtiff.TIFFRawStripSize.restype = c_tsize_t
 libtiff.TIFFRawStripSize.argtypes = [TIFF, c_tstrip_t]
 
-# For adding custom tags (must be void pointer otherwise callback seg faults
+# For adding custom tags (must be void pointer otherwise callback seg faults)
 libtiff.TIFFMergeFieldInfo.restype = ctypes.c_int32
 libtiff.TIFFMergeFieldInfo.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
                                        ctypes.c_uint32]
