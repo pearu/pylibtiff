@@ -1216,7 +1216,7 @@ class TIFF(ctypes.c_void_p):
     writescanline = WriteScanline
     
     @debug
-    def ReadScanline(self, buf, sample=0): 
+    def ReadScanline(self, buf, row, sample=0): 
         return libtiff.TIFFReadScanline(self, buf, row, sample)
     readscanline = ReadScanline
     
