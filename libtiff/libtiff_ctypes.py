@@ -1213,12 +1213,12 @@ class TIFF(ctypes.c_void_p):
     @debug
     def WriteScanline(self, buf, row):
         return libtiff.TIFFWriteScanline(self, buf, row, 0)
-    writescanline = WriteScanLine
+    writescanline = WriteScanline
     
     @debug
     def ReadScanline(self, buf, row): 
         return libtiff.TIFFReadScanline(self, buf, row, 0)
-    readscanline = ReadScanLine
+    readscanline = ReadScanline
     
     def ScanlineSize(self): 
         return libtiff.TIFFScanlineSize(self).value
