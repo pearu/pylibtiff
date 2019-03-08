@@ -7,24 +7,22 @@ Provides TIFFfile class.
 
 __all__ = ['TIFFfile', 'TiffFile']
 
-import mmap
 import os
-import shutil
 import sys
+import shutil
 import warnings
-
 import numpy
-from numpy.testing.utils import memusage
-
-from . import lsm, tif_lzw
-from .tiff_array import TiffArray
-from .tiff_base import TiffBase
-from .tiff_data import (BigEndianNumpyDTypes, LittleEndianNumpyDTypes,
-                        default_tag_values, name2type, sample_format_map,
-                        tag_name2value, tag_value2name, type2bytes, type2dtype,
-                        type2name)
-from .tiff_sample_plane import TiffSamplePlane
+import mmap
+from .tiff_data import type2name, name2type, type2bytes, tag_value2name
+from .tiff_data import LittleEndianNumpyDTypes, BigEndianNumpyDTypes, \
+    default_tag_values, sample_format_map
 from .utils import bytes2str, isindisk
+from .tiff_base import TiffBase
+from .tiff_sample_plane import TiffSamplePlane
+from .tiff_array import TiffArray
+
+from . import lsm
+from . import tif_lzw
 
 IFDEntry_init_hooks = []
 IFDEntry_finalize_hooks = []
@@ -344,7 +342,7 @@ class TIFFfile(TiffBase):
             start = strip_offsets0
             end = strip_offsets1 + strip_nbytes1
         return self.data[start:end].view(dtype=dtype).reshape(
-            (depth, width, length))
+           (depth, width, length))
 
     def get_subfile_types(self):
         """ Return a list of subfile types.
@@ -505,7 +503,7 @@ class TIFFfile(TiffBase):
                 assert width == ifd.get_value('ImageWidth', width), repr(
                     (width, ifd.get_value('ImageWidth')))
                 assert length == ifd.get_value('ImageLength', length), repr(
-                    (length, ifd.get_value('ImageLength')))
+                   (length, ifd.get_value('ImageLength')))
                 # assert samples_per_pixel == ifd.get(
                 # 'SamplesPerPixel').value, `samples_per_pixel, ifd.get(
                 # 'SamplesPerPixel').value`
@@ -513,7 +511,7 @@ class TIFFfile(TiffBase):
                                                       planar_config)
                 if can_return_memmap:
                     assert strip_length == lst[-1][1] - lst[-1][0], repr(
-                        (strip_length, lst[-1][1] - lst[-1][0]))
+                       (strip_length, lst[-1][1] - lst[-1][0]))
                 else:
                     strip_length = max(strip_length, lst[-1][1] - lst[-1][0])
                     strip_length_str = ' < ' + bytes2str(strip_length)
@@ -575,7 +573,7 @@ strip_length : %(strip_length_str)s
                         arr[i:i + d.nbytes] = d
                         i += d.nbytes
                     arr = arr.view(dtype=dtype_lst[0]).reshape(
-                        (depth, length, width))
+                       (depth, length, width))
                     return [arr], sample_names
                 else:
                     i = 0
@@ -605,11 +603,11 @@ strip_length : %(strip_length_str)s
         end = lst[-1][1]
         if start > step:
             arr = self.data[start - step: end].reshape(
-                (depth, strip_length + step))
+               (depth, strip_length + step))
             k = step
         elif end <= self.data.size - step:
             arr = self.data[start: end + step].reshape(
-                (depth, strip_length + step))
+               (depth, strip_length + step))
             k = 0
         else:
             raise NotImplementedError(repr((start, end, step)))
