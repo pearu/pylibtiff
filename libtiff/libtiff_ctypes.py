@@ -433,6 +433,13 @@ tifftags = {
 
     TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda _d: _d.value)
     # offset to CZ_LSMINFO record
+
+    # Adding support for RAW images
+    TIFFTAG_CFAREPEATPATTERNDIM: (
+        ctypes.c_short * 2, lambda _d: _d.contents[:]),
+
+    TIFFTAG_CFAPATTERN: (ctypes.c_char_p, lambda _d: _d.value),
+
 }
 
 
@@ -1214,16 +1221,16 @@ class TIFF(ctypes.c_void_p):
     def WriteScanline(self, buf, row, sample=0):
         return libtiff.TIFFWriteScanline(self, buf, row, sample)
     writescanline = WriteScanline
-    
+
     @debug
-    def ReadScanline(self, buf, row, sample=0): 
+    def ReadScanline(self, buf, row, sample=0):
         return libtiff.TIFFReadScanline(self, buf, row, sample)
     readscanline = ReadScanline
-    
-    def ScanlineSize(self): 
+
+    def ScanlineSize(self):
         return libtiff.TIFFScanlineSize(self).value
     scanlinesize = ScanlineSize
-    
+
     # @debug
     def ReadRawStrip(self, strip, buf, size):
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
