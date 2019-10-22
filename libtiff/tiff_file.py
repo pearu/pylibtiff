@@ -1061,7 +1061,8 @@ class IFDEntry:
                                       self.tag_name))
 
     def close(self):
-        del self.value
+        if hasattr(self, 'value'):
+            del self.value
 
     @property
     def _value_str(self):
