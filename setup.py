@@ -4,6 +4,7 @@ import sys
 import subprocess
 import textwrap
 import warnings
+import glob
 
 CLASSIFIERS = """\
 Development Status :: 3 - Alpha
@@ -231,6 +232,21 @@ def setup_package():
         build_requires = (['numpy>=1.13.3'] if 'bdist_wheel' in sys.argv[1:]
                           else [])
 
+    wininst = 'bdist_wininst' in sys.argv
+    # Scripts support: files in scripts directories are considered as
+    # python scripts that will be installed as
+    # <package_name>.<script_name> to scripts installation directory.
+    console_scripts = []
+    for path in glob.glob(os.path.join('libtiff', 'scripts', '*.py')):
+        base = os.path.basename(path)
+        name = os.path.splitext(base)[0]
+        if "__init__" in name:
+            continue
+        script_name = "libtiff" + ("_" if wininst else ".") + name
+        entry = "{}=libtiff.scripts.{}:main".format(script_name, name)
+        console_scripts.append(entry)
+    print(console_scripts)
+
     metadata = dict(
         name='pylibtiff',
         author='Pearu Peterson',
@@ -251,6 +267,7 @@ PyLibTiff? is a Python package that provides the following modules:
         setup_requires=build_requires,
         install_requires=build_requires,
         python_requires='>=2.7',
+        entry_points={'console_scripts': console_scripts},
     )
     if "--force" in sys.argv:
         run_build = True
