@@ -5,6 +5,7 @@ python:
 arch:
   - amd64
   - arm64
+  - ppc64le
 before_install:
   - sudo apt-get install -y git wget libtiff-dev
 env:
@@ -17,6 +18,10 @@ install:
       bash archiconda.sh -b -p $HOME/miniconda;
       SUDO=sudo;
       $SUDO cp -r $HOME/miniconda/bin/* /usr/bin/;
+    fi
+  - if [[ "$TRAVIS_CPU_ARCH" == "ppc64le" ]]; then 
+      wget https://repo.anaconda.com/miniconda/Miniconda2-latest-Linux-ppc64le.sh -O miniconda.sh;
+      bash miniconda.sh -b -p $HOME/miniconda;
     else
       if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
         wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
