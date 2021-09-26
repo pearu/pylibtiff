@@ -91,7 +91,9 @@ if tiff_h is None:
     if not os.path.isfile(include_tiff_h):
         import glob
         include_tiff_h = (glob.glob(os.path.join(sys.prefix, 'include',
-                                                 '*linux-gnu', 'tiff.h')) +
+                                                 '*linux*', 'tiff.h')) +
+                          glob.glob(os.path.join(sys.prefix, 'include',
+                                                 '*kfreebsd*', 'tiff.h')) +
                           [include_tiff_h])[0]
     if not os.path.isfile(include_tiff_h):
         # Base it off of the python called
