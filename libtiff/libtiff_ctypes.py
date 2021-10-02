@@ -114,6 +114,8 @@ if tiff_h is None:
         if len(words) != 2:
             continue
         name, value = words
+        if name in ['TIFF_GCC_DEPRECATED', 'TIFF_MSC_DEPRECATED']:
+            continue
         i = value.find('/*')
         if i != -1:
             value = value[:i]
