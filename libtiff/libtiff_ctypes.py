@@ -23,10 +23,11 @@ cwd = os.getcwd()
 try:
     os.chdir(os.path.dirname(__file__))
     if os.name == 'nt':
-        # assume that the directory of libtiff3.dll is in PATH.
-        lib = ctypes.util.find_library('libtiff3')
+        # assume that the directory of libtiff.dll is in PATH.
+        lib = ctypes.util.find_library('libtiff.dll')
         if lib is None:
-            lib = ctypes.util.find_library('libtiff.dll')
+            # Fallback to the old "libtiff3" name
+            lib = ctypes.util.find_library('libtiff3')
         if lib is None:
             # try default installation path:
             lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
