@@ -71,7 +71,7 @@ def runner(parser, options, args):
             print('  pixel_sizes=', arr.get_pixel_sizes())
 
 
-def main():
+def main(args=None):
     try:
         from libtiff.optparse_gui import OptionParser
     except ImportError:
@@ -83,7 +83,7 @@ def main():
     set_info_options(parser)
     if hasattr(parser, 'runner'):
         parser.runner = runner
-    options, args = parser.parse_args()
+    options, args = parser.parse_args(args)
     runner(parser, Options(options), args)
     return
 

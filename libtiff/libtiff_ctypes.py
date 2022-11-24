@@ -524,7 +524,7 @@ class TIFF(ctypes.c_void_p):
         return tiff
 
     @staticmethod
-    def get_numpy_type(bits, sample_format=None):
+    def get_numpy_type(bits, sample_format=None, byte_swapped=False):
         """ Return numpy dtype corresponding to bits and sample format.
         """
         if bits % 8 != 0:
@@ -540,6 +540,11 @@ class TIFF(ctypes.c_void_p):
             typ = getattr(np, 'complex%s' % bits)
         else:
             raise NotImplementedError(repr(sample_format))
+
+        if byte_swapped:
+            endian = ">" if sys.byteorder == "little" else "<"
+            return np.dtype(typ).newbyteorder(endian)
+
         return typ
 
     @debug
@@ -572,7 +577,7 @@ class TIFF(ctypes.c_void_p):
             # TODO: rotate according to orientation
 
             # TODO: might need special support if bits < 8
-            typ = self.get_numpy_type(bits, sample_format)
+            typ = self.get_numpy_type(bits, sample_format, self.IsByteSwapped())
 
             if samples_pp == 1:
                 # only 2 dimensions array
@@ -918,7 +923,7 @@ class TIFF(ctypes.c_void_p):
         sample_format = self.GetField('SampleFormat')
 
         # TODO: might need special support if bits < 8
-        dtype = self.get_numpy_type(bits, sample_format)
+        dtype = self.get_numpy_type(bits, sample_format, self.IsByteSwapped())
 
         if y < 0 or y >= num_irows:
             raise ValueError("Invalid y value")
@@ -1562,7 +1567,8 @@ class TIFF(ctypes.c_void_p):
             sample_format = self.GetField('SampleFormat')
             assert bits >= 8, repr((bits, sample_format))
             itemsize = bits // 8
-            dtype = self.get_numpy_type(bits, sample_format)
+            dtype = self.get_numpy_type(bits, sample_format,
+                                        self.IsByteSwapped())
             for _name, define in name_define_list:
                 orig_value = self.GetField(define)
                 if orig_value is None and define not in define_rewrite:
@@ -1578,7 +1584,8 @@ class TIFF(ctypes.c_void_p):
                 other.SetField(define, _value)
             new_bits = other.GetField('BitsPerSample')
             new_sample_format = other.GetField('SampleFormat')
-            new_dtype = other.get_numpy_type(new_bits, new_sample_format)
+            new_dtype = other.get_numpy_type(new_bits, new_sample_format,
+                                             other.IsByteSwapped())
             assert new_bits >= 8, repr(
                 (new_bits, new_sample_format, new_dtype))
             new_itemsize = new_bits // 8
@@ -1676,7 +1683,7 @@ class TIFF3D(TIFF):
         sample_format = self.GetField('SampleFormat')
         compression = self.GetField('Compression')
 
-        typ = self.get_numpy_type(bits, sample_format)
+        typ = self.get_numpy_type(bits, sample_format, self.IsByteSwapped())
 
         if typ is None:
             if bits == 1:

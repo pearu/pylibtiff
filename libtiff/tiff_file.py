@@ -1061,7 +1061,8 @@ class IFDEntry:
                                       self.tag_name))
 
     def close(self):
-        del self.value
+        if hasattr(self, 'value'):
+            del self.value
 
     @property
     def _value_str(self):
@@ -1069,8 +1070,9 @@ class IFDEntry:
         value = self.value
         if value is not None:
             if tag_name in ['ImageDescription', 'Software']:
-                return ''.join(
-                    value.view('|S%s' % (value.nbytes // value.size)))
+                return b''.join(
+                    value.view('|S%s' % (value.nbytes //
+                                         value.size))).decode('utf-8')
         return value
 
     def __str__(self):
