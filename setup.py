@@ -254,6 +254,9 @@ PyLibTiff? is a Python package that provides the following modules:
         platforms=["All"],
         setup_requires=build_requires,
         install_requires=build_requires,
+        extras_require={
+            'bitarray': ['bitarray'],
+        },
         python_requires='>=2.7',
     )
     if "--force" in sys.argv:
