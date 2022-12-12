@@ -11,19 +11,8 @@ def configuration(parent_package='', top_path=None):
     from numpy.distutils.misc_util import Configuration
     package_name = 'libtiff'
     config = Configuration(package_name, parent_package, top_path)
-
-    bitarray_path = 'bitarray-a1646c0/bitarray'
-
-    # Add subpackages here:
-    config.add_subpackage('bitarray', bitarray_path)
-    # eof add.
-
-    # Add extensions here:
-    config.add_extension('bitarray._bitarray',
-                         join(bitarray_path, '_bitarray.c'))
     config.add_extension('bittools', join('src', 'bittools.c'))
     config.add_extension('tif_lzw', join('src', 'tif_lzw.c'))
-    # eof add.
 
     wininst = 'bdist_wininst' in sys.argv
 

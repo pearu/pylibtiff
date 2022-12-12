@@ -27,10 +27,3 @@ from .tiff_files import TiffFiles
 from .tiff_channels_and_files import TiffChannelsAndFiles
 from .tiff_base import TiffBase
 
-# Make bitarray location available, when running from source,
-import os as _os
-import sys as _sys
-_sys.path.append(_os.path.join(_os.path.dirname(__file__),
-                               'bitarray-a1646c0'))
-import bitarray as _bitarray    # noqa: F402
-_sys.modules['libtiff.bitarray'] = _bitarray
