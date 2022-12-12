@@ -1,7 +1,5 @@
 
-[![Build Status](https://travis-ci.org/pearu/pylibtiff.svg?branch=master)](https://travis-ci.org/pearu/pylibtiff)
-
-[![Build status](https://ci.appveyor.com/api/projects/status/4u5dr1ccpabwrgd1?svg=true)](https://ci.appveyor.com/project/pearu/pylibtiff)
+[![Build Status](https://github.com/pearu/pylibtiff/actions/workflows/ci.yaml/badge.svg)](https://github.com/pearu/pylibtiff/actions/workflows/ci.yaml)
 
 PyLibTiff is a package that provides:
 
