@@ -977,9 +977,9 @@ class IFD:
         if descr.startswith('<?xml') or descr[:4].lower() == '<ome':
             raise NotImplementedError(
                 'getting pixels sizes from OME-XML string')
-        for vx, vy, vz in [('PixelSizeX', 'PixelSizeY', 'PixelSizeZ'),
-                           ('VoxelSizeX', 'VoxelSizeY', 'VoxelSizeZ'),
-                           ]:
+        for vx, vy in [('PixelSizeX', 'PixelSizeY'),
+                       ('VoxelSizeX', 'VoxelSizeY'),
+                       ]:
             ix = descr.find(vx)
             iy = descr.find(vy)
             if ix == -1:

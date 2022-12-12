@@ -60,5 +60,5 @@ class TiffChannelsAndFiles(TiffBase):
         return '\n'.join(lst)
 
     def close(self):
-        for channel, tiff in list(self.channels_files_map.items()):
+        for tiff in self.channels_files_map.values():
             tiff.close()

@@ -17,7 +17,7 @@ class TiffFiles(TiffBase):
     TiffFile, TiffChannelsAndFiles
     """
 
-    def __init__(self, files, time_map={}, verbose=False, local_cache=None):
+    def __init__(self, files, time_map=None, verbose=False, local_cache=None):
         """
         Parameters
         ----------
@@ -34,7 +34,7 @@ class TiffFiles(TiffBase):
         """
         self.verbose = verbose
         self.files = files
-        self.tiff_files = {}
+        self.tiff_files = time_map or {}
         self.time_map = time_map
         self.local_cache = local_cache
 

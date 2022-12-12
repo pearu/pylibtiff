@@ -550,7 +550,7 @@ class EventList:
             n = self.header['NumberEvents']
             offset = self.offset + self.header.nbytes
             self._events = []
-            for i in range(n):
+            for _ in range(n):
                 entry_size = self.ifdentry.tiff.get_value(offset, numpy.uint32)
                 time = self.ifdentry.tiff.get_value(offset + 4, numpy.float64)
                 event_type = self.ifdentry.tiff.get_value(
@@ -706,7 +706,7 @@ class ChannelColors:
             n = header[2]
             offset = self.offset + header[4] + 4
             self._names = []
-            for i in range(n):
+            for _ in range(n):
                 name = self.ifdentry.tiff.get_string(offset)
                 offset += len(name) + 1 + 4
                 self._names.append(name)
@@ -719,7 +719,7 @@ class ChannelColors:
             n = header[1]
             offset = self.offset + header[3]
             self._colors = []
-            for i in range(n):
+            for _ in range(n):
                 color = self.ifdentry.tiff.get_values(offset, numpy.uint8, 4)
                 offset += color.nbytes
                 self._colors.append(tuple(color))
