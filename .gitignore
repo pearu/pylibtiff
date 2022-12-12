@@ -2,3 +2,5 @@ build
 *.egg-info
 *.pyc
 *.pyd
+libtiff/version.py
+

@@ -641,7 +641,7 @@ class TIFF(ctypes.c_void_p):
         arr = np.ascontiguousarray(arr)
         if arr.dtype in np.sctypes['float']:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool]:
+        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
             sample_format = SAMPLEFORMAT_UINT
         elif arr.dtype in np.sctypes['int']:
             sample_format = SAMPLEFORMAT_INT
@@ -728,7 +728,7 @@ class TIFF(ctypes.c_void_p):
 
         if arr.dtype in np.sctypes['float']:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool]:
+        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
             sample_format = SAMPLEFORMAT_UINT
         elif arr.dtype in np.sctypes['int']:
             sample_format = SAMPLEFORMAT_INT
