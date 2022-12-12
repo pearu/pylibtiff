@@ -1,6 +1,4 @@
-import os
 import pytest
-from tempfile import mktemp
 import numpy as np
 from libtiff import TIFFimage
 
@@ -16,4 +14,3 @@ def test_issue69(tmp_path):
     del tif
     tif = lt.TIFF3D.open(fn)
     tif.close()
-
