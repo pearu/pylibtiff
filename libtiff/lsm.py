@@ -41,7 +41,7 @@ def IFDEntry_lsm_init_hook(ifdentry):
         CZ_LSMInfo_type = (CZ_LSMInfo_tag, reserved_bytes)
         if CZ_LSMInfo_type not in tiff_module_dict['type2dtype']:
             dtype = numpy.dtype(CZ_LSMInfo_dtype_fields + [
-                ('Reserved', numpy.dtype('(%s,)u4' % (reserved_bytes//4)))])
+                ('Reserved', numpy.dtype('(%s,)u4' % (reserved_bytes // 4)))])
             CZ_LSMInfo_type_name = 'CZ_LSMInfo%s' % (reserved_bytes)
             CZ_LSMInfo_type_size = dtype.itemsize
             tiff_module_dict['type2dtype'][CZ_LSMInfo_type] = dtype
@@ -80,7 +80,7 @@ def IFDEntry_lsm_finalize_hook(ifdentry):
                     if verbose_lsm_memory_usage:
                         ifdentry.memory_usage.append(
                             (start, end,
-                             ifdentry.tag_name+' '+name[6:]))
+                             ifdentry.tag_name + ' ' + name[6:]))
         if verbose_lsm_memory_usage:
             for offset in ifdentry.value['Reserved'][0]:
                 if offset:
@@ -159,7 +159,7 @@ class LSMBlock:
     def __str__(self):
         return '%s(offset=%s, size=%s, end=%s)' % (
             self.__class__.__name__, self.offset, self.get_size(),
-            self.offset+self.get_size())
+            self.offset + self.get_size())
 
     def get_data(self, new_offset):
         raise NotImplementedError(repr(new_offset))
@@ -181,7 +181,7 @@ def lsmblock(ifdentry, debug=True):
     if debug:
         arr = r.toarray()
         offset = r.offset
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -189,6 +189,7 @@ def lsmblock(ifdentry, debug=True):
 class ScanInfoEntry:
     """ Holds scan information entry data structure.
     """
+
     def __init__(self, entry, type_name, label, data):
         self._offset = None
         self.record = (entry, type_name, label, data)
@@ -196,7 +197,7 @@ class ScanInfoEntry:
         if type_name == 'ASCII':
             self.type = 2
             self.header = numpy.array(
-                [entry, 2, len(data)+1], dtype=numpy.uint32).view(
+                [entry, 2, len(data) + 1], dtype=numpy.uint32).view(
                     dtype=numpy.ubyte)
         elif type_name == 'LONG':
             self.type = 4
@@ -283,13 +284,13 @@ class ScanInfoEntry:
                     item.toarray(target[n:])
                     n += item.get_size()
         elif type_name == 'ASCII':
-            target[12:12+len(data)+1] = numpy.array(
-                [data+'\0']).view(dtype=dtype)
+            target[12:12 + len(data) + 1] = numpy.array(
+                [data + '\0']).view(dtype=dtype)
         elif type_name == 'LONG':
-            target[12:12+4] = numpy.array(
+            target[12:12 + 4] = numpy.array(
                 [data], dtype=numpy.uint32).view(dtype=dtype)
         elif type_name == 'DOUBLE':
-            target[12:12+8] = numpy.array(
+            target[12:12 + 8] = numpy.array(
                 [data], dtype=numpy.float64).view(dtype=dtype)
         else:
             raise NotImplementedError(repr(self.record))
@@ -307,7 +308,7 @@ class ScanInfoEntry:
             lst = ['%s%s[size=%s]' % (tab, label, self.get_size())]
             for item in data:
                 if not short or item.data:
-                    lst.append(item.tostr(tab=tab+'  ', short=short))
+                    lst.append(item.tostr(tab=tab + '  ', short=short))
             return '\n'.join(lst)
         if label.startswith(parent_label):
             label = label[len(parent_label):]
@@ -374,7 +375,7 @@ def scaninfo(ifdentry, debug=True):
             continue
         if type_name == 'ASCII':
             assert type == 2, repr((hex(entry), type, size))
-            value = ifdentry.tiff.get_string(n, size-1)
+            value = ifdentry.tiff.get_string(n, size - 1)
         elif type_name == 'LONG':
             assert type == 4, repr((hex(entry), type,
                                     size, scaninfo_map[entry]))
@@ -394,7 +395,7 @@ def scaninfo(ifdentry, debug=True):
         record_size = record.get_size()
         assert size == record_size, repr((size, record_size))
         arr = record.toarray()
-        arr2 = ifdentry.tiff.data[n1:n1+size]
+        arr2 = ifdentry.tiff.data[n1:n1 + size]
         assert (arr == arr2).all()
 
     record.offset = n1
@@ -405,6 +406,7 @@ def scaninfo(ifdentry, debug=True):
 class TimeStamps:
     """ Holds LSM time stamps information.
     """
+
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
         self._offset = None
@@ -438,7 +440,7 @@ class TimeStamps:
         return '%s(stamps=%s)' % (self.__class__.__name__, self.stamps)
 
     def get_size(self):
-        return 8+self.stamps.nbytes
+        return 8 + self.stamps.nbytes
 
     def toarray(self, target=None):
         sz = self.get_size()
@@ -450,7 +452,7 @@ class TimeStamps:
         assert header.nbytes == 8, repr(header.nbytes)
         data = self.stamps.view(dtype=dtype)
         target[:header.nbytes] = header
-        target[header.nbytes:header.nbytes+data.nbytes] = data
+        target[header.nbytes:header.nbytes + data.nbytes] = data
         return target
 
 
@@ -467,7 +469,7 @@ def timestamps(ifdentry, debug=True):
     r = TimeStamps(ifdentry)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -502,7 +504,7 @@ class EventEntry:
             self.time, self.type_name, self.description)
 
     def get_size(self):
-        return 4+8+4+4+len(self.description)+1
+        return 4 + 8 + 4 + 4 + len(self.description) + 1
 
     def toarray(self, target=None):
         sz = self.get_size()
@@ -510,18 +512,19 @@ class EventEntry:
             target = numpy.zeros((sz,), dtype=numpy.ubyte)
         dtype = target.dtype
         target[:4].view(dtype=numpy.uint32)[0] = sz
-        target[4:4+8].view(dtype=numpy.float64)[0] = self.time
+        target[4:4 + 8].view(dtype=numpy.float64)[0] = self.time
         target[12:16].view(dtype=numpy.uint32)[0] = self.type
         target[16:20].view(dtype=numpy.uint32)[0] = self.record[3]
         ln = len(self.description)
-        target[20:20+ln] = numpy.array([self.description]).view(dtype=dtype)
-        target[20+ln] = 0
+        target[20:20 + ln] = numpy.array([self.description]).view(dtype=dtype)
+        target[20 + ln] = 0
         return target
 
 
 class EventList:
     """ Holds LSM event list information.
     """
+
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
         self._offset = None
@@ -549,12 +552,12 @@ class EventList:
             self._events = []
             for i in range(n):
                 entry_size = self.ifdentry.tiff.get_value(offset, numpy.uint32)
-                time = self.ifdentry.tiff.get_value(offset+4, numpy.float64)
+                time = self.ifdentry.tiff.get_value(offset + 4, numpy.float64)
                 event_type = self.ifdentry.tiff.get_value(
-                    offset + 4+8, numpy.uint32)
+                    offset + 4 + 8, numpy.uint32)
                 unknown = self.ifdentry.tiff.get_value(
-                    offset + 4+8+4, numpy.uint32)
-                descr = self.ifdentry.tiff.get_string(offset + 4+8+4+4)
+                    offset + 4 + 8 + 4, numpy.uint32)
+                descr = self.ifdentry.tiff.get_string(offset + 4 + 8 + 4 + 4)
                 self._events.append(EventEntry(
                     entry_size, time, event_type, unknown, descr))
                 offset += entry_size
@@ -598,7 +601,7 @@ def eventlist(ifdentry, debug=True):
     r = EventList(ifdentry)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -606,6 +609,7 @@ def eventlist(ifdentry, debug=True):
 class ChannelWavelength:
     """ Holds LSM channel wavelength information.
     """
+
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
         self._offset = None
@@ -625,7 +629,7 @@ class ChannelWavelength:
             n = self.ifdentry.tiff.get_value(offset, numpy.int32)
             for i in range(n):
                 start, end = self.ifdentry.tiff.get_values(
-                    offset + 4 + i*(8+8), numpy.float64, 2)
+                    offset + 4 + i * (8 + 8), numpy.float64, 2)
                 self._ranges.append((start, end))
         return self._ranges
 
@@ -633,7 +637,7 @@ class ChannelWavelength:
         return '%s (ranges=%s)' % (self.__class__.__name__, self.ranges)
 
     def get_size(self):
-        return 4 + len(self.ranges)*16
+        return 4 + len(self.ranges) * 16
 
     def toarray(self, target=None):
         sz = self.get_size()
@@ -642,7 +646,7 @@ class ChannelWavelength:
         dtype = target.dtype
         target[:4].view(dtype=numpy.int32)[0] = len(self.ranges)
         data = numpy.array(self.ranges).ravel()
-        target[4:4+data.nbytes] = data.view(dtype=dtype)
+        target[4:4 + data.nbytes] = data.view(dtype=dtype)
         return target
 
 
@@ -659,7 +663,7 @@ def channelwavelength(ifdentry, debug=True):
     r = ChannelWavelength(ifdentry)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -667,6 +671,7 @@ def channelwavelength(ifdentry, debug=True):
 class ChannelColors:
     """ Holds LSM channel name and color information.
     """
+
     def __init__(self, ifdentry):
         self.ifdentry = ifdentry
         self._offset = None
@@ -769,8 +774,8 @@ def channelcolors(ifdentry, debug=True):
     r = ChannelColors(ifdentry)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
-        assert(arr == arr2).all()
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
+        assert (arr == arr2).all()
     return r
 
 
@@ -822,7 +827,7 @@ def channelfactors(ifdentry, debug=True):
     r = ChannelFactors(ifdentry)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -929,7 +934,7 @@ def offsetdata(ifdentry, offset_name, debug=True):
     r = OffsetData(ifdentry, offset_name)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -952,7 +957,7 @@ class DrawingElement:
     def data(self):
         if self._data is None:
             # n = self.ifdentry.tiff.get_value(self.offset, numpy.int32)
-            sz = self.ifdentry.tiff.get_value(self.offset+4, numpy.int32)
+            sz = self.ifdentry.tiff.get_value(self.offset + 4, numpy.int32)
             self._data = self.ifdentry.tiff.get_values(
                 self.offset, numpy.ubyte, sz)
         return self._data
@@ -984,7 +989,7 @@ def drawingelement(ifdentry, offset_name, debug=True):
     r = DrawingElement(ifdentry, offset_name)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -1012,8 +1017,8 @@ class LookupTable:
         return self._data
 
     def __str__(self):
-        nsubblocks = self.ifdentry.tiff.get_value(self.offset+4, numpy.uint32)
-        nchannels = self.ifdentry.tiff.get_value(self.offset+8, numpy.uint32)
+        nsubblocks = self.ifdentry.tiff.get_value(self.offset + 4, numpy.uint32)
+        nchannels = self.ifdentry.tiff.get_value(self.offset + 8, numpy.uint32)
         return '%s(name=%r, size=%r, subblocks=%r, channels=%r, offset=%r)' \
                % (self.__class__.__name__, self.offset_name, self.get_size(),
                   nsubblocks, nchannels, self.offset)
@@ -1039,7 +1044,7 @@ def lookuptable(ifdentry, offset_name, debug=True):
     r = LookupTable(ifdentry, offset_name)
     if debug:
         arr = r.toarray()
-        arr2 = ifdentry.tiff.data[offset:offset+arr.nbytes]
+        arr2 = ifdentry.tiff.data[offset:offset + arr.nbytes]
         assert (arr == arr2).all()
     return r
 
@@ -1113,7 +1118,7 @@ CZ_LSMOffsetField_readers = dict(
     OffsetTopoIsolineOverlay=topoisolineoverlay,
     OffsetTopoProfileOverlay=topoprofileoverlay,
     OffsetLinescanOverlay=linescanoverlay,
-    )
+)
 
 CZ_LSMInfo_dtype_fields = [
     ('MagicNumber', numpy.uint32),
@@ -1170,26 +1175,26 @@ CZ_LSMInfo_dtype_fields = [
     ('OffsetUnmixParameters', numpy.uint32),
     # ('Reserved', numpy.dtype('(69,)u4')),
     #   depends on the version of LSM file
-    ]
+]
 
 CZ_LSMInfo_dtype_fields_size = 0
 for item in CZ_LSMInfo_dtype_fields:
     CZ_LSMInfo_dtype_fields_size += item[1]().itemsize
 
 CZ_LSMTimeStamps_header_dtype = numpy.dtype([
-        ('Size', numpy.int32),
-        ('NumberTimeStamps', numpy.int32),
-        # ('TimeStamp<N>', numpy.float64)
-        ])
+    ('Size', numpy.int32),
+    ('NumberTimeStamps', numpy.int32),
+    # ('TimeStamp<N>', numpy.float64)
+])
 
 CZ_LSMEventList_header_dtype = numpy.dtype([
-        ('Size', numpy.int32),
-        ('NumberEvents', numpy.int32),
-        # ('Event<N>', EventListEntry)
-        ])
+    ('Size', numpy.int32),
+    ('NumberEvents', numpy.int32),
+    # ('Event<N>', EventListEntry)
+])
 
 scaninfo_map = {
-    0x0ffffffff: ('end',  'SUBBLOCK'),
+    0x0ffffffff: ('end', 'SUBBLOCK'),
     0x010000000: ('recording', 'SUBBLOCK'),
     0x010000001: ('recording name', 'ASCII'),
     0x010000002: ('recording description', 'ASCII'),

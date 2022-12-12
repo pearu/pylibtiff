@@ -39,7 +39,7 @@ class TiffArray:
                 return self.planes[index][()]
             elif isinstance(index, slice):
                 indices = list(range(*index.indices(self.shape[0])))
-                r = numpy.empty((len(indices), )+self.shape[1:],
+                r = numpy.empty((len(indices), ) + self.shape[1:],
                                 dtype=self.dtype)
                 for i, j in enumerate(indices):
                     r[i] = self.planes[j][()]
@@ -77,7 +77,7 @@ class TiffArray:
                                 ' sample type), expected %s but got %s'
                                 % ((self.planes[0].shape, self.dtype),
                                    (plane.shape, plane.dtype)))
-            self.shape = (self.shape[0]+1,) + self.shape[1:]
+            self.shape = (self.shape[0] + 1,) + self.shape[1:]
         else:
             self.dtype = plane.dtype
             self.shape = (1, ) + plane.shape

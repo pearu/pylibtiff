@@ -28,7 +28,7 @@ class MyHelpFormatter(TitledHelpFormatter):
                 if choice == option.default:
                     if ' ' in choice:
                         choice = repr(choice)
-                    choice = '['+choice+']'
+                    choice = '[' + choice + ']'
                 else:
                     if ' ' in choice:
                         choice = repr(choice)

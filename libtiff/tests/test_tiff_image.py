@@ -9,7 +9,7 @@ from libtiff import TIFFfile, TIFFimage, TIFF
 
 def test_rw_rgb():
     itype = uint8
-    dt = dtype(dict(names=list('rgb'), formats=[itype]*3))
+    dt = dtype(dict(names=list('rgb'), formats=[itype] * 3))
 
     image = zeros((2, 3), dtype=dt)
     image['r'][:, 0] = 250
@@ -78,8 +78,8 @@ def test_write_lzw():
         atexit.register(os.remove, fn)
         for i in range(image.size):
             if image.flat[i] != image2.flat[i]:
-                print(repr((i, image.flat[i-5:i+5].view(dtype=uint8),
-                            image2.flat[i-5:i+5].view(dtype=uint8))))
+                print(repr((i, image.flat[i - 5:i + 5].view(dtype=uint8),
+                            image2.flat[i - 5:i + 5].view(dtype=uint8))))
                 break
 
         assert image.dtype == image2.dtype

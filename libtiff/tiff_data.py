@@ -179,7 +179,7 @@ EXIF_ImageUniqueID a420 ASCII 33
 '''
 
 default_tag_values = dict(BitsPerSample=8, SampleFormat=1,
-                          RowsPerStrip=2**32-1,
+                          RowsPerStrip=2**32 - 1,
                           SamplesPerPixel=1, ExtraSamples=None,
                           PlanarConfiguration=1,
                           Compression=1, Predictor=1,
@@ -225,7 +225,7 @@ for line in tag_info.split('\n'):
         pass
     else:
         n, h, t = line.split()[:3]
-        h = eval('0x'+h)
+        h = eval('0x' + h)
         tag_value2name[h] = n
         tag_value2type[h] = t
         tag_name2value[n] = h

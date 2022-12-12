@@ -40,11 +40,11 @@ def test_write_read():
 
 
 def test_issue19():
-    size = 1024*32  # 1GB
+    size = 1024 * 32  # 1GB
 
     # size = 1024*63  # almost 4GB, test takes about 60 seconds but succeeds
     image = ones((size, size), dtype=uint8)
-    print('image size:', image.nbytes/1024**2, 'MB')
+    print('image size:', image.nbytes / 1024**2, 'MB')
     fn = mktemp('issue19.tif')
     tif = TIFFimage(image)
     try:

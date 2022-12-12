@@ -62,8 +62,7 @@ if %(d)r not in sys.path:
                     j = text.find(end_mark)
                     if j == -1:
                         log.warn("%r missing %r line", script, start_mark)
-                    new_text = (text[:i + len(start_mark)]
-                                + script_replace_text + text[j:])
+                    new_text = (text[:i + len(start_mark)] + script_replace_text + text[j:])
                 else:
                     new_text = text
 

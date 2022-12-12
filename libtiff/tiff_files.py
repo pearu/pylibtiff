@@ -116,7 +116,7 @@ class TiffFiles(TiffBase):
         tiff_array = TiffArray(planes)
         if self.verbose:
             print('%s.get_tiff_array: took %ss' % (self.__class__.__name__,
-                                                   time.time()-start))
+                                                   time.time() - start))
         return tiff_array
 
     def close(self):

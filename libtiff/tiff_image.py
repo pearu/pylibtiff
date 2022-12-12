@@ -65,7 +65,7 @@ class TIFFentry:
     @property
     def offset_is_value(self):
         return not self.values and self.count[0] == 1 and \
-               self.type_nbytes <= 4 and self.type_name != 'ASCII'
+            self.type_nbytes <= 4 and self.type_name != 'ASCII'
 
     def __getitem__(self, index):
         if self.offset_is_value:
@@ -122,8 +122,7 @@ class TIFFentry:
             data = numpy.array([self.values[0] + '\0'])
             # print(type(data), data)
             data = numpy.array([self.values[0] + '\0'],
-                               dtype='|S{}'.format(len(self.values[0]) +
-                                                   1)).view(dtype=numpy.ubyte)
+                               dtype='|S{}'.format(len(self.values[0]) + 1)).view(dtype=numpy.ubyte)
             # print(type(data), data)
             target[offset:offset + self.nbytes] = data
         else:
@@ -203,7 +202,7 @@ class TIFFimage:
         """
         if verbose is None:
             nbytes = self.depth * self.length * self.width * \
-                     self.dtype.itemsize
+                self.dtype.itemsize
             verbose = nbytes >= 1024 ** 2
 
         if os.path.splitext(filename)[1].lower() not in ['.tif', '.tiff']:
@@ -425,9 +424,8 @@ class TIFFimage:
                 sys.stdout.write(
                     '\r  filling records: %5s%% done (%s/s)%s' %
                     (int(100.0 * (i + 1) / len(image_directories)),
-                     bytes2str(int(float(image_data_offset -
-                                         first_image_data_offset) /
-                                   (time.time() - start_time))), ' ' * 2))
+                     bytes2str(int(float(image_data_offset - first_image_data_offset) / (time.time() - start_time))),
+                     ' ' * 2))
                 if (i + 1) == len(image_directories):
                     sys.stdout.write('\n')
                 sys.stdout.flush()

@@ -104,10 +104,10 @@ def encode_bittools(seq, max_bits=12):
     decode_bittools
     """
     if isinstance(seq, numpy.ndarray):
-        nbytes = seq.nbytes*2
+        nbytes = seq.nbytes * 2
         seq = seq.tostring()
     else:
-        nbytes = len(seq)*2
+        nbytes = len(seq) * 2
     r = numpy.zeros((nbytes,), dtype=numpy.ubyte)
 
     init_table = [(chr(code), code) for code in range(256)]
@@ -151,7 +151,7 @@ def encode_bittools(seq, max_bits=12):
         index = setword(r, index, bits, table_get(s), 1)
     index = setword(r, index, bits, CODEEOI)
     bytes = index // 8
-    if 8*bytes < index:
+    if 8 * bytes < index:
         bytes += 1
     return r[:bytes]
 
@@ -309,22 +309,22 @@ def test_lzw():
         f = open(fn, 'rb')
         s = f.read()
         f.close()
-        t = time.time()-t0
+        t = time.time() - t0
         print('Reading %s took %.3f seconds, bytes = %s' % (fn, t, len(s)))
         t0 = time.time()
         r = encode(s)
-        t = time.time()-t0
+        t = time.time() - t0
         sz = len(r)
         if default_backend == 'bitarray':
             sz //= 8
         print('Encoding took %.3f seconds, compress ratio = %.3f,'
               ' Kbytes per second = %.3f'
-              % (t, len(s)/sz, len(s)/t/1024))
+              % (t, len(s) / sz, len(s) / t / 1024))
         t0 = time.time()
         s1 = decode(r)
-        t = time.time()-t0
+        t = time.time() - t0
         print('Decoding took %.3f seconds, Kbytes per second = %.3f'
-              % (t, (sz/t)/1024))
+              % (t, (sz / t) / 1024))
         assert s1 == s
 
 
