@@ -70,7 +70,7 @@ jobs:
           miniforge-version: latest
           use-mamba: true
           python-version: ${{ matrix.python-version }}
-          activate-environment: test-environment
+          activate-environment: pylibtiff
 
       - name: Set cache environment variables
         shell: bash -l {0}
@@ -86,7 +86,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n test-environment -f .conda/environment.yaml
+        run: mamba env update -n pylibtiff -f .conda/environment.yaml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install unstable dependencies
