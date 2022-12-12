@@ -11,6 +11,7 @@ from libtiff import TIFFfile, TIFFimage
 
 import pytest
 
+
 @pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 def test_write_read():
     for compression in [None, 'lzw']:
