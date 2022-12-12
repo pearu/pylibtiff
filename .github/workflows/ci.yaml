@@ -82,11 +82,11 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: ${{ env.CONDA_PREFIX }}
-          key: ${{ matrix.os }}-${{matrix.python-version}}-conda-${{ hashFiles('.conda/environment.yaml') }}-${{ env.DATE }}-${{matrix.experimental}}-${{ env.CACHE_NUMBER }}
+          key: ${{ matrix.os }}-${{matrix.python-version}}-conda-${{ hashFiles('.conda/environment.yml') }}-${{ env.DATE }}-${{matrix.experimental}}-${{ env.CACHE_NUMBER }}
         id: cache
 
       - name: Update environment
-        run: mamba env update -n pylibtiff -f .conda/environment.yaml
+        run: mamba env update -n pylibtiff -f .conda/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install unstable dependencies
