@@ -55,10 +55,10 @@ class TiffChannelsAndFiles(TiffBase):
         lst = []
         for channel, tiff in list(self.channels_files_map.items()):
             lst.append('Channel %s:' % (channel))
-            lst.append('-'*len(lst[-1]))
+            lst.append('-' * len(lst[-1]))
             lst.append(tiff.get_info())
         return '\n'.join(lst)
 
     def close(self):
-        for channel, tiff in list(self.channels_files_map.items()):
+        for tiff in self.channels_files_map.values():
             tiff.close()

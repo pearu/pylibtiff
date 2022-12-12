@@ -19,26 +19,26 @@ def isindisk(path):
 
 def bytes2str(bytes):
     lst = []
-    Pbytes = bytes//1024**5
+    Pbytes = bytes // 1024**5
     if Pbytes:
         lst.append('%sPi' % (Pbytes))
         bytes = bytes - 1024**5 * Pbytes
-    Tbytes = bytes//1024**4
+    Tbytes = bytes // 1024**4
     if Tbytes:
         lst.append('%sTi' % (Tbytes))
         bytes = bytes - 1024**4 * Tbytes
-    Gbytes = bytes//1024**3
+    Gbytes = bytes // 1024**3
     if Gbytes:
         lst.append('%sGi' % (Gbytes))
         bytes = bytes - 1024**3 * Gbytes
-    Mbytes = bytes//1024**2
+    Mbytes = bytes // 1024**2
     if Mbytes:
         lst.append('%sMi' % (Mbytes))
         bytes = bytes - 1024**2 * Mbytes
-    kbytes = bytes//1024
+    kbytes = bytes // 1024
     if kbytes:
         lst.append('%sKi' % (kbytes))
-        bytes = bytes - 1024*kbytes
+        bytes = bytes - 1024 * kbytes
     if bytes:
         lst.append('%s' % (bytes))
     if not lst:

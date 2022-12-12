@@ -342,7 +342,7 @@ class TIFFfile(TiffBase):
             start = strip_offsets0
             end = strip_offsets1 + strip_nbytes1
         return self.data[start:end].view(dtype=dtype).reshape(
-           (depth, width, length))
+            (depth, width, length))
 
     def get_subfile_types(self):
         """ Return a list of subfile types.
@@ -503,7 +503,7 @@ class TIFFfile(TiffBase):
                 assert width == ifd.get_value('ImageWidth', width), repr(
                     (width, ifd.get_value('ImageWidth')))
                 assert length == ifd.get_value('ImageLength', length), repr(
-                   (length, ifd.get_value('ImageLength')))
+                    (length, ifd.get_value('ImageLength')))
                 # assert samples_per_pixel == ifd.get(
                 # 'SamplesPerPixel').value, `samples_per_pixel, ifd.get(
                 # 'SamplesPerPixel').value`
@@ -511,12 +511,12 @@ class TIFFfile(TiffBase):
                                                       planar_config)
                 if can_return_memmap:
                     assert strip_length == lst[-1][1] - lst[-1][0], repr(
-                       (strip_length, lst[-1][1] - lst[-1][0]))
+                        (strip_length, lst[-1][1] - lst[-1][0]))
                 else:
                     strip_length = max(strip_length, lst[-1][1] - lst[-1][0])
                     strip_length_str = ' < ' + bytes2str(strip_length)
 
-                assert(bits_per_sample == ifd.get_value(
+                assert (bits_per_sample == ifd.get_value(
                     'BitsPerSample',
                     bits_per_sample)).all(), repr(
                         (bits_per_sample, ifd.get_value('BitsPerSample')))
@@ -573,7 +573,7 @@ strip_length : %(strip_length_str)s
                         arr[i:i + d.nbytes] = d
                         i += d.nbytes
                     arr = arr.view(dtype=dtype_lst[0]).reshape(
-                       (depth, length, width))
+                        (depth, length, width))
                     return [arr], sample_names
                 else:
                     i = 0
@@ -603,11 +603,11 @@ strip_length : %(strip_length_str)s
         end = lst[-1][1]
         if start > step:
             arr = self.data[start - step: end].reshape(
-               (depth, strip_length + step))
+                (depth, strip_length + step))
             k = step
         elif end <= self.data.size - step:
             arr = self.data[start: end + step].reshape(
-               (depth, strip_length + step))
+                (depth, strip_length + step))
             k = 0
         else:
             raise NotImplementedError(repr((start, end, step)))
@@ -792,8 +792,7 @@ class IFD:
                         'DocumentName', 'Model', 'Make', 'PageName',
                         'DateTime', 'Artist', 'HostComputer']:
             if value is not None:
-                return value.view('|S{!s}'.format(str(value.nbytes //
-                                                      value.size))).tostring()
+                return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tostring()
         if human:
             if tag_name == 'Compression':
                 value = {1: 'Uncompressed', 2: 'CCITT1D', 3: 'Group3Fax',
@@ -918,10 +917,8 @@ class IFD:
                 if isinstance(bits_per_sample, numpy.ndarray):
                     dtype = getattr(self.dtypes,
                                     'uint%s' % (bits_per_sample[i]))
-                    r[channel_names[i]] = self.tiff.data[
-                        strip_offsets[i]:strip_offsets[i] +
-                        strip_nbytes[i]].view(
-                            dtype=dtype).reshape((width, length))
+                    subdata = self.tiff.data[strip_offsets[i]: strip_offsets[i] + strip_nbytes[i]]
+                    r[channel_names[i]] = subdata.view(dtype=dtype).reshape((width, length))
                 else:
                     dtype = getattr(self.dtypes, 'uint%s' % (bits_per_sample))
                     r[channel_names[i]] = self.tiff.data[
@@ -980,9 +977,9 @@ class IFD:
         if descr.startswith('<?xml') or descr[:4].lower() == '<ome':
             raise NotImplementedError(
                 'getting pixels sizes from OME-XML string')
-        for vx, vy, vz in [('PixelSizeX', 'PixelSizeY', 'PixelSizeZ'),
-                           ('VoxelSizeX', 'VoxelSizeY', 'VoxelSizeZ'),
-                           ]:
+        for vx, vy in [('PixelSizeX', 'PixelSizeY'),
+                       ('VoxelSizeX', 'VoxelSizeY'),
+                       ]:
             ix = descr.find(vx)
             iy = descr.find(vy)
             if ix == -1:

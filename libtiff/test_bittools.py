@@ -5,7 +5,7 @@ from . import bittools
 
 def tobinary(arr):
     return ''.join([str(bittools.getbit(arr, i))
-                    for i in range(arr.nbytes*8)])
+                    for i in range(arr.nbytes * 8)])
 
 
 def test_setgetbit():
@@ -23,16 +23,16 @@ def test_setgetword():
         arr = numpy.array(list(range(-256, 256)), dtype=dtype)
         arr2 = numpy.zeros(arr.shape, dtype=arr.dtype)
         for i in range(arr.nbytes):
-            word, next = bittools.getword(arr, i*8, 8)
-            bittools.setword(arr2, i*8, 8, word)
+            word, next = bittools.getword(arr, i * 8, 8)
+            bittools.setword(arr2, i * 8, 8, word)
         assert (arr == arr2).all(), repr((arr, arr2))
 
 
 def test_wordbits():
     dtype = numpy.dtype(numpy.int_)
-    for width in range(1, dtype.itemsize*8+1):
+    for width in range(1, dtype.itemsize * 8 + 1):
         arr = numpy.array([17, 131, 235], dtype=dtype)
-        arr2 = numpy.zeros((1+width//8), dtype=dtype)
+        arr2 = numpy.zeros((1 + width // 8), dtype=dtype)
         bstr = tobinary(arr)
         word, next = bittools.getword(arr, 0, width)
         if width > 7:

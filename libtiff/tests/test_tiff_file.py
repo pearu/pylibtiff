@@ -1,5 +1,6 @@
 
 import os
+import sys
 import atexit
 from tempfile import mktemp
 from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
@@ -8,9 +9,11 @@ from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
 from libtiff import TIFF
 from libtiff import TIFFfile, TIFFimage
 
+import pytest
 
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 def test_write_read():
-
     for compression in [None, 'lzw']:
         for itype in [uint8, uint16, uint32, uint64,
                       int8, int16, int32, int64,
@@ -40,11 +43,11 @@ def test_write_read():
 
 
 def test_issue19():
-    size = 1024*32  # 1GB
+    size = 1024 * 32  # 1GB
 
     # size = 1024*63  # almost 4GB, test takes about 60 seconds but succeeds
     image = ones((size, size), dtype=uint8)
-    print('image size:', image.nbytes/1024**2, 'MB')
+    print('image size:', image.nbytes / 1024**2, 'MB')
     fn = mktemp('issue19.tif')
     tif = TIFFimage(image)
     try:

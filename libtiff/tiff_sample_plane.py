@@ -48,8 +48,7 @@ class TiffSamplePlane:
         self.shape = (int(rows_of_pixels), int(pixels_per_row))
 
         rows_per_strip = ifd.get_value('RowsPerStrip')
-        strips_per_image = (rows_of_pixels + rows_per_strip
-                            - 1) // rows_per_strip
+        strips_per_image = (rows_of_pixels + rows_per_strip - 1) // rows_per_strip
         rows_per_strip = min(rows_of_pixels, rows_per_strip)
         self.rows_per_strip = rows_per_strip
 
@@ -142,7 +141,7 @@ rows_per_strip=%(rows_per_strip)s
             index += self.shape[0]
         if index > self.shape[0] or index < 0:
             raise IndexError('Row index %r out of bounds [0,%r]'
-                             % (index, self.shape[0]-1))
+                             % (index, self.shape[0] - 1))
 
         if self.planar_config == 1:  # RGBRGB..
             strip_index, row_index = divmod(index, self.rows_per_strip)
@@ -217,7 +216,7 @@ rows_per_strip=%(rows_per_strip)s
                     start = self.strip_offsets[0]
                 else:
                     start = self.strip_offsets[0] + self.sample_index * \
-                            self.bytes_per_sample_image
+                        self.bytes_per_sample_image
                 stop = start + self.bytes_per_sample_image
                 image = self.ifd.tiff.data[start:stop]
                 image = image.view(dtype=self.dtype).reshape(self.shape)
@@ -244,7 +243,7 @@ rows_per_strip=%(rows_per_strip)s
                     print('%s.get_image warning: tiff data contains %s extra'
                           'bytes (compression=%r) that are ignored'
                           % (self.__class__.__name__,
-                             strip.nbytes-target.nbytes,
+                             strip.nbytes - target.nbytes,
                              self.compression))
                 image[offset:offset + strip.nbytes] = strip[:target.nbytes]
                 offset += strip.nbytes
