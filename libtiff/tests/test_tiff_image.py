@@ -1,4 +1,5 @@
 import os
+import sys
 import atexit
 from tempfile import mktemp
 from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
@@ -6,7 +7,10 @@ from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
                    complex64, complex128)
 from libtiff import TIFFfile, TIFFimage, TIFF
 
+import pytest
 
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 def test_rw_rgb():
     itype = uint8
     dt = dtype(dict(names=list('rgb'), formats=[itype] * 3))
@@ -34,6 +38,7 @@ def test_rw_rgb():
     assert (image['b'] == data[2]).all()
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 def test_write_read():
     for compression in ['none', 'lzw']:
         for itype in [uint8, uint16, uint32, uint64,
@@ -57,6 +62,7 @@ def test_write_read():
             assert (image == data[0]).all()
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 def test_write_lzw():
     for itype in [uint8, uint16, uint32, uint64,
                   int8, int16, int32, int64,
