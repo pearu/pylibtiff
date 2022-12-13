@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-from setuptools import find_packages
-from numpy.distutils.core import setup  # noqa: F811
+import os
+from setuptools import find_packages, Extension, setup
+import numpy as np
 
 try:
     # HACK: https://github.com/pypa/setuptools_scm/issues/190#issuecomment-351181286
@@ -10,12 +11,6 @@ try:
     setuptools_scm.integration.find_files = lambda _: []
 except ImportError:
     pass
-
-
-def configuration(parent_package='', top_path=None):
-    from numpy.distutils.misc_util import Configuration
-    config = Configuration(None, parent_package, top_path)
-    return config
 
 
 def setup_package():
@@ -47,7 +42,6 @@ def setup_package():
         description='PyLibTiff: a Python tiff library.',
         long_description=long_description,
         long_description_content_type='text/markdown',
-        platforms=["All"],
         install_requires=['numpy>=1.13.3'],
         python_requires='>=3.8',
         extras_require={
@@ -55,7 +49,20 @@ def setup_package():
         },
         include_package_data=True,
         packages=find_packages(),
-        configuration=configuration,
+        ext_modules=[
+            Extension(name="libtiff.bittools",
+                      sources=[os.path.join("libtiff", "src", "bittools.c")],
+                      include_dirs=[np.get_include()]),
+            Extension(name="libtiff.tif_lzw",
+                      sources=[os.path.join("libtiff", "src", "tif_lzw.c")],
+                      include_dirs=[np.get_include()]),
+        ],
+        entry_points={
+            'console_scripts': [
+                'libtiff.info = libtiff.scripts.info:main',
+                'libtiff.convert = libtiff.scripts.convert:main',
+            ],
+        },
     )
     setup(**metadata)
 
