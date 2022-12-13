@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from setuptools import find_packages
 from numpy.distutils.core import setup  # noqa: F811
 
 try:
@@ -14,7 +15,6 @@ except ImportError:
 def configuration(parent_package='', top_path=None):
     from numpy.distutils.misc_util import Configuration
     config = Configuration(None, parent_package, top_path)
-    config.add_subpackage('libtiff')
     return config
 
 
@@ -53,6 +53,8 @@ def setup_package():
         extras_require={
             'bitarray': ['bitarray'],
         },
+        include_package_data=True,
+        packages=find_packages(),
         configuration=configuration,
     )
     setup(**metadata)
