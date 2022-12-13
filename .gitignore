@@ -1,6 +1,8 @@
 build
+dist
 *.egg-info
 *.pyc
 *.pyd
+__pycache__
 libtiff/version.py
-
+*.so
