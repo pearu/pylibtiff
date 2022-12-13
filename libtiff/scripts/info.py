@@ -6,9 +6,6 @@
 
 import os  # noqa: F401
 
-### START UPDATE SYS.PATH ###
-### END UPDATE SYS.PATH ###
-
 
 def runner(parser, options, args):
 

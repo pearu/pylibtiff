@@ -6,9 +6,6 @@
 
 import os
 
-### START UPDATE SYS.PATH ###
-### END UPDATE SYS.PATH ###
-
 description_template = '''
 DimensionX: %(DimensionX)s
 DimensionY: %(DimensionY)s
