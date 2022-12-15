@@ -86,6 +86,8 @@ if tiff_h is None:
         include_tiff_h = os.path.join(os.path.split(lib)[0], 'include',
                                       'tiff.h')
     if not os.path.isfile(include_tiff_h):
+        include_tiff_h = os.path.join('/usr', 'local', 'include', 'tiff.h')
+    if not os.path.isfile(include_tiff_h):
         # fix me for windows:
         include_tiff_h = os.path.join(sys.prefix, 'include', 'tiff.h')
         # print(include_tiff_h)
@@ -107,7 +109,14 @@ if tiff_h is None:
     f = open(include_tiff_h, 'r')
     lst = []
     d = {}
+    mergeContinuedLine = None
     for line in f.readlines():
+        if mergeContinuedLine is not None:
+           line = mergeContinuedLine + line
+           mergeContinuedLine = None
+        if line.rstrip().endswith(' \\'):
+            mergeContinuedLine = line.rstrip()[:-1]
+            continue
         if not line.startswith('#define'):
             continue
         words = line[7:].lstrip().split()
@@ -1219,16 +1228,16 @@ class TIFF(ctypes.c_void_p):
     def WriteScanline(self, buf, row, sample=0):
         return libtiff.TIFFWriteScanline(self, buf, row, sample)
     writescanline = WriteScanline
-    
+
     @debug
-    def ReadScanline(self, buf, row, sample=0): 
+    def ReadScanline(self, buf, row, sample=0):
         return libtiff.TIFFReadScanline(self, buf, row, sample)
     readscanline = ReadScanline
-    
-    def ScanlineSize(self): 
+
+    def ScanlineSize(self):
         return libtiff.TIFFScanlineSize(self).value
     scanlinesize = ScanlineSize
-    
+
     # @debug
     def ReadRawStrip(self, strip, buf, size):
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
