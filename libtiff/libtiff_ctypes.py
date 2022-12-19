@@ -75,6 +75,17 @@ try:
 except ImportError:
     tiff_h = None
 
+
+def _generate_lines_without_continuations(file_obj):
+    """Parse lines from tiff.h but concatenate lines using a backslahs for continuation."""
+    line_iter = iter(file_obj)
+    for header_line in line_iter:
+        while header_line.endswith("\\\n"):
+            # line continuation - replace '<extra space>\<NL><indentation>' with a single space
+            header_line = header_line[:-2].rstrip() + " " + next(line_iter).lstrip()
+        yield header_line
+
+
 if tiff_h is None:
     # WARNING: there is not guarantee that the tiff.h found below will
     # correspond to libtiff version. Although, for clean distros the
@@ -107,7 +118,7 @@ if tiff_h is None:
     f = open(include_tiff_h, 'r')
     lst = []
     d = {}
-    for line in f.readlines():
+    for line in _generate_lines_without_continuations(f):
         if not line.startswith('#define'):
             continue
         words = line[7:].lstrip().split()
