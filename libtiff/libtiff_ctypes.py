@@ -187,15 +187,13 @@ class c_ttag_t(ctypes.c_uint32):
     pass
 
 
-if libtiff_version_tuple[0] >= 4 and libtiff_version_tuple[1] >= 5:
-
-    class c_tdir_t(ctypes.c_uint32):
-        pass
-
+if libtiff_version_tuple[:2] >= (4, 5):
+    c_tdir_t_base = ctypes.c_uint32
 else:
+    c_tdir_t_base = ctypes.c_uint16
 
-    class c_tdir_t(ctypes.c_uint16):
-        pass
+class c_tdir_t(c_tdir_t_base):
+    pass
 
 
 class c_tsample_t(ctypes.c_uint16):
