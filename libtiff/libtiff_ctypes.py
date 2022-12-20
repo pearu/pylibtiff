@@ -109,14 +109,7 @@ if tiff_h is None:
     f = open(include_tiff_h, 'r')
     lst = []
     d = {}
-    mergeContinuedLine = None
     for line in f.readlines():
-        if mergeContinuedLine is not None:
-           line = mergeContinuedLine + line
-           mergeContinuedLine = None
-        if line.rstrip().endswith(' \\'):
-            mergeContinuedLine = line.rstrip()[:-1]
-            continue
         if not line.startswith('#define'):
             continue
         words = line[7:].lstrip().split()
