@@ -94,6 +94,8 @@ if tiff_h is None:
     include_tiff_h = os.path.join(os.path.split(lib)[0], '..', 'include',
                                   'tiff.h')
     if not os.path.isfile(include_tiff_h):
+        include_tiff_h = os.environ.get('TIFF_HEADER_PATH', include_tiff_h)
+    if not os.path.isfile(include_tiff_h):
         include_tiff_h = os.path.join(os.path.split(lib)[0], 'include',
                                       'tiff.h')
     if not os.path.isfile(include_tiff_h):
@@ -1230,16 +1232,16 @@ class TIFF(ctypes.c_void_p):
     def WriteScanline(self, buf, row, sample=0):
         return libtiff.TIFFWriteScanline(self, buf, row, sample)
     writescanline = WriteScanline
-    
+
     @debug
-    def ReadScanline(self, buf, row, sample=0): 
+    def ReadScanline(self, buf, row, sample=0):
         return libtiff.TIFFReadScanline(self, buf, row, sample)
     readscanline = ReadScanline
-    
-    def ScanlineSize(self): 
+
+    def ScanlineSize(self):
         return libtiff.TIFFScanlineSize(self).value
     scanlinesize = ScanlineSize
-    
+
     # @debug
     def ReadRawStrip(self, strip, buf, size):
         return libtiff.TIFFReadRawStrip(self, strip, buf, size).value
