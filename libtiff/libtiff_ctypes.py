@@ -23,12 +23,12 @@ cwd = os.getcwd()
 try:
     os.chdir(os.path.dirname(__file__))
     if os.name == 'nt':
-        # assume that the directory of libtiff.dll is in PATH.
-        lib = ctypes.util.find_library('libtiff.dll')
-        if lib is None:
-            # Fallback to the old "libtiff3" name
-            lib = ctypes.util.find_library('libtiff3')
-        if lib is None:
+        # assume that the directory of the libtiff DLL is in PATH.
+        for lib in ('tiff', 'libtiff', 'libtiff3'):
+            lib = ctypes.util.find_library(lib)
+            if lib is not None:
+                break
+        else:
             # try default installation path:
             lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
             if os.path.isfile(lib):
@@ -68,6 +68,7 @@ libtiff_version_str = libtiff.TIFFGetVersion()
 i = libtiff_version_str.lower().split().index(b'version')
 assert i != -1, repr(libtiff_version_str.decode())
 libtiff_version = libtiff_version_str.split()[i + 1].decode()
+libtiff_version_tuple = tuple(int(i) for i in libtiff_version.split('.'))
 
 tiff_h_name = 'tiff_h_%s' % (libtiff_version.replace('.', '_'))
 try:
@@ -182,11 +183,16 @@ for name, value in list(d.items()):
 
 
 # types defined by tiff.h
-class c_ttag_t(ctypes.c_uint):
+class c_ttag_t(ctypes.c_uint32):
     pass
 
 
-class c_tdir_t(ctypes.c_uint16):
+if libtiff_version_tuple[:2] >= (4, 5):
+    c_tdir_t_base = ctypes.c_uint32
+else:
+    c_tdir_t_base = ctypes.c_uint16
+
+class c_tdir_t(c_tdir_t_base):
     pass
 
 
@@ -202,7 +208,7 @@ class c_ttile_t(ctypes.c_uint32):
     pass
 
 
-class c_tsize_t(ctypes.c_int32):
+class c_tsize_t(ctypes.c_ssize_t):
     pass
 
 
