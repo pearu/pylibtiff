@@ -95,10 +95,7 @@ def runner(parser, options, args):
 
 
 def main():
-    try:
-        from libtiff.optparse_gui import OptionParser
-    except ImportError:
-        from optparse import OptionParser
+    from optparse import OptionParser
     from libtiff.script_options import set_convert_options
     parser = OptionParser()
 
