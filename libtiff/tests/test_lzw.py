@@ -31,5 +31,5 @@ def test_encode():
 
         rarr = c_encode(arr)
         arr2 = c_decode(rarr, arr.nbytes)
-        assert arr2.nbytes == arr.nbytes and (arr2 == arr).all(),\
+        assert arr2.nbytes == arr.nbytes and (arr2 == arr).all(), \
             repr((arr2, arr))
