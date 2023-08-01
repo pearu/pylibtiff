@@ -315,7 +315,7 @@ class TIFFimage:
             # entries must be sorted by tag number
             entries.sort(key=lambda x: x.tag)
 
-            strip_info = strip_offsets, strip_byte_counts, strips_per_image,\
+            strip_info = strip_offsets, strip_byte_counts, strips_per_image, \
                 rows_per_strip, bytes_per_row
             image_directories.append((entries, strip_info, image))
 
@@ -359,7 +359,7 @@ class TIFFimage:
         start_time = time.time()
         compressed_data_size = 0
         for i, (entries, strip_info, image) in enumerate(image_directories):
-            strip_offsets, strip_byte_counts, strips_per_image,\
+            strip_offsets, strip_byte_counts, strips_per_image, \
                 rows_per_strip, bytes_per_row = strip_info
 
             # write the nof IFD entries

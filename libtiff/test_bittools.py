@@ -39,7 +39,7 @@ def test_wordbits():
             assert word == arr[0], repr((width, word, arr[0], bstr, dtype))
         bittools.setword(arr2, 0, width, word)
         assert bittools.getword(arr2, 0, width)[0] == word
-        assert tobinary(arr2)[:width] == bstr[:width],\
+        assert tobinary(arr2)[:width] == bstr[:width], \
             repr((tobinary(arr2)[:width], bstr[:width]))
 
 
