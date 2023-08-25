@@ -529,7 +529,7 @@ class TIFF(ctypes.c_void_p):
             try:
                 # Python3: it needs bytes for the arguments of type "c_char_p"
                 if isinstance(filename, str) and 'win' in sys.platform:
-                    filename = filename.encode(locale.getpreferredencoding())
+                    filename = filename.encode(locale.getpreferredencoding(False))
                 else:
                     filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
@@ -1652,7 +1652,7 @@ class TIFF3D(TIFF):
             try:
                 # Python3: it needs bytes for the arguments of type "c_char_p"
                 if isinstance(filename, str) and 'win' in sys.platform:
-                    filename = filename.encode(locale.getpreferredencoding())
+                    filename = filename.encode(locale.getpreferredencoding(False))
                 else:
                     filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
