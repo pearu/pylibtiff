@@ -83,7 +83,7 @@ def test_write_lzw(itype):
     atexit.register(os.remove, fn)
     for i in range(image.size):
         if image.flat[i] != image2.flat[i]:
-            #print(repr((i, image.flat[i - 5:i + 5].view(dtype=uint8),
+            # print(repr((i, image.flat[i - 5:i + 5].view(dtype=uint8),
             #            image2.flat[i - 5:i + 5].view(dtype=uint8))))
             break
 
