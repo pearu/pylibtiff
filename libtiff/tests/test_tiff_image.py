@@ -4,7 +4,7 @@ import atexit
 from tempfile import mktemp
 from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
                    int64, float32, float64, array, zeros, dtype,
-                   complex64, complex128)
+                   complex64, complex128, issubdtype, integer)
 from libtiff import TIFFfile, TIFFimage, TIFF
 
 import pytest
@@ -34,8 +34,6 @@ def test_rw_rgb():
     data, names = tif.get_samples()
     tif.close()
     atexit.register(os.remove, fn)
-    print(image)
-    print(data)
 
     assert itype == data[0].dtype, repr((itype, data[0].dtype))
     assert (image['r'] == data[0]).all()
@@ -67,9 +65,11 @@ def test_write_read(compression, itype):
 @pytest.mark.skipif(sys.platform == "darwin", reason="OSX can't resize mmap")
 @pytest.mark.parametrize("itype", SUPPORTED_DTYPES)
 def test_write_lzw(itype):
-    # image = array([[1,2,3], [4,5,6]], itype)
-    image = array([list(range(10000))], itype)
-    # image = array([[0]*14000], itype)
+    if issubdtype(itype, integer):
+        # avoid overflow failure from numpy for integer types
+        image = array([list(range(10000))]).astype(itype)
+    else:
+        image = array([list(range(10000))], itype)
     fn = mktemp('.tif')
     tif = TIFFimage(image)
     tif.write_file(fn, compression='lzw')
@@ -83,8 +83,8 @@ def test_write_lzw(itype):
     atexit.register(os.remove, fn)
     for i in range(image.size):
         if image.flat[i] != image2.flat[i]:
-            print(repr((i, image.flat[i - 5:i + 5].view(dtype=uint8),
-                        image2.flat[i - 5:i + 5].view(dtype=uint8))))
+            # print(repr((i, image.flat[i - 5:i + 5].view(dtype=uint8),
+            #            image2.flat[i - 5:i + 5].view(dtype=uint8))))
             break
 
     assert image.dtype == image2.dtype
