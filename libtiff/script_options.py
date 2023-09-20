@@ -1,8 +1,5 @@
-
-
 __all__ = ['set_formatter', 'set_info_options', 'set_convert_options']
 
-import os
 from optparse import NO_DEFAULT
 from optparse import TitledHelpFormatter
 
