@@ -63,7 +63,7 @@ def set_convert_options(parser):
     if os.name == 'posix':
         try:
             import matplotlib
-            matplotlib.use('GTkAgg')
+            matplotlib.use('GTk3Agg')
             parser.run_methods = ['subcommand']
         except ImportError:
             pass
@@ -92,7 +92,7 @@ def set_info_options(parser):
     if os.name == 'posix':
         try:
             import matplotlib
-            matplotlib.use('GTkAgg')
+            matplotlib.use('GTk3Agg')
             parser.run_methods = ['subcommand']
         except ImportError:
             pass
