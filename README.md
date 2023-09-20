@@ -65,7 +65,7 @@ LSM files, it is as fast as libtiff.py by using numpy.
 # Script usage examples #
 
 ```
-$ libtiff.info -i result_0.tif --no-gui
+$ libtiff.info -i result_0.tif
 IFDEntry(tag=ImageWidth, value=512, count=1, offset=None)
 IFDEntry(tag=ImageLength, value=512, count=1, offset=None)
 IFDEntry(tag=BitsPerSample, value=32, count=1, offset=None)
@@ -92,7 +92,7 @@ strip_length : 1048576
 ```
 
 ```
-$ libtiff.info --no-gui -i psf_1024_z5_airy1_set1.lsm
+$ libtiff.info -i psf_1024_z5_airy1_set1.lsm
 IFDEntry(tag=NewSubfileType, value=0, count=1, offset=None)
 IFDEntry(tag=ImageWidth, value=1024, count=1, offset=None)
 IFDEntry(tag=ImageLength, value=1024, count=1, offset=None)
