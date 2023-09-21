@@ -1,16 +1,7 @@
-
-
 __all__ = ['set_formatter', 'set_info_options', 'set_convert_options']
 
-import os
 from optparse import NO_DEFAULT
 from optparse import TitledHelpFormatter
-
-try:
-    import wx  # noqa: F401
-    have_wx = True
-except ImportError:
-    have_wx = False
 
 
 class MyHelpFormatter(TitledHelpFormatter):
@@ -60,20 +51,13 @@ def set_formatter(parser):
 
 def set_convert_options(parser):
     set_formatter(parser)
-    if os.name == 'posix':
-        try:
-            import matplotlib
-            matplotlib.use('GTkAgg')
-            parser.run_methods = ['subcommand']
-        except ImportError:
-            pass
     parser.set_usage('%prog [options] -i INPUTPATH [-o OUTPUTPATH]')
     parser.set_description('Convert INPUTPATH to OUTPUTPATH.')
     parser.add_option('--input-path', '-i',
-                      type='file' if have_wx else str, metavar='INPUTPATH',
+                      type=str, metavar='INPUTPATH',
                       help='Specify INPUTPATH.')
     parser.add_option('--output-path', '-o',
-                      type='file' if have_wx else str, metavar='OUTPUTPATH',
+                      type=str, metavar='OUTPUTPATH',
                       help='Specify OUTPUTPATH.')
     parser.add_option('--compression',
                       type='choice', default='none',
@@ -89,17 +73,10 @@ def set_convert_options(parser):
 
 def set_info_options(parser):
     set_formatter(parser)
-    if os.name == 'posix':
-        try:
-            import matplotlib
-            matplotlib.use('GTkAgg')
-            parser.run_methods = ['subcommand']
-        except ImportError:
-            pass
     parser.set_usage('%prog [options] -i INPUTPATH')
     parser.set_description('Show INPUTPATHs information.')
     parser.add_option('--input-path', '-i',
-                      type='file' if have_wx else str, metavar='INPUTPATH',
+                      type=str, metavar='INPUTPATH',
                       help='Specify INPUTPATH.')
     parser.add_option('--memory-usage',
                       action='store_true', default=False,

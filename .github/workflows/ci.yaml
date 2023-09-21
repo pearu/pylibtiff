@@ -99,7 +99,6 @@ jobs:
           --index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple/ \
           --trusted-host pypi.anaconda.org \
           --no-deps --pre --upgrade \
-          matplotlib \
           numpy;
           LD_PRELOAD=$(python -c "import sys; print(sys.prefix)")/lib/libstdc++.so
           echo "LD_PRELOAD=${LD_PRELOAD}" >> $GITHUB_ENV
