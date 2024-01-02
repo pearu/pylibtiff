@@ -16,6 +16,7 @@ import ctypes
 import ctypes.util
 import struct
 import collections
+import locale
 
 __all__ = ['libtiff', 'TIFF']
 
@@ -527,7 +528,10 @@ class TIFF(ctypes.c_void_p):
         try:
             try:
                 # Python3: it needs bytes for the arguments of type "c_char_p"
-                filename = os.fsencode(filename)  # no-op if already bytes
+                if isinstance(filename, str) and 'win' in sys.platform:
+                    filename = filename.encode(locale.getpreferredencoding(False))
+                else:
+                    filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
                 # Python2: it needs str for the arguments of type "c_char_p"
                 if isinstance(filename, unicode):  # noqa: F821
@@ -1647,7 +1651,10 @@ class TIFF3D(TIFF):
         try:
             try:
                 # Python3: it needs bytes for the arguments of type "c_char_p"
-                filename = os.fsencode(filename)  # no-op if already bytes
+                if isinstance(filename, str) and 'win' in sys.platform:
+                    filename = filename.encode(locale.getpreferredencoding(False))
+                else:
+                    filename = os.fsencode(filename)  # no-op if already bytes
             except AttributeError:
                 # Python2: it needs str for the arguments of type "c_char_p"
                 if isinstance(filename, unicode):  # noqa: F821
