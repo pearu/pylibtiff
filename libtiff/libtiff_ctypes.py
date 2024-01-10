@@ -229,6 +229,11 @@ class c_thandle_t(ctypes.c_void_p):
 # types defined for creating custom tags
 FIELD_CUSTOM = 65
 
+# Special values for field_readcount & field_writecount
+TIFF_VARIABLE = -1  # The length is variable, this number is passed as an uint16
+TIFFTAG_SPP = -2  # There are as many values as defined in TIFFTAG_SAMPLESPERPIXEL
+TIFF_VARIABLE2 = -3  # The length is variable, this number is passed as an uint32
+
 
 class TIFFDataType(object):
     """Place holder for the enum in C.
@@ -289,8 +294,8 @@ class TIFFFieldInfo(ctypes.Structure):
     """
     typedef struct {
         ttag_t  field_tag;      /* field's tag */
-        short   field_readcount;    /* read count/TIFF_VARIABLE/TIFF_SPP */
-        short   field_writecount;   /* write count/TIFF_VARIABLE */
+        short   field_readcount;    /* read count/TIFF_VARIABLE/TIFF_VARIABLE2/TIFF_SPP */
+        short   field_writecount;   /* write count/TIFF_VARIABLE/TIFF_VARIABLE2*/
         TIFFDataType field_type;    /* type of associated data */
         unsigned short field_bit;   /* bit in fieldsset bit vector */
         unsigned char field_oktochange; /* if true, can change while writing */
@@ -338,21 +343,72 @@ class TIFFExtender(object):
 
 
 def add_tags(tag_list):
+    """
+    Adds support for reading and writing custom tags.
+
+    Parameters
+    ----------
+    tag_list: List of TIFFFieldInfo.
+       The definitions of each new tags to support, as defined by libtiff.
+
+    Returns
+    -------
+        TIFFExtender: the new function that will be used by libtiff to support
+        the new custom tags.
+    """
     tag_list_array = (TIFFFieldInfo * len(tag_list))(*tag_list)
     for field_info in tag_list_array:
-        _name = "TIFFTAG_" + str(field_info.field_name).upper()
-        globals()[_name] = field_info.field_tag
-        if field_info.field_writecount > 1 and field_info.field_type != \
-                TIFFDataType.TIFF_ASCII:
-            tifftags[field_info.field_tag] = (
-                ttype2ctype[
-                    field_info.field_type] * field_info.field_writecount,
-                lambda _d: _d.contents[:])
-        else:
-            tifftags[field_info.field_tag] = (
-                ttype2ctype[field_info.field_type], lambda _d: _d.value)
+        tifftags[field_info.field_tag] = _field_info_to_tifftag(field_info)
+
+        name = "TIFFTAG_" + field_info.field_name.decode("ascii").upper()
+        globals()[name] = field_info.field_tag
 
     return TIFFExtender(tag_list_array)
+
+
+def _field_info_to_tifftag(field_info):
+    """
+    Creates an entry for tifftags based on a field_info.
+
+    Parameters
+    ----------
+    field_info: TIFFFieldInfo
+        The definition of the new tag.
+
+    Returns
+    -------
+       Tuple with: C type of the data (or tuple of C types for the count and data,
+       if it's a variable length field), and a function to convert from the C
+       type to a python type.
+    """
+    data_t = ttype2ctype[field_info.field_type]
+    convert_c_to_py = lambda d: d.value
+
+    # Note: typically field_readcount == field_writecount
+    if field_info.field_readcount != field_info.field_writecount:
+        warnings.warn(f"Unsupported readcount != writecount "
+                      f"({field_info.field_readcount} != {field_info.field_writecount})")
+        # Let's be optimistic and assume it'll work as-is
+
+    # Handle arrays (except for ASCII arrays aka C strings, because they are automatically handled)
+    if (field_info.field_readcount != 1
+        and field_info.field_type != TIFFDataType.TIFF_ASCII
+       ):
+        if field_info.field_readcount > 1:
+            data_t = data_t * field_info.field_readcount
+            convert_c_to_py = lambda d: d.contents[:]
+        elif field_info.field_readcount in (TIFF_VARIABLE, TIFF_VARIABLE2):
+            if field_info.field_readcount == TIFF_VARIABLE:
+                count_t = ctypes.c_uint16
+            else:
+                count_t = ctypes.c_uint32
+            data_t = (count_t, data_t)
+            convert_c_to_py = lambda d: d[1][:d[0]]
+        else:
+            warnings.warn(f"Unsupported readcount {field_info.field_readcount}")
+            # Let's be optimistic and assume the standard behaviour will work
+
+    return (data_t, convert_c_to_py)
 
 
 tifftags = {
@@ -418,7 +474,7 @@ tifftags = {
     TIFFTAG_BITSPERSAMPLE: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_CLEANFAXDATA: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_COMPRESSION: (ctypes.c_uint16, lambda _d: _d.value),
-    TIFFTAG_DATATYPE: (ctypes.c_uint16, lambda _d: _d.value),
+    TIFFTAG_DATATYPE: (ctypes.c_uint16, lambda _d: _d.value),  # Obsolete tag replaced by SampleFormat
     TIFFTAG_FILLORDER: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_INKSET: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_MATTEING: (ctypes.c_uint16, lambda _d: _d.value),
@@ -1373,17 +1429,19 @@ class TIFF(ctypes.c_void_p):
         tag can be numeric constant TIFFTAG_<tagname> or a
         string containing <tagname>.
         """
+        # Special trick to read extra metadata as text in the ImageDescription
         if tag in ['PixelSizeX', 'PixelSizeY', 'RelativeTime']:
             descr = self.GetField('ImageDescription')
             if not descr:
                 return
-            _i = descr.find(tag)
+            _i = descr.find(tag.encode("ascii"))
             if _i == -1:
                 return
             _value = eval(descr[_i + len(tag):].lstrip().split()[0])
             return _value
+
         if isinstance(tag, str):
-            tag = eval('TIFFTAG_' + tag.upper())
+            tag = globals()['TIFFTAG_' + tag.upper()]
         t = tifftags.get(tag)
         if t is None:
             if not ignore_undefined_tag:
@@ -1462,7 +1520,7 @@ class TIFF(ctypes.c_void_p):
             print("Warning: count argument is deprecated")
 
         if isinstance(tag, str):
-            tag = eval('TIFFTAG_' + tag.upper())
+            tag = globals()['TIFFTAG_' + tag.upper()]
         t = tifftags.get(tag)
         if t is None:
             print('Warning: no tag %r defined' % tag)
@@ -1601,7 +1659,8 @@ class TIFF(ctypes.c_void_p):
                 orig_value = self.GetField(define)
                 if orig_value is None and define not in define_rewrite:
                     continue
-                if _name.endswith('OFFSETS') or _name.endswith('BYTECOUNTS'):
+                if (_name.endswith('OFFSETS') or _name.endswith('BYTECOUNTS')
+                    or define == TIFFTAG_DATATYPE):  # old version of SampleFormat
                     continue
                 if define in define_rewrite:
                     _value = define_rewrite[define]
@@ -1958,11 +2017,12 @@ def _test_custom_tags():
     def _tag_write():
         a = TIFF.open("/tmp/libtiff_test_custom_tags.tif", "w")
 
-        a.SetField("ARTIST", "MY NAME")
+        a.SetField("ARTIST", b"MY NAME")
         a.SetField("LibtiffTestByte", 42)
-        a.SetField("LibtiffTeststr", "FAKE")
+        a.SetField("LibtiffTeststr", b"FAKE")
         a.SetField("LibtiffTestuint16", 42)
         a.SetField("LibtiffTestMultiuint32", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+        a.SetField("LibtiffTestBytes", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         a.SetField("XPOSITION", 42.0)
         a.SetField("PRIMARYCHROMATICITIES", (1.0, 2, 3, 4, 5, 6))
 
@@ -1983,7 +2043,7 @@ def _test_custom_tags():
         tmp = a.GetField("XPOSITION")
         assert tmp == 42.0, "XPosition was not read as 42.0"
         tmp = a.GetField("ARTIST")
-        assert tmp == "MY NAME", "Artist was not read as 'MY NAME'"
+        assert tmp == b"MY NAME", "Artist was not read as 'MY NAME'"
         tmp = a.GetField("LibtiffTestByte")
         assert tmp == 42, "LibtiffTestbyte was not read as 42"
         tmp = a.GetField("LibtiffTestuint16")
@@ -1993,7 +2053,9 @@ def _test_custom_tags():
                        10], "LibtiffTestMultiuint32 was not read as [1,2,3," \
                             "4,5,6,7,8,9,10]"
         tmp = a.GetField("LibtiffTeststr")
-        assert tmp == "FAKE", "LibtiffTeststr was not read as 'FAKE'"
+        assert tmp == b"FAKE", "LibtiffTeststr was not read as 'FAKE'"
+        tmp = a.GetField("LibtiffTestBytes")
+        assert tmp == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         tmp = a.GetField("PRIMARYCHROMATICITIES")
         assert tmp == [1.0, 2.0, 3.0, 4.0, 5.0,
                        6.0], "PrimaryChromaticities was not read as [1.0," \
@@ -2003,13 +2065,15 @@ def _test_custom_tags():
     # Define a C structure that says how each tag should be used
     test_tags = [
         TIFFFieldInfo(40100, 1, 1, TIFFDataType.TIFF_BYTE, FIELD_CUSTOM, True,
-                      False, "LibtiffTestByte"),
+                      False, b"LibtiffTestByte"),
         TIFFFieldInfo(40103, 10, 10, TIFFDataType.TIFF_LONG, FIELD_CUSTOM,
-                      True, False, "LibtiffTestMultiuint32"),
+                      True, False, b"LibtiffTestMultiuint32"),
         TIFFFieldInfo(40102, 1, 1, TIFFDataType.TIFF_SHORT, FIELD_CUSTOM, True,
-                      False, "LibtiffTestuint16"),
+                      False, b"LibtiffTestuint16"),
         TIFFFieldInfo(40101, -1, -1, TIFFDataType.TIFF_ASCII, FIELD_CUSTOM,
-                      True, False, "LibtiffTeststr")
+                      True, False, b"LibtiffTeststr"),
+        TIFFFieldInfo(40104, TIFF_VARIABLE2, TIFF_VARIABLE2, TIFFDataType.TIFF_BYTE, FIELD_CUSTOM,
+                      True, True, b"LibtiffTestBytes"),
     ]
 
     # Add tags to the libtiff library
@@ -2255,7 +2319,7 @@ def _test_read_one_tile():
         raise AssertionError(
             "An exception must be raised with invalid (x, y) values")
     except ValueError as inst:
-        assert inst.message == "Invalid x value", repr(inst.message)
+        assert str(inst) == "Invalid x value", inst
 
     # test y greater than the image height
     try:
@@ -2263,7 +2327,7 @@ def _test_read_one_tile():
         raise AssertionError(
             "An exception must be raised with invalid (x, y) values")
     except ValueError as inst:
-        assert inst.message == "Invalid y value", repr(inst.message)
+        assert str(inst) == "Invalid y value", inst
 
     # RGB image sized 3000 x 2500, PLANARCONFIG_SEPARATE
     tiff.SetDirectory(3)
@@ -2325,9 +2389,9 @@ def _test_tiled_image_read(filename="/tmp/libtiff_test_tile_write.tiff"):
 
 def _test_tags_write():
     tiff = TIFF.open('/tmp/libtiff_tags_write.tiff', mode='w')
-    tmp = tiff.SetField("Artist", "A Name")
+    tmp = tiff.SetField("Artist", b"A Name")
     assert tmp == 1, "Tag 'Artist' was not written properly"
-    tmp = tiff.SetField("DocumentName", "")
+    tmp = tiff.SetField("DocumentName", b"")
     assert tmp == 1, "Tag 'DocumentName' with empty string was not written " \
                      "properly"
     tmp = tiff.SetField("PrimaryChromaticities", [1, 2, 3, 4, 5, 6])
@@ -2355,10 +2419,10 @@ def _test_tags_read(filename=None):
             filename = sys.argv[1]
     tiff = TIFF.open(filename)
     tmp = tiff.GetField("Artist")
-    assert tmp == "A Name", "Tag 'Artist' did not read the correct value (" \
+    assert tmp == b"A Name", "Tag 'Artist' did not read the correct value (" \
         "Got '%s'; Expected 'A Name')" % (tmp,)
     tmp = tiff.GetField("DocumentName")
-    assert tmp == "", "Tag 'DocumentName' did not read the correct value (" \
+    assert tmp == b"", "Tag 'DocumentName' did not read the correct value (" \
         "Got '%s'; Expected empty string)" % (tmp,)
     tmp = tiff.GetField("PrimaryChromaticities")
     assert tmp == [1, 2, 3, 4, 5,
@@ -2504,7 +2568,7 @@ def _test_copy():
             arr[_i, j] = 1 + _i + 10 * j
     # from scipy.stats import poisson
     # arr = poisson.rvs (arr)
-    tiff.SetField('ImageDescription', 'Hey\nyou')
+    tiff.SetField('ImageDescription', b'Hey\nyou')
     tiff.write_image(arr, compression='lzw')
     del tiff
 
@@ -2516,16 +2580,18 @@ def _test_copy():
 
     for compression in ['none', 'lzw', 'deflate']:
         for sampleformat in ['int', 'uint', 'float']:
-            for bitspersample in [256, 128, 64, 32, 16, 8]:
-                if sampleformat == 'float' and (
-                                bitspersample < 32 or bitspersample > 128):
+            for bitspersample in [128, 64, 32, 16, 8]:
+                if sampleformat == 'float' and bitspersample < 32:
                     continue
                 if sampleformat in ['int', 'uint'] and bitspersample > 64:
+                    continue
+                # With compression, less data types supported
+                if compression != 'none' and bitspersample > 32:
                     continue
                 # print compression, sampleformat, bitspersample
                 tiff.copy('/tmp/libtiff_test_copy2.tiff',
                           compression=compression,
-                          imagedescription='hoo',
+                          imagedescription=b'hoo',
                           sampleformat=sampleformat,
                           bitspersample=bitspersample)
                 tiff2 = TIFF.open('/tmp/libtiff_test_copy2.tiff', mode='r')
