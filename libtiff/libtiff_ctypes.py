@@ -17,6 +17,7 @@ import ctypes.util
 import struct
 import collections
 import locale
+import warnings
 
 __all__ = ['libtiff', 'TIFF']
 
@@ -524,24 +525,34 @@ class TIFF(ctypes.c_void_p):
     @classmethod
     def open(cls, filename, mode='r'):
         """ Open tiff file as TIFF.
-        """
-        try:
-            try:
-                # Python3: it needs bytes for the arguments of type "c_char_p"
-                if isinstance(filename, str) and 'win' in sys.platform:
-                    filename = filename.encode(locale.getpreferredencoding(False))
-                else:
-                    filename = os.fsencode(filename)  # no-op if already bytes
-            except AttributeError:
-                # Python2: it needs str for the arguments of type "c_char_p"
-                if isinstance(filename, unicode):  # noqa: F821
-                    filename = filename.encode(sys.getfilesystemencoding())
-        except Exception as ex:
-            # It's probably going to not work, but let it try
-            print('Warning: filename argument is of wrong type or encoding: %s'
-                  % ex)
 
-        tiff = libtiff.TIFFOpen(filename, mode.encode('ascii'))
+        Parameters
+        ----------
+        filename: path-like object (str, bytes, or Path)
+          The path to the file.
+        mode: str
+          Specifies if the file is to be opened for reading ('r'), writing ('w'),
+          or appending ('a'). Optional flags can be passed. See the documentation
+          of TIFFOpen() for the complete list.
+        """
+        filename = os.fspath(filename)
+
+        if isinstance(filename, str) and hasattr(libtiff, "TIFFOpenW"):
+            # On Windows, the only reliable way to open a file with unicode characters
+            # is to use the *W function.
+            # It needs a str for the argument of type "c_wchar_p"
+            tiff = libtiff.TIFFOpenW(filename, mode.encode('ascii'))
+        else:
+            # It needs bytes for the argument of type "c_char_p"
+            try:
+                filename = os.fsencode(filename)  # no-op if already bytes
+            except UnicodeError as ex:
+                # It's probably not going to work, but let's try
+                warnings.warn(f"Warning: filename argument is of wrong type or "
+                              f"encoding for the filesystem: {ex}")
+
+            tiff = libtiff.TIFFOpen(filename, mode.encode('ascii'))
+
         if tiff.value is None:
             raise TypeError('Failed to open file ' + repr(filename))
         return tiff
@@ -1648,39 +1659,18 @@ class TIFF3D(TIFF):
     def open(cls, filename, mode='r'):
         """ just like TIFF.open, except returns a TIFF3D instance.
         """
-        try:
-            try:
-                # Python3: it needs bytes for the arguments of type "c_char_p"
-                if isinstance(filename, str) and 'win' in sys.platform:
-                    filename = filename.encode(locale.getpreferredencoding(False))
-                else:
-                    filename = os.fsencode(filename)  # no-op if already bytes
-            except AttributeError:
-                # Python2: it needs str for the arguments of type "c_char_p"
-                if isinstance(filename, unicode):  # noqa: F821
-                    filename = filename.encode(sys.getfilesystemencoding())
-        except Exception as ex:
-            # It's probably going to not work, but let it try
-            print('Warning: filename argument is of wrong type or encoding: %s'
-                  % ex)
-        if isinstance(mode, str):
-            mode = mode.encode()
-
         # monkey-patch the restype:
-        old_restype = libtiff.TIFFOpen.restype
         libtiff.TIFFOpen.restype = TIFF3D
+        if hasattr(libtiff, "TIFFOpenW"):
+            libtiff.TIFFOpenW.restype = TIFF3D
+
         try:
-            # actually call the library function:
-            tiff = libtiff.TIFFOpen(filename, mode)
-        except Exception:
-            raise
+            return super().open(filename, mode)
         finally:
             # restore the old restype:
-            libtiff.TIFFOpen.restype = old_restype
-
-        if tiff.value is None:
-            raise TypeError('Failed to open file ' + repr(filename))
-        return tiff
+            libtiff.TIFFOpen.restype = TIFF
+            if hasattr(libtiff, "TIFFOpenW"):
+                libtiff.TIFFOpenW.restype = TIFF
 
     @debug
     def read_image(self, verbose=False, as3d=True):
@@ -1788,6 +1778,10 @@ class CZ_LSMInfo:
 
 libtiff.TIFFOpen.restype = TIFF
 libtiff.TIFFOpen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+
+if hasattr(libtiff, "TIFFOpenW"):  # Windows-only
+    libtiff.TIFFOpenW.restype = TIFF
+    libtiff.TIFFOpenW.argtypes = [ctypes.c_wchar_p, ctypes.c_char_p]
 
 libtiff.TIFFFileName.restype = ctypes.c_char_p
 libtiff.TIFFFileName.argtypes = [TIFF]
