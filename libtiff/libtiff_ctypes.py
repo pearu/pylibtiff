@@ -1903,8 +1903,10 @@ libtiff.TIFFIsMSB2LSB.argtypes = [TIFF]
 
 # GetField and SetField arguments are dependent on the tag
 libtiff.TIFFGetField.restype = ctypes.c_int
+libtiff.TIFFGetField.argtypes = [TIFF, ctypes.c_uint32]
 
 libtiff.TIFFSetField.restype = ctypes.c_int
+libtiff.TIFFSetField.argtypes = [TIFF, ctypes.c_uint32]
 
 libtiff.TIFFNumberOfStrips.restype = c_tstrip_t
 libtiff.TIFFNumberOfStrips.argtypes = [TIFF]
