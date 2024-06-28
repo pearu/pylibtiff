@@ -21,6 +21,13 @@ import warnings
 
 __all__ = ['libtiff', 'TIFF']
 
+SCTYPES = {
+    "float": [np.float16, np.float32, np.float64],
+    "uint": [np.uint8, np.uint16, np.uint32, np.uint64, np.bool_],
+    "int": [np.int8, np.int16, np.int32, np.int64],
+    "complex": [np.complex64, np.complex128],
+}
+
 cwd = os.getcwd()
 try:
     os.chdir(os.path.dirname(__file__))
@@ -729,13 +736,13 @@ class TIFF(ctypes.c_void_p):
         compression = self._fix_compression(compression)
 
         arr = np.ascontiguousarray(arr)
-        if arr.dtype in np.sctypes['float']:
+        if arr.dtype in SCTYPES["float"]:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
+        elif arr.dtype in SCTYPES["uint"]:
             sample_format = SAMPLEFORMAT_UINT
-        elif arr.dtype in np.sctypes['int']:
+        elif arr.dtype in SCTYPES["int"]:
             sample_format = SAMPLEFORMAT_INT
-        elif arr.dtype in np.sctypes['complex']:
+        elif arr.dtype in SCTYPES["complex"]:
             sample_format = SAMPLEFORMAT_COMPLEXIEEEFP
         else:
             raise NotImplementedError(repr(arr.dtype))
@@ -816,13 +823,13 @@ class TIFF(ctypes.c_void_p):
                     compression=None, write_rgb=False):
         compression = self._fix_compression(compression)
 
-        if arr.dtype in np.sctypes['float']:
+        if arr.dtype in SCTYPES["float"]:
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
+        elif arr.dtype in SCTYPES["uint"]:
             sample_format = SAMPLEFORMAT_UINT
-        elif arr.dtype in np.sctypes['int']:
+        elif arr.dtype in SCTYPES["int"]:
             sample_format = SAMPLEFORMAT_INT
-        elif arr.dtype in np.sctypes['complex']:
+        elif arr.dtype in SCTYPES["complex"]:
             sample_format = SAMPLEFORMAT_COMPLEXIEEEFP
         else:
             raise NotImplementedError(repr(arr.dtype))
