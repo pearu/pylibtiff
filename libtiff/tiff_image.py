@@ -435,6 +435,7 @@ class TIFFimage:
 
         compression = 1 / (float(compressed_data_size) / image_data_size)
 
+        total_size = int(total_size)
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
             total_size -= sdiff
