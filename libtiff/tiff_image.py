@@ -226,7 +226,7 @@ class TIFFimage:
         decompress = decompress_map.get(compression or 'none', None)
         # compute tif file size and create image file directories data
         image_directories = []
-        total_size = 8
+        total_size = numpy.int32(8)
         data_size = 0
         image_data_size = 0
         for i, image in enumerate(self.data):
@@ -435,7 +435,6 @@ class TIFFimage:
 
         compression = 1 / (float(compressed_data_size) / image_data_size)
 
-        total_size = int(total_size)
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
             total_size -= sdiff
