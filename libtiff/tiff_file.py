@@ -483,7 +483,7 @@ class TIFFfile(TiffBase):
                 assert 8 * bytes_per_pixel == bits_per_pixel, repr(
                     bits_per_pixel)
                 bytes_per_row = width * bytes_per_pixel
-                strip_length = lst[-1][1] - lst[-1][0]
+                strip_length = int(lst[-1][1]) - int(lst[-1][0])
                 strip_length_str = bytes2str(strip_length)
                 bytes_per_image = length * bytes_per_row
 
@@ -792,7 +792,7 @@ class IFD:
                         'DocumentName', 'Model', 'Make', 'PageName',
                         'DateTime', 'Artist', 'HostComputer']:
             if value is not None:
-                return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tostring()
+                return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tobytes()
         if human:
             if tag_name == 'Compression':
                 value = {1: 'Uncompressed', 2: 'CCITT1D', 3: 'Group3Fax',
