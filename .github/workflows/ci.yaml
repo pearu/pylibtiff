@@ -86,7 +86,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n pylibtiff -f .conda/environment.yml
+        run: mamba env update -n pylibtiff -v -f .conda/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install unstable dependencies
@@ -116,7 +116,7 @@ jobs:
       - name: Install pylibtiff
         shell: bash -l {0}
         run: |
-          python -m pip install --no-deps -e .
+          python -m pip install --no-deps -v -e .
 
       - name: Run unit tests
         shell: bash -l {0}
