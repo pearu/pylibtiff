@@ -19,6 +19,7 @@ def isindisk(path):
 
 def bytes2str(bytes):
     lst = []
+    bytes = int(bytes)
     Pbytes = bytes // 1024**5
     if Pbytes:
         lst.append('%sPi' % (Pbytes))
