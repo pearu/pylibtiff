@@ -66,8 +66,6 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          mamba-version: "*"
-          use-mamba: true
           channels: conda-forge,defaults
           python-version: ${{ matrix.python-version }}
           activate-environment: pylibtiff
@@ -86,7 +84,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n pylibtiff -f .conda/environment.yml
+        run: conda env update -n pylibtiff -f .conda/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install unstable dependencies
