@@ -73,7 +73,6 @@ libtiff_version = libtiff_version_str.split()[i + 1].decode()
 libtiff_version_tuple = tuple(int(i) for i in libtiff_version.split('.'))
 
 tiff_h_name = 'tiff_h_%s' % (libtiff_version.replace('.', '_'))
-print(f"{tiff_h_name=}")
 try:
     exec(u"import libtiff.{0:s} as tiff_h".format(tiff_h_name))
 except ImportError:
@@ -117,7 +116,6 @@ if tiff_h is None:
         # Base it off of the python called
         include_tiff_h = os.path.realpath(os.path.join(os.path.split(
             sys.executable)[0], '..', 'include', 'tiff.h'))
-    print(f"{include_tiff_h=}")
     if not os.path.isfile(include_tiff_h):
         raise ValueError('Failed to find TIFF header file (may be need to '
                          'run: sudo apt-get install libtiff5-dev)')
