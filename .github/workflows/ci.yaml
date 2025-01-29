@@ -104,7 +104,9 @@ jobs:
       - name: Install system libtiff
         if: matrix.system-libtiff == true
         shell: bash -l {0}
-        run: sudo apt-get install -y libtiff-dev
+        run: |
+          sudo apt-get install -y libtiff-dev;
+          sudo apt list "*tiff*"
 
       - name: Install conda libtiff
         if: matrix.system-libtiff == false
@@ -120,7 +122,7 @@ jobs:
         shell: bash -l {0}
         run: |
           export LD_PRELOAD=${{ env.LD_PRELOAD }};
-          pytest --cov=libtiff libtiff/tests
+          pytest -s --cov=libtiff libtiff/tests
 
       - name: Coveralls Parallel
         uses: AndreMiras/coveralls-python-action@develop
