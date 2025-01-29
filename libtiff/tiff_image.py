@@ -437,7 +437,7 @@ class TIFFimage:
 
         if compressed_data_size != image_data_size:
             sdiff = image_data_size - compressed_data_size
-            total_size -= sdiff
+            total_size = int(total_size) - sdiff
             base = tif._mmap
             if base is None:
                 base = tif.base
