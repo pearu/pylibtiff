@@ -107,7 +107,7 @@ jobs:
       - name: Install system libtiff
         if: matrix.system-libtiff == true
         shell: bash -l {0}
-        run: sudo apt-get install -y libtiff5-dev
+        run: sudo apt-get install -y libtiff-dev
 
       - name: Install conda libtiff
         if: matrix.system-libtiff == false
