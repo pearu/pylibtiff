@@ -67,10 +67,10 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
+          conda-remove-defaults: true
           channels: conda-forge
           python-version: ${{ matrix.python-version }}
           activate-environment: pylibtiff
-          conda-remove-defaults: true
           channel-priority: strict
 
       - name: Set cache environment variables
