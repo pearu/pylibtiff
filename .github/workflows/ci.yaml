@@ -66,9 +66,12 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          channels: conda-forge,defaults
+          miniforge-version: latest
+          channels: conda-forge
           python-version: ${{ matrix.python-version }}
           activate-environment: pylibtiff
+          conda-remove-defaults: true
+          channel-priority: strict
 
       - name: Set cache environment variables
         shell: bash -l {0}
