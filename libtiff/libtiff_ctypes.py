@@ -23,7 +23,15 @@ __all__ = ['libtiff', 'TIFF']
 
 cwd = os.getcwd()
 try:
-    os.chdir(os.path.dirname(__file__))
+    try:
+        # Typically, on Windows, the CWD is among the folders searched to locate
+        # a DLL. So change it to the directory containing this module, in case
+        # the libtiff DLL was installed aside it (although that's not typically the case).
+        os.chdir(os.path.dirname(__file__))
+    except FileNotFoundError:
+        # If "frozen" (ie, embedded in an executable), the directory is not real, and chdir fails
+        # => just ignore (and look for the DLL in all the other standard locations)
+        pass
     if os.name == 'nt':
         # assume that the directory of the libtiff DLL is in PATH.
         for lib in ('tiff', 'libtiff', 'libtiff3'):
