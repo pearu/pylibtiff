@@ -737,13 +737,13 @@ class TIFF(ctypes.c_void_p):
         compression = self._fix_compression(compression)
 
         arr = np.ascontiguousarray(arr)
-        if arr.dtype in np.sctypes['float']:
+        if np.issubdtype(arr.dtype, np.floating):
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
+        elif np.issubdtype(arr.dtype, np.unsignedinteger) or np.issubdtype(arr.dtype, np.bool_):
             sample_format = SAMPLEFORMAT_UINT
-        elif arr.dtype in np.sctypes['int']:
+        elif np.issubdtype(arr.dtype, np.signedinteger):
             sample_format = SAMPLEFORMAT_INT
-        elif arr.dtype in np.sctypes['complex']:
+        elif np.issubdtype(arr.dtype, np.complexfloating):
             sample_format = SAMPLEFORMAT_COMPLEXIEEEFP
         else:
             raise NotImplementedError(repr(arr.dtype))
@@ -824,13 +824,13 @@ class TIFF(ctypes.c_void_p):
                     compression=None, write_rgb=False):
         compression = self._fix_compression(compression)
 
-        if arr.dtype in np.sctypes['float']:
+        if np.issubdtype(arr.dtype, np.floating):
             sample_format = SAMPLEFORMAT_IEEEFP
-        elif arr.dtype in np.sctypes['uint'] + [np.bool_]:
+        elif np.issubdtype(arr.dtype, np.unsignedinteger) or np.issubdtype(arr.dtype, np.bool_):
             sample_format = SAMPLEFORMAT_UINT
-        elif arr.dtype in np.sctypes['int']:
+        elif np.issubdtype(arr.dtype, np.signedinteger):
             sample_format = SAMPLEFORMAT_INT
-        elif arr.dtype in np.sctypes['complex']:
+        elif np.issubdtype(arr.dtype, np.complexfloating):
             sample_format = SAMPLEFORMAT_COMPLEXIEEEFP
         else:
             raise NotImplementedError(repr(arr.dtype))

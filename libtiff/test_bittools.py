@@ -19,8 +19,10 @@ def test_setgetbit():
 
 
 def test_setgetword():
+    arange = numpy.arange(-256, 256)
     for dtype in [numpy.ubyte, numpy.int32, numpy.float64]:
-        arr = numpy.array(list(range(-256, 256)), dtype=dtype)
+        # arr = numpy.array(list(range(-256, 256)), dtype=dtype)
+        arr = arange.astype(dtype)
         arr2 = numpy.zeros(arr.shape, dtype=arr.dtype)
         for i in range(arr.nbytes):
             word, next = bittools.getword(arr, i * 8, 8)

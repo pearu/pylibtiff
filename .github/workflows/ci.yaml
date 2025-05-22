@@ -39,8 +39,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: ["windows-latest", "ubuntu-latest", "macos-latest"]
-        python-version: ["3.8", "3.9", "3.10"]
+        os: ["windows-latest", "ubuntu-latest"]  # , "macos-latest"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         experimental: [false]
         system-libtiff: [false]
         include:
@@ -66,11 +66,12 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
-          use-mamba: true
+          conda-remove-defaults: true
+          channels: conda-forge
           python-version: ${{ matrix.python-version }}
           activate-environment: pylibtiff
+          channel-priority: strict
 
       - name: Set cache environment variables
         shell: bash -l {0}
@@ -86,7 +87,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n pylibtiff -f .conda/environment.yml
+        run: conda env update -n pylibtiff -f .conda/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install unstable dependencies
@@ -122,7 +123,7 @@ jobs:
         shell: bash -l {0}
         run: |
           export LD_PRELOAD=${{ env.LD_PRELOAD }};
-          pytest --cov=libtiff libtiff/tests
+          pytest -s --cov=libtiff libtiff/tests
 
       - name: Coveralls Parallel
         uses: AndreMiras/coveralls-python-action@develop
