@@ -247,7 +247,7 @@ class TIFFfile(TiffBase):
             while self.data[offset + i]:
                 i += 1
             length = i
-        string = self.get_values(offset, 'BYTE', length).tostring()
+        string = self.get_values(offset, 'BYTE', length).tobytes()
         return string
 
     def check_memory_usage(self, verbose=True):
@@ -792,7 +792,7 @@ class IFD:
                         'DocumentName', 'Model', 'Make', 'PageName',
                         'DateTime', 'Artist', 'HostComputer']:
             if value is not None:
-                return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tostring()
+                return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tobytes()
         if human:
             if tag_name == 'Compression':
                 value = {1: 'Uncompressed', 2: 'CCITT1D', 3: 'Group3Fax',
