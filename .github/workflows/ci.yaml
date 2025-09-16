@@ -117,7 +117,7 @@ jobs:
       - name: Install pylibtiff
         shell: bash -l {0}
         run: |
-          python -m pip install --no-deps -e .
+          python -m pip install --no-deps -v -e .
 
       - name: Run unit tests
         shell: bash -l {0}
