@@ -34,7 +34,6 @@ def IFDEntry_lsm_str_hook(entry):
 def IFDEntry_lsm_init_hook(ifdentry):
     """Make tiff.IFDENTRYEntry CZ_LSM aware.
     """
-    global tiff_module_dict
     if ifdentry.tag == CZ_LSMInfo_tag:
         # replace type,count=(BYTE,500) with (CZ_LSMInfo, 1)
         reserved_bytes = (ifdentry.count - CZ_LSMInfo_dtype_fields_size)
