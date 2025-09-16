@@ -39,7 +39,7 @@ def encode_bitarray(seq, max_bits=12):
     decode_bitarray
     """
     if isinstance(seq, numpy.ndarray):
-        seq = seq.tostring()
+        seq = seq.tobytes()
     r = bitarray(0, endian='little')
     write = r.fromword
 
@@ -105,7 +105,7 @@ def encode_bittools(seq, max_bits=12):
     """
     if isinstance(seq, numpy.ndarray):
         nbytes = seq.nbytes * 2
-        seq = seq.tostring()
+        seq = seq.tobytes()
     else:
         nbytes = len(seq) * 2
     r = numpy.zeros((nbytes,), dtype=numpy.ubyte)
