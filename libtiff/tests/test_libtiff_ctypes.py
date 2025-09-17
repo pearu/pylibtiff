@@ -1,3 +1,4 @@
+import ctypes
 import numpy as np
 import pytest
 import time
@@ -573,3 +574,148 @@ def test_copy(tmp_path):
                 assert (arr == arr3).all(), 'arrays not equal %r' % (
                     (compression, sampleformat, bitspersample),)
     print('test copy ok')
+
+def test_set_get_field_lowlevel(tmp_path):
+    ltc = lt.libtiff
+    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
+    uint16_data = ctypes.c_uint16(0)
+    p_uint16_data = ctypes.byref(uint16_data)
+    uint32_data = ctypes.c_uint32(0)
+    p_uint32_data = ctypes.byref(uint32_data)
+    float_data = ctypes.c_float(0.0)
+    p_float_data = ctypes.byref(float_data)
+    double_data = ctypes.c_double(0.0)
+    p_double_data = ctypes.byref(double_data)
+    char_p_data = ctypes.c_char_p(b'')
+    p_char_p_data = ctypes.byref(char_p_data)
+
+    # Test uint16 tags
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, lt.SAMPLEFORMAT_INT)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, p_uint16_data)
+    assert uint16_data.value == lt.SAMPLEFORMAT_INT
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, lt.SAMPLEFORMAT_UINT)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, p_uint16_data)
+    assert uint16_data.value == lt.SAMPLEFORMAT_UINT
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COMPRESSION, lt.COMPRESSION_LZW)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_COMPRESSION, p_uint16_data)
+    assert uint16_data.value == lt.COMPRESSION_LZW
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_ORIENTATION, lt.ORIENTATION_TOPLEFT)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_ORIENTATION, p_uint16_data)
+    assert uint16_data.value == lt.ORIENTATION_TOPLEFT
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_THRESHHOLDING, lt.THRESHHOLD_BILEVEL)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_THRESHHOLDING, p_uint16_data)
+    assert uint16_data.value == lt.THRESHHOLD_BILEVEL
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_FILLORDER, lt.FILLORDER_MSB2LSB)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_FILLORDER, p_uint16_data)
+    assert uint16_data.value == lt.FILLORDER_MSB2LSB
+
+    # Test uint32 tags
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGEWIDTH, 256)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGEWIDTH, p_uint32_data)
+    assert uint32_data.value == 256
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGELENGTH, 256)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGELENGTH, p_uint32_data)
+    assert uint32_data.value == 256
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SUBFILETYPE, lt.FILETYPE_REDUCEDIMAGE)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SUBFILETYPE, p_uint32_data)
+    assert uint32_data.value == lt.FILETYPE_REDUCEDIMAGE
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_TILEWIDTH, 256)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_TILEWIDTH, p_uint32_data)
+    assert uint32_data.value == 256
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_TILELENGTH, 256)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_TILELENGTH, p_uint32_data)
+    assert uint32_data.value == 256
+
+    # Test float tags
+    # NOTE: some tags are defined as float but can be set as float or double
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_XRESOLUTION, ctypes.c_double(88.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_XRESOLUTION, p_float_data)
+    assert float_data.value == 88.0
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_YRESOLUTION, ctypes.c_double(88.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_YRESOLUTION, p_float_data)
+    assert float_data.value == 88.0
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_XPOSITION, ctypes.c_double(88.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_XPOSITION, p_float_data)
+    assert float_data.value == 88.0
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_YPOSITION, ctypes.c_double(88.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_YPOSITION, p_float_data)
+    assert float_data.value == 88.0
+
+    # Test string tags
+    test_string = b"test string"
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_ARTIST, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_ARTIST, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_DATETIME, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_DATETIME, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_HOSTCOMPUTER, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_HOSTCOMPUTER, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_MAKE, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_MAKE, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_MODEL, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_MODEL, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SOFTWARE, test_string)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SOFTWARE, p_char_p_data)
+    assert char_p_data.value == test_string
+
+    # Test setting a tag with a different data type
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGEWIDTH, 128)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGEWIDTH, p_uint32_data)
+    assert uint32_data.value == 128
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_BITSPERSAMPLE, 8)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_BITSPERSAMPLE, p_uint16_data)
+    assert uint16_data.value == 8
+
+    # Test tags with count > 1
+    # Create three arrays of 256 16-bit integers
+    colormap_red = (ctypes.c_uint16 * 256)(*range(256))
+    colormap_green = (ctypes.c_uint16 * 256)(*range(256))
+    colormap_blue = (ctypes.c_uint16 * 256)(*range(256))
+
+    for i in range(256):
+        print(i)
+        assert colormap_red[i] == i
+        assert colormap_green[i] == i
+        assert colormap_blue[i] == i
+
+    # Create pointers to receive the data
+    p_colormap_red = ctypes.POINTER(ctypes.c_uint16)()
+    p_colormap_green = ctypes.POINTER(ctypes.c_uint16)()
+    p_colormap_blue = ctypes.POINTER(ctypes.c_uint16)()
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COLORMAP, colormap_red, colormap_green, colormap_blue)
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_COLORMAP, ctypes.byref(p_colormap_red), ctypes.byref(p_colormap_green), ctypes.byref(p_colormap_blue))
+
+    # Check that the retrieved values are correc)t
+    for i in range(256):
+        print(i)
+        assert p_colormap_red[i] == i
+        assert p_colormap_green[i] == i
+        assert p_colormap_blue[i] == i
+
