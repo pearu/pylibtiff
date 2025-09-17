@@ -1908,6 +1908,9 @@ libtiff.TIFFIsMSB2LSB.argtypes = [TIFF]
 libtiff.TIFFGetField.restype = ctypes.c_int
 libtiff.TIFFGetField.argtypes = [TIFF, ctypes.c_uint32]
 
+libtiff.TIFFGetFieldDefaulted.restype = ctypes.c_int
+libtiff.TIFFGetFieldDefaulted.argtypes = [TIFF, ctypes.c_uint32]
+
 libtiff.TIFFSetField.restype = ctypes.c_int
 libtiff.TIFFSetField.argtypes = [TIFF, ctypes.c_uint32]
 
