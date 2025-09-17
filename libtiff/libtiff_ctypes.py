@@ -1583,16 +1583,13 @@ class TIFF(ctypes.c_void_p):
             else:
                 data = data_type(_value)
 
+            if issubclass(data_type, ctypes._SimpleCData) and isinstance(data.value, int):
+                data = data.value
+
             if count_type is None:
-                if issubclass(data_type, ctypes._SimpleCData) and isinstance(data.value, int):
-                    r = libtiff.TIFFSetField(self, c_ttag_t(tag), data.value)
-                else:
-                    r = libtiff.TIFFSetField(self, c_ttag_t(tag), data)
+                r = libtiff.TIFFSetField(self, c_ttag_t(tag), data)
             else:
-                if issubclass(data_type, ctypes._SimpleCData) and isinstance(data.value, int):
-                    r = libtiff.TIFFSetField(self, c_ttag_t(tag), count, data.value)
-                else:
-                    r = libtiff.TIFFSetField(self, c_ttag_t(tag), count, data)
+                r = libtiff.TIFFSetField(self, c_ttag_t(tag), count, data)
         return r
 
     def info(self):
