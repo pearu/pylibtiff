@@ -575,6 +575,7 @@ def test_copy(tmp_path):
                     (compression, sampleformat, bitspersample),)
     print('test copy ok')
 
+
 def test_set_get_field_lowlevel(tmp_path):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
@@ -758,12 +759,22 @@ def test_set_get_field_lowlevel(tmp_path):
     p_colormap_blue = ctypes.POINTER(ctypes.c_uint16)()
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COLORMAP, colormap_red, colormap_green, colormap_blue)
-    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_COLORMAP, ctypes.byref(p_colormap_red), ctypes.byref(p_colormap_green), ctypes.byref(p_colormap_blue))
+    assert ltc.TIFFGetField(
+        tiff, lt.TIFFTAG_COLORMAP, 
+        ctypes.byref(p_colormap_red), 
+        ctypes.byref(p_colormap_green),  
+        ctypes.byref(p_colormap_blue)
+    )
 
     p_colormap_red_defaulted = ctypes.POINTER(ctypes.c_uint16)()
     p_colormap_green_defaulted = ctypes.POINTER(ctypes.c_uint16)()
     p_colormap_blue_defaulted = ctypes.POINTER(ctypes.c_uint16)()
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_COLORMAP, ctypes.byref(p_colormap_red_defaulted), ctypes.byref(p_colormap_green_defaulted), ctypes.byref(p_colormap_blue_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(
+        tiff, lt.TIFFTAG_COLORMAP, 
+        ctypes.byref(p_colormap_red_defaulted), 
+        ctypes.byref(p_colormap_green_defaulted), 
+        ctypes.byref(p_colormap_blue_defaulted)
+    )
 
     # Check that the retrieved values are correc)t
     for i in range(256):
