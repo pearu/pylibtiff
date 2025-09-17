@@ -584,8 +584,6 @@ def test_set_get_field_lowlevel(tmp_path):
     p_uint32_data = ctypes.byref(uint32_data)
     float_data = ctypes.c_float(0.0)
     p_float_data = ctypes.byref(float_data)
-    double_data = ctypes.c_double(0.0)
-    p_double_data = ctypes.byref(double_data)
     char_p_data = ctypes.c_char_p(b'')
     p_char_p_data = ctypes.byref(char_p_data)
 
@@ -596,7 +594,6 @@ def test_set_get_field_lowlevel(tmp_path):
     float_data_defaulted = ctypes.c_float(0.0)
     p_float_data_defaulted = ctypes.byref(float_data_defaulted)
     char_p_data_defaulted = ctypes.c_char_p(b'')
-    p_char_p_data_defaulted = ctypes.byref(char_p_data_defaulted)
 
     # Test uint16 tags
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, lt.SAMPLEFORMAT_INT)
@@ -778,4 +775,3 @@ def test_set_get_field_lowlevel(tmp_path):
         assert p_colormap_blue_defaulted[i] == i
 
     tiff.close()
-
