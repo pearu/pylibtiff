@@ -698,12 +698,6 @@ def test_set_get_field_lowlevel(tmp_path):
     colormap_green = (ctypes.c_uint16 * 256)(*range(256))
     colormap_blue = (ctypes.c_uint16 * 256)(*range(256))
 
-    for i in range(256):
-        print(i)
-        assert colormap_red[i] == i
-        assert colormap_green[i] == i
-        assert colormap_blue[i] == i
-
     # Create pointers to receive the data
     p_colormap_red = ctypes.POINTER(ctypes.c_uint16)()
     p_colormap_green = ctypes.POINTER(ctypes.c_uint16)()
@@ -714,7 +708,6 @@ def test_set_get_field_lowlevel(tmp_path):
 
     # Check that the retrieved values are correc)t
     for i in range(256):
-        print(i)
         assert p_colormap_red[i] == i
         assert p_colormap_green[i] == i
         assert p_colormap_blue[i] == i
