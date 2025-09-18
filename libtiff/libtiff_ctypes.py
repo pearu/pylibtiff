@@ -498,6 +498,7 @@ tifftags = {
         lambda d: d[1][:d[0]]),  # uint16*, uint16**  count & types array
     TIFFTAG_SAMPLEFORMAT: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_YCBCRPOSITIONING: (ctypes.c_uint16, lambda _d: _d.value),
+    TIFFTAG_THRESHHOLDING: (ctypes.c_uint16, lambda _d: _d.value),
 
     TIFFTAG_JPEGQUALITY: (ctypes.c_int, lambda _d: _d.value),
     TIFFTAG_JPEGCOLORMODE: (ctypes.c_int, lambda _d: _d.value),
