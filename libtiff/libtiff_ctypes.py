@@ -498,6 +498,7 @@ tifftags = {
         lambda d: d[1][:d[0]]),  # uint16*, uint16**  count & types array
     TIFFTAG_SAMPLEFORMAT: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_YCBCRPOSITIONING: (ctypes.c_uint16, lambda _d: _d.value),
+    TIFFTAG_THRESHHOLDING: (ctypes.c_uint16, lambda _d: _d.value),
 
     TIFFTAG_JPEGQUALITY: (ctypes.c_int, lambda _d: _d.value),
     TIFFTAG_JPEGCOLORMODE: (ctypes.c_int, lambda _d: _d.value),
@@ -1583,6 +1584,9 @@ class TIFF(ctypes.c_void_p):
             else:
                 data = data_type(_value)
 
+            if issubclass(data_type, ctypes._SimpleCData) and isinstance(data.value, int):
+                data = data.value
+
             if count_type is None:
                 r = libtiff.TIFFSetField(self, c_ttag_t(tag), data)
             else:
@@ -1903,8 +1907,13 @@ libtiff.TIFFIsMSB2LSB.argtypes = [TIFF]
 
 # GetField and SetField arguments are dependent on the tag
 libtiff.TIFFGetField.restype = ctypes.c_int
+libtiff.TIFFGetField.argtypes = [TIFF, ctypes.c_uint32]
+
+libtiff.TIFFGetFieldDefaulted.restype = ctypes.c_int
+libtiff.TIFFGetFieldDefaulted.argtypes = [TIFF, ctypes.c_uint32]
 
 libtiff.TIFFSetField.restype = ctypes.c_int
+libtiff.TIFFSetField.argtypes = [TIFF, ctypes.c_uint32]
 
 libtiff.TIFFNumberOfStrips.restype = c_tstrip_t
 libtiff.TIFFNumberOfStrips.argtypes = [TIFF]
