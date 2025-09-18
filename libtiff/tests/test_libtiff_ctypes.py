@@ -579,24 +579,35 @@ def test_copy(tmp_path):
 def test_set_get_field_lowlevel(tmp_path):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
+
+    # Store the output of TIFFGetField
     uint16_data = ctypes.c_uint16(0)
     p_uint16_data = ctypes.byref(uint16_data)
     uint32_data = ctypes.c_uint32(0)
     p_uint32_data = ctypes.byref(uint32_data)
     float_data = ctypes.c_float(0.0)
     p_float_data = ctypes.byref(float_data)
+    double_data = ctypes.c_double(0.0)
+    p_double_data = ctypes.byref(double_data)
     char_p_data = ctypes.c_char_p(b'')
     p_char_p_data = ctypes.byref(char_p_data)
 
+    # Store the output of TIFFGetFieldDefaulted
     uint16_data_defaulted = ctypes.c_uint16(0)
     p_uint16_data_defaulted = ctypes.byref(uint16_data_defaulted)
     uint32_data_defaulted = ctypes.c_uint32(0)
     p_uint32_data_defaulted = ctypes.byref(uint32_data_defaulted)
     float_data_defaulted = ctypes.c_float(0.0)
     p_float_data_defaulted = ctypes.byref(float_data_defaulted)
+    double_data_defaulted = ctypes.c_double(0.0)
+    p_double_data_defaulted = ctypes.byref(double_data_defaulted)
     char_p_data_defaulted = ctypes.c_char_p(b'')
+    p_char_p_data_defaulted = ctypes.byref(char_p_data_defaulted)
 
     # Test uint16 tags
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_SAMPLEFORMAT, p_uint16_data_defaulted)
+    assert uint16_data_defaulted.value == lt.SAMPLEFORMAT_UINT
+
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, lt.SAMPLEFORMAT_INT)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SAMPLEFORMAT, p_uint16_data)
     assert uint16_data.value == lt.SAMPLEFORMAT_INT
@@ -666,6 +677,8 @@ def test_set_get_field_lowlevel(tmp_path):
 
     # Test float tags
     # NOTE: some tags are defined as float but can be set as float or double
+    # Using ctypes.c_float instead of ctypes.c_double results in
+    #       "RuntimeError: ffi_prep_cif_var failed"
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_XRESOLUTION, ctypes.c_double(88.0))
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_XRESOLUTION, p_float_data)
     assert float_data.value == 88.0
@@ -675,76 +688,89 @@ def test_set_get_field_lowlevel(tmp_path):
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_YRESOLUTION, ctypes.c_double(88.0))
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_YRESOLUTION, p_float_data)
     assert float_data.value == 88.0
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_YRESOLUTION, ctypes.byref(float_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_YRESOLUTION, p_float_data_defaulted)
     assert float_data_defaulted.value == 88.0
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_XPOSITION, ctypes.c_double(88.0))
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_XPOSITION, p_float_data)
     assert float_data.value == 88.0
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_XPOSITION, ctypes.byref(float_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_XPOSITION, p_float_data_defaulted)
     assert float_data_defaulted.value == 88.0
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_YPOSITION, ctypes.c_double(88.0))
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_YPOSITION, p_float_data)
     assert float_data.value == 88.0
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_YPOSITION, ctypes.byref(float_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_YPOSITION, p_float_data_defaulted)
     assert float_data_defaulted.value == 88.0
+
+    # Test double tags
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SMAXSAMPLEVALUE, ctypes.c_double(255.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SMAXSAMPLEVALUE, p_double_data)
+    assert double_data.value == 255.0
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_SMAXSAMPLEVALUE, p_double_data_defaulted)
+    assert double_data_defaulted.value == 255.0
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SMINSAMPLEVALUE, ctypes.c_double(0.0))
+    assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SMINSAMPLEVALUE, p_double_data)
+    assert double_data.value == 0.0
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_SMINSAMPLEVALUE, p_double_data_defaulted)
+    assert double_data_defaulted.value == 0.0
 
     # Test string tags
     test_string = b"test string"
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_ARTIST, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_ARTIST, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_ARTIST, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_ARTIST, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_DATETIME, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_DATETIME, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_DATETIME, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_DATETIME, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_HOSTCOMPUTER, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_HOSTCOMPUTER, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_HOSTCOMPUTER, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_HOSTCOMPUTER, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_IMAGEDESCRIPTION, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_MAKE, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_MAKE, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_MAKE, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_MAKE, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_MODEL, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_MODEL, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_MODEL, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_MODEL, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_SOFTWARE, test_string)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_SOFTWARE, p_char_p_data)
     assert char_p_data.value == test_string
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_SOFTWARE, ctypes.byref(char_p_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_SOFTWARE, p_char_p_data_defaulted)
     assert char_p_data_defaulted.value == test_string
 
     # Test setting a tag with a different data type
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_IMAGEWIDTH, 128)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_IMAGEWIDTH, p_uint32_data)
     assert uint32_data.value == 128
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_IMAGEWIDTH, ctypes.byref(uint32_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_IMAGEWIDTH, p_uint32_data_defaulted)
     assert uint32_data_defaulted.value == 128
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_BITSPERSAMPLE, 8)
     assert ltc.TIFFGetField(tiff, lt.TIFFTAG_BITSPERSAMPLE, p_uint16_data)
     assert uint16_data.value == 8
-    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_BITSPERSAMPLE, ctypes.byref(uint16_data_defaulted))
+    assert ltc.TIFFGetFieldDefaulted(tiff, lt.TIFFTAG_BITSPERSAMPLE, p_uint16_data_defaulted)
     assert uint16_data_defaulted.value == 8
 
     # Test tags with count > 1
@@ -753,10 +779,14 @@ def test_set_get_field_lowlevel(tmp_path):
     colormap_green = (ctypes.c_uint16 * 256)(*range(256))
     colormap_blue = (ctypes.c_uint16 * 256)(*range(256))
 
-    # Create pointers to receive the data
+    # Create pointers to receive colormap data
     p_colormap_red = ctypes.POINTER(ctypes.c_uint16)()
     p_colormap_green = ctypes.POINTER(ctypes.c_uint16)()
     p_colormap_blue = ctypes.POINTER(ctypes.c_uint16)()
+
+    p_colormap_red_defaulted = ctypes.POINTER(ctypes.c_uint16)()
+    p_colormap_green_defaulted = ctypes.POINTER(ctypes.c_uint16)()
+    p_colormap_blue_defaulted = ctypes.POINTER(ctypes.c_uint16)()
 
     assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COLORMAP, colormap_red, colormap_green, colormap_blue)
     assert ltc.TIFFGetField(
@@ -765,10 +795,6 @@ def test_set_get_field_lowlevel(tmp_path):
         ctypes.byref(p_colormap_green),
         ctypes.byref(p_colormap_blue)
     )
-
-    p_colormap_red_defaulted = ctypes.POINTER(ctypes.c_uint16)()
-    p_colormap_green_defaulted = ctypes.POINTER(ctypes.c_uint16)()
-    p_colormap_blue_defaulted = ctypes.POINTER(ctypes.c_uint16)()
     assert ltc.TIFFGetFieldDefaulted(
         tiff, lt.TIFFTAG_COLORMAP,
         ctypes.byref(p_colormap_red_defaulted),
@@ -776,11 +802,12 @@ def test_set_get_field_lowlevel(tmp_path):
         ctypes.byref(p_colormap_blue_defaulted)
     )
 
-    # Check that the retrieved values are correc)t
+    # Check that the retrieved values are correct
     for i in range(256):
         assert p_colormap_red[i] == i
         assert p_colormap_green[i] == i
         assert p_colormap_blue[i] == i
+
         assert p_colormap_red_defaulted[i] == i
         assert p_colormap_green_defaulted[i] == i
         assert p_colormap_blue_defaulted[i] == i
