@@ -813,3 +813,104 @@ def test_set_get_field_lowlevel(tmp_path):
         assert p_colormap_blue_defaulted[i] == i
 
     tiff.close()
+
+
+def test_set_get_field(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
+
+    # Test uint16 tags
+    tiff.SetField('SampleFormat', lt.SAMPLEFORMAT_INT)
+    assert tiff.GetField('SampleFormat') == lt.SAMPLEFORMAT_INT
+
+    tiff.SetField('Compression', lt.COMPRESSION_LZW)
+    assert tiff.GetField('Compression') == lt.COMPRESSION_LZW
+
+    tiff.SetField('Orientation', lt.ORIENTATION_TOPLEFT)
+    assert tiff.GetField('Orientation') == lt.ORIENTATION_TOPLEFT
+
+    tiff.SetField('Threshholding', lt.THRESHHOLD_BILEVEL)
+    assert tiff.GetField('Threshholding') == lt.THRESHHOLD_BILEVEL
+
+    tiff.SetField('FillOrder', lt.FILLORDER_MSB2LSB)
+    assert tiff.GetField('FillOrder') == lt.FILLORDER_MSB2LSB
+
+    # Test uint32 tags
+    tiff.SetField('ImageWidth', 256)
+    assert tiff.GetField('ImageWidth') == 256
+
+    tiff.SetField('ImageLength', 256)
+    assert tiff.GetField('ImageLength') == 256
+
+    tiff.SetField('SubfileType', lt.FILETYPE_REDUCEDIMAGE)
+    assert tiff.GetField('SubfileType') == lt.FILETYPE_REDUCEDIMAGE
+
+    tiff.SetField('TileWidth', 256)
+    assert tiff.GetField('TileWidth') == 256
+
+    tiff.SetField('TileLength', 256)
+    assert tiff.GetField('TileLength') == 256
+
+    # Test float tags
+    tiff.SetField('XResolution', 88.0)
+    assert tiff.GetField('XResolution') == 88.0
+
+    tiff.SetField('YResolution', 88.0)
+    assert tiff.GetField('YResolution') == 88.0
+
+    tiff.SetField('XPosition', 88.0)
+    assert tiff.GetField('XPosition') == 88.0
+
+    tiff.SetField('YPosition', 88.0)
+    assert tiff.GetField('YPosition') == 88.0
+
+    # Test double tags
+    tiff.SetField('SMaxSampleValue', 255.0)
+    assert tiff.GetField('SMaxSampleValue') == 255.0
+
+    tiff.SetField('SMinSampleValue', 0.0)
+    assert tiff.GetField('SMinSampleValue') == 0.0
+
+    # Test string tags
+    test_string = b"test string"
+    tiff.SetField('Artist', test_string)
+    assert tiff.GetField('Artist') == test_string
+
+    tiff.SetField('DateTime', test_string)
+    assert tiff.GetField('DateTime') == test_string
+
+    tiff.SetField('HostComputer', test_string)
+    assert tiff.GetField('HostComputer') == test_string
+
+    tiff.SetField('ImageDescription', test_string)
+    assert tiff.GetField('ImageDescription') == test_string
+
+    tiff.SetField('Make', test_string)
+    assert tiff.GetField('Make') == test_string
+
+    tiff.SetField('Model', test_string)
+    assert tiff.GetField('Model') == test_string
+
+    tiff.SetField('Software', test_string)
+    assert tiff.GetField('Software') == test_string
+
+    # Test setting a tag with a different data type
+    tiff.SetField('ImageWidth', 128)
+    assert tiff.GetField('ImageWidth') == 128
+
+    tiff.SetField('BitsPerSample', 8)
+    assert tiff.GetField('BitsPerSample') == 8
+
+    # Test tags with count > 1
+    colormap_red = list(range(256))
+    colormap_green = list(range(256))
+    colormap_blue = list(range(256))
+    tiff.SetField('ColorMap', [colormap_red, colormap_green, colormap_blue])
+    p_colormap_red, p_colormap_green, p_colormap_blue = tiff.GetField('ColorMap')
+
+    # Check that the retrieved values are correct
+    for i in range(256):
+        assert p_colormap_red[i] == i
+        assert p_colormap_green[i] == i
+        assert p_colormap_blue[i] == i
+
+    tiff.close()
