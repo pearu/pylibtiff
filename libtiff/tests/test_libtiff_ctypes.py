@@ -576,6 +576,63 @@ def test_copy(tmp_path):
     print('test copy ok')
 
 
+tag_test_data = {
+    'uint16': {
+        'ctype': ctypes.c_uint16,
+        'values': [
+            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_INT),
+            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_UINT),
+            (lt.TIFFTAG_COMPRESSION, 'Compression', lt.COMPRESSION_LZW),
+            (lt.TIFFTAG_ORIENTATION, 'Orientation', lt.ORIENTATION_TOPLEFT),
+            (lt.TIFFTAG_THRESHHOLDING, 'Threshholding', lt.THRESHHOLD_BILEVEL),
+            (lt.TIFFTAG_FILLORDER, 'FillOrder', lt.FILLORDER_MSB2LSB),
+            (lt.TIFFTAG_BITSPERSAMPLE, 'BitsPerSample', 8),
+        ]
+    },
+    'uint32': {
+        'ctype': ctypes.c_uint32,
+        'values': [
+            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 256),
+            (lt.TIFFTAG_IMAGELENGTH, 'ImageLength', 256),
+            (lt.TIFFTAG_SUBFILETYPE, 'SubfileType', lt.FILETYPE_REDUCEDIMAGE),
+            (lt.TIFFTAG_TILEWIDTH, 'TileWidth', 256),
+            (lt.TIFFTAG_TILELENGTH, 'TileLength', 256),
+            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 128),
+        ]
+    },
+    'float': {
+        'ctype': ctypes.c_float,
+        'set_wrapper': ctypes.c_double,
+        'values': [
+            (lt.TIFFTAG_XRESOLUTION, 'XResolution', 88.0),
+            (lt.TIFFTAG_YRESOLUTION, 'YResolution', 88.0),
+            (lt.TIFFTAG_XPOSITION, 'XPosition', 88.0),
+            (lt.TIFFTAG_YPOSITION, 'YPosition', 88.0),
+        ]
+    },
+    'double': {
+        'ctype': ctypes.c_double,
+        'set_wrapper': ctypes.c_double,
+        'values': [
+            (lt.TIFFTAG_SMAXSAMPLEVALUE, 'SMaxSampleValue', 255.0),
+            (lt.TIFFTAG_SMINSAMPLEVALUE, 'SMinSampleValue', 0.0),
+        ]
+    },
+    'string': {
+        'ctype': ctypes.c_char_p,
+        'values': [
+            (lt.TIFFTAG_ARTIST, 'Artist', b"test string"),
+            (lt.TIFFTAG_DATETIME, 'DateTime', b"test string"),
+            (lt.TIFFTAG_HOSTCOMPUTER, 'HostComputer', b"test string"),
+            (lt.TIFFTAG_IMAGEDESCRIPTION, 'ImageDescription', b"test string"),
+            (lt.TIFFTAG_MAKE, 'Make', b"test string"),
+            (lt.TIFFTAG_MODEL, 'Model', b"test string"),
+            (lt.TIFFTAG_SOFTWARE, 'Software', b"test string"),
+        ]
+    }
+}
+
+
 def test_set_get_field_lowlevel(tmp_path):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
