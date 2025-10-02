@@ -577,6 +577,7 @@ def test_copy(tmp_path):
 
 
 # The tag_test_data dictionary is used to test setting and getting TIFF tags.
+# The script get_tag_defaults.py was used to obtain the default values
 # The structure is as follows:
 # {
 #     'type_name': {
