@@ -646,9 +646,10 @@ tag_test_data = {
 }
 
 
-def test_set_get_field_lowlevel(tmp_path):
+@pytest.mark.parametrize("type_name", tag_test_data.keys())
+def test_set_get_field_lowlevel(tmp_path, type_name):
     ltc = lt.libtiff
-    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel.tiff', mode='w')
+    tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_lowlevel_{type_name}.tiff', mode='w')
 
     data_holders = {
         'uint16': ctypes.c_uint16(0),
@@ -665,32 +666,38 @@ def test_set_get_field_lowlevel(tmp_path):
         'string': ctypes.c_char_p(b''),
     }
 
+    test_data = tag_test_data[type_name]
+    data = data_holders[type_name]
+    p_data = ctypes.byref(data)
+    data_defaulted = data_holders_defaulted[type_name]
+    p_data_defaulted = ctypes.byref(data_defaulted)
+    set_wrapper = test_data.get('set_wrapper')
+
     processed_tags = set()
-    for type_name, test_data in tag_test_data.items():
-        data = data_holders[type_name]
-        p_data = ctypes.byref(data)
-        data_defaulted = data_holders_defaulted[type_name]
-        p_data_defaulted = ctypes.byref(data_defaulted)
-        set_wrapper = test_data.get('set_wrapper')
+    for tag_const, tag_name, value, default_value in test_data['values']:
+        if tag_const not in processed_tags:
+            # Check the default value
+            if default_value is not None:
+                assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
+                assert data_defaulted.value == default_value
+            processed_tags.add(tag_const)
 
-        for tag_const, tag_name, value, default_value in test_data['values']:
-            if tag_const not in processed_tags:
-                # Check the default value
-                if default_value is not None:
-                    assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
-                    assert data_defaulted.value == default_value
-                processed_tags.add(tag_const)
+        set_value = value
+        if set_wrapper:
+            set_value = set_wrapper(value)
 
-            set_value = value
-            if set_wrapper:
-                set_value = set_wrapper(value)
+        assert ltc.TIFFSetField(tiff, tag_const, set_value)
+        assert ltc.TIFFGetField(tiff, tag_const, p_data)
+        assert data.value == value
+        assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
+        assert data_defaulted.value == value
+    tiff.close()
 
-            assert ltc.TIFFSetField(tiff, tag_const, set_value)
-            assert ltc.TIFFGetField(tiff, tag_const, p_data)
-            assert data.value == value
-            assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
-            assert data_defaulted.value == value
 
+def test_set_get_field_lowlevel_colormap(tmp_path):
+    ltc = lt.libtiff
+    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel_colormap.tiff', mode='w')
+    tiff.SetField('BitsPerSample', 8)
     # Test tags with count > 1
     # Create three arrays of 256 16-bit integers
     colormap_red = (ctypes.c_uint16 * 256)(*range(256))
@@ -733,14 +740,19 @@ def test_set_get_field_lowlevel(tmp_path):
     tiff.close()
 
 
-def test_set_get_field(tmp_path):
-    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field.tiff', mode='w')
+@pytest.mark.parametrize("type_name", tag_test_data.keys())
+def test_set_get_field(tmp_path, type_name):
+    tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_{type_name}.tiff', mode='w')
+    test_data = tag_test_data[type_name]
+    for tag_const, tag_name, value, default_value in test_data['values']:
+        tiff.SetField(tag_name, value)
+        assert tiff.GetField(tag_name) == value
+    tiff.close()
 
-    for type_name, test_data in tag_test_data.items():
-        for tag_const, tag_name, value, default_value in test_data['values']:
-            tiff.SetField(tag_name, value)
-            assert tiff.GetField(tag_name) == value
 
+def test_set_get_field_colormap(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_colormap.tiff', mode='w')
+    tiff.SetField('BitsPerSample', 8)
     # Test tags with count > 1
     colormap_red = list(range(256))
     colormap_green = list(range(256))
