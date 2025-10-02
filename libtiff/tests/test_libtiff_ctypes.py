@@ -675,7 +675,7 @@ def test_set_get_field_lowlevel(tmp_path, type_name):
         set_wrapper = test_data.get('set_wrapper')
 
         processed_tags = set()
-        for tag_const, tag_name, value, default_value in test_data['values']:
+        for tag_const, _tag_name, value, default_value in test_data['values']:
             if tag_const not in processed_tags:
                 # Check the default value
                 if default_value is not None:
@@ -748,7 +748,7 @@ def test_set_get_field(tmp_path, type_name):
     tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_{type_name}.tiff', mode='w')
     try:
         test_data = tag_test_data[type_name]
-        for tag_const, tag_name, value, default_value in test_data['values']:
+        for _tag_const, tag_name, value, _default_value in test_data['values']:
             tiff.SetField(tag_name, value)
             assert tiff.GetField(tag_name) == value
     finally:

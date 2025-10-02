@@ -60,6 +60,7 @@ tag_test_data = {
     }
 }
 
+
 def get_default_tag_values(tmp_path):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'default_values.tiff', mode='w')
@@ -90,9 +91,10 @@ def get_default_tag_values(tmp_path):
     defaults[lt.TIFFTAG_SAMPLEFORMAT] = 1
     return defaults
 
+
 with tempfile.TemporaryDirectory() as tmpdir:
     default_values = get_default_tag_values(pathlib.Path(tmpdir))
-    
+
     new_tag_test_data = {}
     for type_name, test_data in tag_test_data.items():
         new_tag_test_data[type_name] = {
@@ -106,5 +108,5 @@ with tempfile.TemporaryDirectory() as tmpdir:
             new_tag_test_data[type_name]['values'].append(
                 (tag_const, tag_name, value, default_values.get(tag_const))
             )
-    
+
     print("tag_test_data = " + pprint.pformat(new_tag_test_data))
