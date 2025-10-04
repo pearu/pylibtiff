@@ -51,7 +51,7 @@ def runner(parser, options, args):
     for ifd in tiff.IFD:
         s = ifd.get('ImageDescription')
         if s is not None:
-            description.append(s.value.tostring())
+            description.append(s.value.tobytes())
     init_description = '\n'.join(description)
     samples_list, names_list = tiff.get_samples()
     while samples_list:
