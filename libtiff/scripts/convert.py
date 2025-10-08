@@ -49,7 +49,7 @@ def runner(parser, options, args):
 
     description = []
     for ifd in tiff.IFD:
-        v = ifd.get_value('ImageDescription', human=True)
+        v = ifd.get_value('ImageDescription')
         if v is not None:
             description.append(v)
     init_description = '\n'.join(description)
