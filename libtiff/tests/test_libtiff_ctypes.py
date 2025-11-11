@@ -697,53 +697,61 @@ def tag_test_data(tmp_path_factory):
     return new_tag_test_data
 
 
-@pytest.mark.parametrize("type_name", TAG_TEST_DATA_BASE.keys())
-def test_set_get_field_lowlevel(tmp_path, type_name, tag_test_data):
-    ltc = lt.libtiff
+@pytest.fixture(params=TAG_TEST_DATA_BASE.keys())
+def tiff_data_case(request, tmp_path, tag_test_data):
+    type_name = request.param
     tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_lowlevel_{type_name}.tiff', mode='w')
-    try:
-        data_holders = {
-            'uint16': ctypes.c_uint16(0),
-            'uint32': ctypes.c_uint32(0),
-            'float': ctypes.c_float(0.0),
-            'double': ctypes.c_double(0.0),
-            'string': ctypes.c_char_p(b''),
-        }
-        data_holders_defaulted = {
-            'uint16': ctypes.c_uint16(0),
-            'uint32': ctypes.c_uint32(0),
-            'float': ctypes.c_float(0.0),
-            'double': ctypes.c_double(0.0),
-            'string': ctypes.c_char_p(b''),
-        }
 
-        test_data = tag_test_data[type_name]
-        data = data_holders[type_name]
-        p_data = ctypes.byref(data)
-        data_defaulted = data_holders_defaulted[type_name]
-        p_data_defaulted = ctypes.byref(data_defaulted)
-        set_wrapper = test_data.get('set_wrapper')
+    data_holders = {
+        'uint16': ctypes.c_uint16(0),
+        'uint32': ctypes.c_uint32(0),
+        'float': ctypes.c_float(0.0),
+        'double': ctypes.c_double(0.0),
+        'string': ctypes.c_char_p(b''),
+    }
+    data_holders_defaulted = {
+        'uint16': ctypes.c_uint16(0),
+        'uint32': ctypes.c_uint32(0),
+        'float': ctypes.c_float(0.0),
+        'double': ctypes.c_double(0.0),
+        'string': ctypes.c_char_p(b''),
+    }
 
-        processed_tags = set()
-        for tag_const, _tag_name, value, default_value in test_data['values']:
-            if tag_const not in processed_tags:
-                # Check the default value
-                if default_value is not None:
-                    assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
-                    assert data_defaulted.value == default_value
-                processed_tags.add(tag_const)
+    test_data = tag_test_data[type_name]
+    data = data_holders[type_name]
+    data_defaulted = data_holders_defaulted[type_name]
 
-            set_value = value
-            if set_wrapper:
-                set_value = set_wrapper(value)
+    yield tiff, test_data, data, data_defaulted
 
-            assert ltc.TIFFSetField(tiff, tag_const, set_value)
-            assert ltc.TIFFGetField(tiff, tag_const, p_data)
-            assert data.value == value
-            assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
-            assert data_defaulted.value == value
-    finally:
-        tiff.close()
+    tiff.close()
+
+
+def test_set_get_field_lowlevel(tiff_data_case):
+    ltc = lt.libtiff
+    tiff, test_data, data, data_defaulted = tiff_data_case
+
+    p_data = ctypes.byref(data)
+    p_data_defaulted = ctypes.byref(data_defaulted)
+    set_wrapper = test_data.get('set_wrapper')
+
+    processed_tags = set()
+    for tag_const, _tag_name, value, default_value in test_data['values']:
+        if tag_const not in processed_tags:
+            # Check the default value
+            if default_value is not None:
+                assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
+                assert data_defaulted.value == default_value
+            processed_tags.add(tag_const)
+
+        set_value = value
+        if set_wrapper:
+            set_value = set_wrapper(value)
+
+        assert ltc.TIFFSetField(tiff, tag_const, set_value)
+        assert ltc.TIFFGetField(tiff, tag_const, p_data)
+        assert data.value == value
+        assert ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_defaulted)
+        assert data_defaulted.value == value
 
 
 def test_set_get_field_lowlevel_colormap(tmp_path):
