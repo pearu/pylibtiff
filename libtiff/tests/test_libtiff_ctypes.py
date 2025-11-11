@@ -576,79 +576,129 @@ def test_copy(tmp_path):
     print('test copy ok')
 
 
-# The tag_test_data dictionary is used to test setting and getting TIFF tags.
-# The script get_tag_defaults.py was used to obtain the default values
-# The structure is as follows:
-# {
-#     'type_name': {
-#         'ctype': ctypes data type,
-#         'set_wrapper': optional wrapper for setting the value,
-#         'values': [
-#             (tag_const, tag_name, value, default_value),
-#             ...
-#         ]
-#     },
-#     ...
-# }
-tag_test_data = {
+import pathlib
+
+
+# The TAG_TEST_DATA_BASE dictionary is used to test setting and getting TIFF
+# tags.
+TAG_TEST_DATA_BASE = {
     'uint16': {
         'ctype': ctypes.c_uint16,
         'values': [
-            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_INT, 1),
-            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_UINT, 1),
-            (lt.TIFFTAG_COMPRESSION, 'Compression', lt.COMPRESSION_LZW, 1),
-            (lt.TIFFTAG_ORIENTATION, 'Orientation', lt.ORIENTATION_TOPLEFT, 1),
-            (lt.TIFFTAG_THRESHHOLDING, 'Threshholding', lt.THRESHHOLD_BILEVEL, 1),
-            (lt.TIFFTAG_FILLORDER, 'FillOrder', lt.FILLORDER_MSB2LSB, 1),
-            (lt.TIFFTAG_BITSPERSAMPLE, 'BitsPerSample', 8, 1),
+            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_INT),
+            (lt.TIFFTAG_SAMPLEFORMAT, 'SampleFormat', lt.SAMPLEFORMAT_UINT),
+            (lt.TIFFTAG_COMPRESSION, 'Compression', lt.COMPRESSION_LZW),
+            (lt.TIFFTAG_ORIENTATION, 'Orientation', lt.ORIENTATION_TOPLEFT),
+            (lt.TIFFTAG_THRESHHOLDING, 'Threshholding', lt.THRESHHOLD_BILEVEL),
+            (lt.TIFFTAG_FILLORDER, 'FillOrder', lt.FILLORDER_MSB2LSB),
+            (lt.TIFFTAG_BITSPERSAMPLE, 'BitsPerSample', 8),
         ]
     },
     'uint32': {
         'ctype': ctypes.c_uint32,
         'values': [
-            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 256, None),
-            (lt.TIFFTAG_IMAGELENGTH, 'ImageLength', 256, None),
-            (lt.TIFFTAG_SUBFILETYPE, 'SubfileType', lt.FILETYPE_REDUCEDIMAGE, 0),
-            (lt.TIFFTAG_TILEWIDTH, 'TileWidth', 256, None),
-            (lt.TIFFTAG_TILELENGTH, 'TileLength', 256, None),
-            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 128, None),
+            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 256),
+            (lt.TIFFTAG_IMAGELENGTH, 'ImageLength', 256),
+            (lt.TIFFTAG_SUBFILETYPE, 'SubfileType', lt.FILETYPE_REDUCEDIMAGE),
+            (lt.TIFFTAG_TILEWIDTH, 'TileWidth', 256),
+            (lt.TIFFTAG_TILELENGTH, 'TileLength', 256),
+            (lt.TIFFTAG_IMAGEWIDTH, 'ImageWidth', 128),
         ]
     },
     'float': {
         'ctype': ctypes.c_float,
         'set_wrapper': ctypes.c_double,
         'values': [
-            (lt.TIFFTAG_XRESOLUTION, 'XResolution', 88.0, None),
-            (lt.TIFFTAG_YRESOLUTION, 'YResolution', 88.0, None),
-            (lt.TIFFTAG_XPOSITION, 'XPosition', 88.0, None),
-            (lt.TIFFTAG_YPOSITION, 'YPosition', 88.0, None),
+            (lt.TIFFTAG_XRESOLUTION, 'XResolution', 88.0),
+            (lt.TIFFTAG_YRESOLUTION, 'YResolution', 88.0),
+            (lt.TIFFTAG_XPOSITION, 'XPosition', 88.0),
+            (lt.TIFFTAG_YPOSITION, 'YPosition', 88.0),
         ]
     },
     'double': {
         'ctype': ctypes.c_double,
         'set_wrapper': ctypes.c_double,
         'values': [
-            (lt.TIFFTAG_SMAXSAMPLEVALUE, 'SMaxSampleValue', 255.0, None),
-            (lt.TIFFTAG_SMINSAMPLEVALUE, 'SMinSampleValue', 0.0, None),
+            (lt.TIFFTAG_SMAXSAMPLEVALUE, 'SMaxSampleValue', 255.0),
+            (lt.TIFFTAG_SMINSAMPLEVALUE, 'SMinSampleValue', 0.0),
         ]
     },
     'string': {
         'ctype': ctypes.c_char_p,
         'values': [
-            (lt.TIFFTAG_ARTIST, 'Artist', b"test string", None),
-            (lt.TIFFTAG_DATETIME, 'DateTime', b"test string", None),
-            (lt.TIFFTAG_HOSTCOMPUTER, 'HostComputer', b"test string", None),
-            (lt.TIFFTAG_IMAGEDESCRIPTION, 'ImageDescription', b"test string", None),
-            (lt.TIFFTAG_MAKE, 'Make', b"test string", None),
-            (lt.TIFFTAG_MODEL, 'Model', b"test string", None),
-            (lt.TIFFTAG_SOFTWARE, 'Software', b"test string", None),
+            (lt.TIFFTAG_ARTIST, 'Artist', b"test string"),
+            (lt.TIFFTAG_DATETIME, 'DateTime', b"test string"),
+            (lt.TIFFTAG_HOSTCOMPUTER, 'HostComputer', b"test string"),
+            (lt.TIFFTAG_IMAGEDESCRIPTION, 'ImageDescription', b"test string"),
+            (lt.TIFFTAG_MAKE, 'Make', b"test string"),
+            (lt.TIFFTAG_MODEL, 'Model', b"test string"),
+            (lt.TIFFTAG_SOFTWARE, 'Software', b"test string"),
         ]
     }
 }
 
 
-@pytest.mark.parametrize("type_name", tag_test_data.keys())
-def test_set_get_field_lowlevel(tmp_path, type_name):
+def _get_default_tag_values(tmp_path, base_data):
+    ltc = lt.libtiff
+    tiff = lt.TIFF.open(tmp_path / 'default_values.tiff', mode='w')
+    try:
+        defaults = {}
+
+        data_holders = {
+            'uint16': ctypes.c_uint16(0),
+            'uint32': ctypes.c_uint32(0),
+            'float': ctypes.c_float(0.0),
+            'double': ctypes.c_double(0.0),
+            'string': ctypes.c_char_p(b''),
+        }
+
+        for type_name, test_data in base_data.items():
+            for tag_const, _, _ in test_data['values']:
+                if tag_const in defaults:
+                    continue  # Already checked
+
+                data_holder = data_holders[type_name]
+                p_data_holder = ctypes.byref(data_holder)
+
+                if ltc.TIFFGetFieldDefaulted(tiff, tag_const, p_data_holder):
+                    defaults[tag_const] = data_holder.value
+                else:
+                    defaults[tag_const] = None
+        # manually add missing default
+        defaults[lt.TIFFTAG_SAMPLEFORMAT] = 1
+        return defaults
+    finally:
+        tiff.close()
+
+
+@pytest.fixture(scope='session')
+def tag_test_data(tmp_path_factory):
+    """
+    This fixture generates the tag_test_data dictionary by determining the
+    default values for each tag. This avoids hardcoding the defaults and
+    makes the tests more robust to changes in libtiff.
+    """
+    tmpdir = tmp_path_factory.mktemp("tag_defaults")
+    default_values = _get_default_tag_values(tmpdir, TAG_TEST_DATA_BASE)
+
+    new_tag_test_data = {}
+    for type_name, test_data in TAG_TEST_DATA_BASE.items():
+        new_tag_test_data[type_name] = {
+            'ctype': test_data['ctype'],
+            'values': []
+        }
+        if 'set_wrapper' in test_data:
+            new_tag_test_data[type_name]['set_wrapper'] = test_data['set_wrapper']
+
+        for tag_const, tag_name, value in test_data['values']:
+            new_tag_test_data[type_name]['values'].append(
+                (tag_const, tag_name, value, default_values.get(tag_const))
+            )
+    return new_tag_test_data
+
+
+@pytest.mark.parametrize("type_name", TAG_TEST_DATA_BASE.keys())
+def test_set_get_field_lowlevel(tmp_path, type_name, tag_test_data):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_lowlevel_{type_name}.tiff', mode='w')
     try:
@@ -743,8 +793,8 @@ def test_set_get_field_lowlevel_colormap(tmp_path):
         tiff.close()
 
 
-@pytest.mark.parametrize("type_name", tag_test_data.keys())
-def test_set_get_field(tmp_path, type_name):
+@pytest.mark.parametrize("type_name", TAG_TEST_DATA_BASE.keys())
+def test_set_get_field(tmp_path, type_name, tag_test_data):
     tiff = lt.TIFF.open(tmp_path / f'libtiff_set_get_field_{type_name}.tiff', mode='w')
     try:
         test_data = tag_test_data[type_name]
