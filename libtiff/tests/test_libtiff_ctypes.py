@@ -754,7 +754,8 @@ def test_set_get_field_lowlevel(tiff_data_case):
         assert data_defaulted.value == value
 
 
-def test_set_get_field_lowlevel_colormap(tmp_path):
+@pytest.fixture
+def colormap_test_data(tmp_path):
     ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel_colormap.tiff', mode='w')
     try:
@@ -774,31 +775,47 @@ def test_set_get_field_lowlevel_colormap(tmp_path):
         p_colormap_green_defaulted = ctypes.POINTER(ctypes.c_uint16)()
         p_colormap_blue_defaulted = ctypes.POINTER(ctypes.c_uint16)()
 
-        assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COLORMAP, colormap_red, colormap_green, colormap_blue)
-        assert ltc.TIFFGetField(
-            tiff, lt.TIFFTAG_COLORMAP,
-            ctypes.byref(p_colormap_red),
-            ctypes.byref(p_colormap_green),
-            ctypes.byref(p_colormap_blue)
+        yield (
+            tiff,
+            colormap_red, colormap_green, colormap_blue,
+            p_colormap_red, p_colormap_green, p_colormap_blue,
+            p_colormap_red_defaulted, p_colormap_green_defaulted, p_colormap_blue_defaulted
         )
-        assert ltc.TIFFGetFieldDefaulted(
-            tiff, lt.TIFFTAG_COLORMAP,
-            ctypes.byref(p_colormap_red_defaulted),
-            ctypes.byref(p_colormap_green_defaulted),
-            ctypes.byref(p_colormap_blue_defaulted)
-        )
-
-        # Check that the retrieved values are correct
-        for i in range(256):
-            assert p_colormap_red[i] == i
-            assert p_colormap_green[i] == i
-            assert p_colormap_blue[i] == i
-
-            assert p_colormap_red_defaulted[i] == i
-            assert p_colormap_green_defaulted[i] == i
-            assert p_colormap_blue_defaulted[i] == i
     finally:
         tiff.close()
+
+
+def test_set_get_field_lowlevel_colormap(colormap_test_data):
+    ltc = lt.libtiff
+    (
+        tiff,
+        colormap_red, colormap_green, colormap_blue,
+        p_colormap_red, p_colormap_green, p_colormap_blue,
+        p_colormap_red_defaulted, p_colormap_green_defaulted, p_colormap_blue_defaulted
+    ) = colormap_test_data
+
+    assert ltc.TIFFSetField(tiff, lt.TIFFTAG_COLORMAP, colormap_red, colormap_green, colormap_blue)
+    assert ltc.TIFFGetField(
+        tiff, lt.TIFFTAG_COLORMAP,
+        ctypes.byref(p_colormap_red),
+        ctypes.byref(p_colormap_green),
+        ctypes.byref(p_colormap_blue)
+    )
+    assert ltc.TIFFGetFieldDefaulted(
+        tiff, lt.TIFFTAG_COLORMAP,
+        ctypes.byref(p_colormap_red_defaulted),
+        ctypes.byref(p_colormap_green_defaulted),
+        ctypes.byref(p_colormap_blue_defaulted)
+    )
+
+    for i in range(256):
+        assert p_colormap_red[i] == i
+        assert p_colormap_green[i] == i
+        assert p_colormap_blue[i] == i
+
+        assert p_colormap_red_defaulted[i] == i
+        assert p_colormap_green_defaulted[i] == i
+        assert p_colormap_blue_defaulted[i] == i
 
 
 @pytest.mark.parametrize("type_name", TAG_TEST_DATA_BASE.keys())
