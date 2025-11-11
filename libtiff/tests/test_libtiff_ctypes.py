@@ -544,7 +544,7 @@ def test_copy(tmp_path):
     # from scipy.stats import poisson
     # arr = poisson.rvs (arr)
     tiff.SetField('ImageDescription', b'Hey\nyou\x00')
-    tiff.write_image(arr)
+    tiff.write_image(arr, compression='lzw')
     del tiff
 
     tiff = lt.TIFF.open(tmp_path / 'libtiff_test_compression.tiff', mode='r')
@@ -553,7 +553,7 @@ def test_copy(tmp_path):
 
     assert (arr == arr2).all(), 'arrays not equal'
 
-    for compression in ['none', 'lzw', 'adobe_deflate']:
+    for compression in ['none', 'lzw', 'deflate', 'adobe_deflate']:
         for sampleformat in ['int', 'uint', 'float']:
             for bitspersample in [128, 64, 32, 16, 8]:
                 dtype_name = f"{sampleformat}{bitspersample}"
