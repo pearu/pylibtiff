@@ -543,8 +543,8 @@ def test_copy(tmp_path):
             arr[_i, j] = 1 + _i + 10 * j
     # from scipy.stats import poisson
     # arr = poisson.rvs (arr)
-    tiff.SetField('ImageDescription', b'Hey\nyou')
-    tiff.write_image(arr, compression='lzw')
+    tiff.SetField('ImageDescription', b'Hey\nyou\x00')
+    tiff.write_image(arr)
     del tiff
 
     tiff = lt.TIFF.open(tmp_path / 'libtiff_test_compression.tiff', mode='r')
@@ -553,7 +553,7 @@ def test_copy(tmp_path):
 
     assert (arr == arr2).all(), 'arrays not equal'
 
-    for compression in ['none', 'lzw', 'deflate']:
+    for compression in ['none', 'lzw', 'adobe_deflate']:
         for sampleformat in ['int', 'uint', 'float']:
             for bitspersample in [128, 64, 32, 16, 8]:
                 dtype_name = f"{sampleformat}{bitspersample}"
@@ -566,7 +566,7 @@ def test_copy(tmp_path):
                 # print compression, sampleformat, bitspersample
                 tiff.copy(tmp_path / 'libtiff_test_copy2.tiff',
                           compression=compression,
-                          imagedescription=b'hoo',
+                          imagedescription=b'hoo\x00',
                           sampleformat=sampleformat,
                           bitspersample=bitspersample)
                 tiff2 = lt.TIFF.open(tmp_path / 'libtiff_test_copy2.tiff', mode='r')
