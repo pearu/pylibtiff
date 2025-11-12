@@ -201,3 +201,21 @@ def test_bytes_description(tmp_path):
     tif = TIFF.open(fn, 'r')
     assert tif.GetField('ImageDescription') == b'a longer description'
     tif.close()
+
+
+@pytest.mark.parametrize("description", ["", "a", "ab", "abc", "abcd", "abcde", "a longer string"])
+def test_tiffimage_description_short_strings(tmp_path, description):
+    itype = uint8
+    image = array([[1, 2, 3], [4, 5, 6]], itype)
+    fn = str(tmp_path / "test_description.tif")
+
+    tif = TIFFimage(image, description=description)
+    tif.write_file(fn)
+    del tif
+
+    tif = TIFFfile(fn)
+    read_description = tif.IFD[0].get_value("ImageDescription").decode('utf-8').rstrip('\x00')
+    tif.close()
+    atexit.register(os.remove, fn)
+
+    assert read_description == description, f"Expected '{description}', got '{read_description}'"
