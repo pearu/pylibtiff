@@ -1538,6 +1538,10 @@ class TIFF(ctypes.c_void_p):
         if data_type == ctypes.c_float:
             data_type = ctypes.c_double
 
+        if data_type == ctypes.c_char_p and isinstance(_value, bytes) and not _value.endswith(b'\x00'):
+            # Ensure c_char_p values are null-terminated, as expected by C functions.
+            _value += b'\x00'
+
         if tag == TIFFTAG_COLORMAP:
             # ColorMap passes 3 values each a c_uint16 pointer
             try:
@@ -1668,6 +1672,13 @@ class TIFF(ctypes.c_void_p):
             itemsize = bits // 8
             dtype = self.get_numpy_type(bits, sample_format)
             for _name, define in name_define_list:
+                # Skip TIFFTAG_COLORMAP if BitsPerSample > 16, as it's typically for paletted images (8 or 16 bits).
+                # Trying to read it for higher bit depths can lead to errors.
+                if define == TIFFTAG_COLORMAP and self.GetField('BitsPerSample') > 16:
+                    continue
+                # Skip TIFFTAG_PREDICTOR if compression is none, as it's only relevant when compression is used.
+                if define == TIFFTAG_PREDICTOR and define_rewrite.get(TIFFTAG_COMPRESSION, self.GetField('Compression')) == COMPRESSION_NONE:
+                    continue
                 orig_value = self.GetField(define)
                 if orig_value is None and define not in define_rewrite:
                     continue
