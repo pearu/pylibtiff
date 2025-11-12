@@ -129,8 +129,7 @@ class TIFFentry:
         # print(self.values)
         # print(dtype)
         if self.type_name == 'ASCII':
-            data = numpy.array([self.values[0]],
-                               dtype='|S{}'.format(len(self.values[0]))).view(dtype=numpy.ubyte)
+            data = numpy.frombuffer(self.values[0], dtype=numpy.ubyte)
             target[offset:offset + self.nbytes] = data
         else:
             for value in self.values:
