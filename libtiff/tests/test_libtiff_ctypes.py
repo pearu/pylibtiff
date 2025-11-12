@@ -576,9 +576,6 @@ def test_copy(tmp_path):
     print('test copy ok')
 
 
-import pathlib
-
-
 # The TAG_TEST_DATA_BASE dictionary is used to test setting and getting TIFF
 # tags.
 TAG_TEST_DATA_BASE = {
@@ -756,7 +753,6 @@ def test_set_get_field_lowlevel(tiff_data_case):
 
 @pytest.fixture
 def colormap_test_data(tmp_path):
-    ltc = lt.libtiff
     tiff = lt.TIFF.open(tmp_path / 'libtiff_set_get_field_lowlevel_colormap.tiff', mode='w')
     try:
         tiff.SetField('BitsPerSample', 8)
