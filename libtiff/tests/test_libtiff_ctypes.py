@@ -3,6 +3,8 @@ import numpy as np
 import pytest
 import time
 from libtiff import TIFFimage
+import os
+import sys
 
 lt = pytest.importorskip('libtiff.libtiff_ctypes')
 
@@ -543,7 +545,7 @@ def test_copy(tmp_path):
             arr[_i, j] = 1 + _i + 10 * j
     # from scipy.stats import poisson
     # arr = poisson.rvs (arr)
-    tiff.SetField('ImageDescription', b'Hey\nyou\x00')
+    tiff.SetField('ImageDescription', b'Hey\nyou')
     tiff.write_image(arr, compression='lzw')
     del tiff
 
@@ -564,11 +566,36 @@ def test_copy(tmp_path):
                 if compression != 'none' and bitspersample > 32:
                     continue
                 # print compression, sampleformat, bitspersample
-                tiff.copy(tmp_path / 'libtiff_test_copy2.tiff',
-                          compression=compression,
-                          imagedescription=b'hoo\x00',
-                          sampleformat=sampleformat,
-                          bitspersample=bitspersample)
+                if compression == 'deflate':
+                    # Redirect C-level stderr
+                    stderr_fileno = sys.stderr.fileno()
+                    stderr_save = os.dup(stderr_fileno)
+                    pipe_out, pipe_in = os.pipe()
+                    os.dup2(pipe_in, stderr_fileno)
+
+                    try:
+                        tiff.copy(tmp_path / 'libtiff_test_copy2.tiff',
+                                  compression=compression,
+                                  imagedescription=b'hoo',
+                                  sampleformat=sampleformat,
+                                  bitspersample=bitspersample)
+                    finally:
+                        os.close(pipe_in)
+                        # Restore stderr
+                        os.dup2(stderr_save, stderr_fileno)
+                        os.close(stderr_save)
+
+                    # Read from the pipe
+                    with os.fdopen(pipe_out) as f:
+                        stderr_output = f.read()
+
+                    assert 'legacy Deflate codec' in stderr_output
+                else:
+                    tiff.copy(tmp_path / 'libtiff_test_copy2.tiff',
+                              compression=compression,
+                              imagedescription=b'hoo',
+                              sampleformat=sampleformat,
+                              bitspersample=bitspersample)
                 tiff2 = lt.TIFF.open(tmp_path / 'libtiff_test_copy2.tiff', mode='r')
                 arr3 = tiff2.read_image()
                 assert (arr == arr3).all(), 'arrays not equal %r' % (
