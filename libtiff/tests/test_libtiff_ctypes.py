@@ -567,7 +567,10 @@ def test_copy(tmp_path):
                     continue
                 # print compression, sampleformat, bitspersample
                 if compression == 'deflate':
-                    # Redirect C-level stderr
+                    # Redirect C-level stderr to capture the warning:
+                    # "TIFFWriteDirectorySec: Warning, Creating TIFF with legacy Deflate codec identifier,
+                    # COMPRESSION_ADOBE_DEFLATE is more widely supported."
+                    # This warning occurs when using 'deflate' compression.
                     stderr_fileno = sys.stderr.fileno()
                     stderr_save = os.dup(stderr_fileno)
                     pipe_out, pipe_in = os.pipe()
