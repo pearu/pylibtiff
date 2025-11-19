@@ -49,9 +49,9 @@ def runner(parser, options, args):
 
     description = []
     for ifd in tiff.IFD:
-        s = ifd.get('ImageDescription')
-        if s is not None:
-            description.append(s.value.tostring())
+        v = ifd.get_value('ImageDescription')
+        if v is not None:
+            description.append(v)
     init_description = '\n'.join(description)
     samples_list, names_list = tiff.get_samples()
     while samples_list:

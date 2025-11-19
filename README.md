@@ -26,7 +26,7 @@ such files. In addition, the pure Python module is more memory
 efficient as the arrays are returned as memory maps. Support for
 compressed files is not implemented yet.
 
-[tifffile.py](http://www.lfd.uci.edu/~gohlke/code/tifffile.py.html) by
+[tifffile](https://github.com/cgohlke/tifffile) by
 Christoph Gohlke is an excellent module for reading TIFF as well as
 LSM files, it is as fast as libtiff.py by using numpy.
 
