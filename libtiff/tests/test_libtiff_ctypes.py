@@ -671,7 +671,7 @@ def _get_default_tag_values(tmp_path, base_data):
 @pytest.fixture(scope='session')
 def tag_test_data(tmp_path_factory):
     """Get dictionary of default TIFF tag values.
-    
+
     This fixture generates the dictionary of tag defaults
     by accessing a real TIFF file. This avoids hardcoding the defaults and
     makes the tests more robust to changes in libtiff.
