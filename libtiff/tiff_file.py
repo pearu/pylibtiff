@@ -792,6 +792,8 @@ class IFD:
                         'DocumentName', 'Model', 'Make', 'PageName',
                         'DateTime', 'Artist', 'HostComputer']:
             if value is not None:
+                if isinstance(value, bytes):
+                    return value
                 return value.view('|S{!s}'.format(str(value.nbytes // value.size))).tobytes()
         if human:
             if tag_name == 'Compression':
@@ -1033,11 +1035,23 @@ class IFDEntry:
         self.type = tiff.get_uint16(offset + 2)
         self.count = tiff.get_uint32(offset + 4)
 
+        self.tag_name = tag_value2name.get(self.tag, 'TAG%s'
+                                           % (hex(self.tag), ))
+
+        self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type, ))
+
         for hook in IFDEntry_init_hooks:
             hook(self)
 
         self.bytes = bytes = type2bytes.get(self.type, 0)
-        if self.count == 1 and 1 <= bytes <= 4:
+        if self.type_name == 'ASCII':
+            if self.count <= 4:
+                self.offset = None
+                value = tiff.get_string(offset + 8, self.count)
+            else:
+                self.offset = tiff.get_int32(offset + 8)
+                value = tiff.get_string(self.offset, self.count)
+        elif self.count == 1 and 1 <= bytes <= 4:
             self.offset = None
             value = tiff.get_value(offset + 8, self.type)
         else:
@@ -1045,10 +1059,6 @@ class IFDEntry:
             value = tiff.get_values(self.offset, self.type, self.count)
         if value is not None:
             self.value = value
-        self.tag_name = tag_value2name.get(self.tag, 'TAG%s'
-                                           % (hex(self.tag), ))
-
-        self.type_name = type2name.get(self.type, 'TYPE%s' % (self.type, ))
 
         self.memory_usage = []
 
