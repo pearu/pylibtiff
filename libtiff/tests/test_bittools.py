@@ -1,6 +1,7 @@
-
 import numpy
-from . import bittools
+import pytest
+
+bittools = pytest.importorskip('libtiff.bittools')
 
 
 def tobinary(arr):
@@ -43,9 +44,3 @@ def test_wordbits():
         assert bittools.getword(arr2, 0, width)[0] == word
         assert tobinary(arr2)[:width] == bstr[:width], \
             repr((tobinary(arr2)[:width], bstr[:width]))
-
-
-if __name__ == '__main__':
-    test_setgetbit()
-    test_setgetword()
-    test_wordbits()
