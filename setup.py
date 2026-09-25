@@ -47,7 +47,9 @@ def setup_package():
         extras_require={
             'bitarray': ['bitarray'],
         },
-        include_package_data=True,
+        # The only non-Python files in the package are the C extension sources in libtiff/src/.
+        # These are included in the sdist automatically but should not be installed.
+        include_package_data=False,
         packages=find_packages(),
         ext_modules=[
             Extension(name="libtiff.bittools",
