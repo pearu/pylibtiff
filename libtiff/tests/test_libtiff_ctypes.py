@@ -1,4 +1,6 @@
 import ctypes
+import struct
+import subprocess
 import numpy as np
 import pytest
 import time
@@ -875,3 +877,612 @@ def test_set_get_field_colormap(tmp_path):
             assert p_colormap_blue[i] == i
     finally:
         tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="add_tags does not keep the TIFFExtender alive; later opens segfault")
+def test_add_tags_keeps_extender_alive(tmp_path):
+    # Run in a subprocess: when the extender is garbage collected, the next
+    # TIFFOpen calls a freed callback and crashes the interpreter.
+    script = """
+import gc
+import sys
+import numpy as np
+import libtiff.libtiff_ctypes as lt
+
+lt.add_tags([lt.TIFFFieldInfo(40200, 1, 1, lt.TIFFDataType.TIFF_SHORT, lt.FIELD_CUSTOM,
+                              True, False, b"LibtiffTestRegistry")])
+gc.collect()
+fn = sys.argv[1]
+tiff = lt.TIFF.open(fn, mode='w')
+tiff.SetField('LibtiffTestRegistry', 42)
+tiff.write_image(np.zeros((2, 2), np.uint8))
+tiff.close()
+tiff = lt.TIFF.open(fn)
+assert tiff.GetField('LibtiffTestRegistry') == 42
+tiff.close()
+"""
+    proc = subprocess.run([sys.executable, '-c', script, str(tmp_path / 'registry.tif')],
+                          capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.xfail(strict=True, reason="TIFF3D.read_image computes a float itemsize (bits / 8)")
+def test_tiff3d_read_image(tmp_path):
+    itype = np.uint32
+    image = np.array([[[1, 2, 3], [4, 5, 6]]], itype)
+    fn = str(tmp_path / "issue69.tif")
+    tif = TIFFimage(image)
+    tif.write_file(fn)
+    del tif
+    tif = lt.TIFF3D.open(fn)
+    arr = tif.read_image()
+    tif.close()
+    np.testing.assert_array_equal(arr, image)
+    assert arr.dtype == itype
+
+
+@pytest.mark.xfail(strict=True, reason="TIFF3D.read_image computes a float itemsize (bits / 8)")
+def test_tiff3d_read_image_multipage(tmp_path):
+    fn = tmp_path / "tiff3d.tif"
+    arr = np.arange(3 * 20 * 7, dtype=np.uint16).reshape(3, 20, 7)
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+
+    tiff = lt.TIFF3D.open(fn)
+    arr2 = tiff.read_image()
+    assert tiff.CurrentDirectory() == 0
+    tiff.close()
+    np.testing.assert_array_equal(arr, arr2)
+
+
+@pytest.mark.xfail(strict=True, reason="GetField('PixelSizeX') eval()s text from ImageDescription")
+@pytest.mark.parametrize(
+    "descr",
+    [
+        b"PixelSizeX __import__('os').environ.__setitem__('PYLIBTIFF_PWNED','1')",
+        b"PixelSizeX",
+        b"PixelSizeX abc",
+    ]
+)
+def test_pixelsize_does_not_eval(tmp_path, descr):
+    fn = tmp_path / "pixelsize.tif"
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.SetField('ImageDescription', descr)
+    tiff.write_image(np.zeros((2, 2), np.uint8))
+    tiff.close()
+
+    try:
+        tiff = lt.TIFF.open(fn)
+        assert tiff.GetField('PixelSizeX') is None
+        tiff.info()
+        tiff.close()
+        assert os.environ.get('PYLIBTIFF_PWNED') is None
+    finally:
+        os.environ.pop('PYLIBTIFF_PWNED', None)
+
+
+def test_pixelsize_from_description(tmp_path):
+    fn = tmp_path / "pixelsize.tif"
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.SetField('ImageDescription', b"PixelSizeX 0.5\nPixelSizeY 2 RelativeTime 1e-3")
+    tiff.write_image(np.zeros((2, 2), np.uint8))
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField('PixelSizeX') == 0.5
+    assert tiff.GetField('PixelSizeY') == 2.0
+    assert tiff.GetField('RelativeTime') == 1e-3
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="SetField of pointer tags uses collections.Iterable (removed in Python 3.10) "
+                                       "and passes a list to a scalar ctypes type")
+def test_set_field_pointer_tag(tmp_path, monkeypatch):
+    tag = 40300
+    extenders.append(lt.add_tags([
+        lt.TIFFFieldInfo(tag, 3, 3, lt.TIFFDataType.TIFF_LONG, lt.FIELD_CUSTOM,
+                         True, False, b"LibtiffTestPointer"),
+    ]))
+    # A fixed count array tag without passcount is passed as a uint32* by libtiff
+    monkeypatch.setitem(lt.tifftags, tag, (ctypes.POINTER(ctypes.c_uint32), lambda d: d[:3]))
+
+    fn = tmp_path / "pointer_tag.tif"
+    tiff = lt.TIFF.open(fn, mode='w')
+    assert tiff.SetField(tag, [7, 8, 9]) == 1
+    tiff.write_image(np.zeros((2, 2), np.uint8))
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField(tag) == [7, 8, 9]
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="Strip/tile offsets and bytecounts are read as a single uint32")
+def test_strip_offsets_are_full_arrays(tmp_path):
+    fn = tmp_path / "tiles.tif"
+    arr = np.arange(64 * 48, dtype=np.uint16).reshape(64, 48)
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_tiles(arr, 16, 16)
+    tiff.close()
+
+    n_tiles = 4 * 3
+    tiff = lt.TIFF.open(fn)
+    offsets = tiff.GetField('TileOffsets')
+    bytecounts = tiff.GetField('TileByteCounts')
+    tiff.close()
+    assert len(offsets) == n_tiles
+    assert all(isinstance(o, int) for o in offsets)
+    assert bytecounts == [16 * 16 * 2] * n_tiles
+    assert sorted(set(offsets)) == offsets
+
+
+def _write_bigtiff_with_large_strip_offset(fn, offset):
+    """Write a 1x1 BigTIFF whose (fake) strip offset does not fit 32 bits."""
+    entries = [
+        (256, 3, 1, 1),  # ImageWidth
+        (257, 3, 1, 1),  # ImageLength
+        (258, 3, 1, 8),  # BitsPerSample
+        (259, 3, 1, 1),  # Compression
+        (262, 3, 1, 1),  # Photometric
+        (273, 16, 1, offset),  # StripOffsets (LONG8)
+        (277, 3, 1, 1),  # SamplesPerPixel
+        (278, 3, 1, 1),  # RowsPerStrip
+        (279, 16, 1, 1),  # StripByteCounts (LONG8)
+    ]
+    ifd = struct.pack('<Q', len(entries))
+    for tag, typ, count, value in entries:
+        ifd += struct.pack('<HHQQ', tag, typ, count, value)
+    ifd += struct.pack('<Q', 0)
+    with open(fn, 'wb') as f:
+        f.write(b'II+\x00' + struct.pack('<HHQ', 8, 0, 16) + ifd)
+
+
+@pytest.mark.xfail(strict=True, reason="Strip/tile offsets and bytecounts are read as a single uint32")
+def test_strip_offsets_64bit(tmp_path):
+    fn = tmp_path / "bigtiff.tif"
+    offset = 2 ** 33 + 16
+    _write_bigtiff_with_large_strip_offset(fn, offset)
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField('StripOffsets') == [offset]
+    assert tiff.GetField('StripByteCounts') == [1]
+    tiff.close()
+
+
+def _write_lsm_like_tiff(fn, lsminfo):
+    """Write a 1x1 TIFF with a CZ_LSMInfo (BYTE) tag, as found in LSM files."""
+    n = 10
+    data_off = 8 + 2 + n * 12 + 4
+    lsm_off = data_off + 4
+    entries = [
+        (256, 3, 1, 1), (257, 3, 1, 1), (258, 3, 1, 8), (259, 3, 1, 1),
+        (262, 3, 1, 1), (273, 4, 1, data_off), (277, 3, 1, 1), (278, 3, 1, 1),
+        (279, 4, 1, 1), (lt.TIFFTAG_CZ_LSMINFO, 1, len(lsminfo), lsm_off),
+    ]
+    ifd = struct.pack('<H', n)
+    for tag, typ, count, value in entries:
+        ifd += struct.pack('<HHII', tag, typ, count, value)
+    ifd += struct.pack('<I', 0)
+    with open(fn, 'wb') as f:
+        f.write(b'II*\x00' + struct.pack('<I', 8) + ifd + b'\x07\x00\x00\x00' + lsminfo)
+
+
+@pytest.mark.skip(reason="Crashes on current code: GetField('CZ_LSMInfo') reads the tag with the wrong "
+                         "type (c_toff_t is int32) and CZ_LSMInfo closes libtiff's file descriptor")
+def test_cz_lsminfo(tmp_path):
+    fn = tmp_path / "lsm_like.tif"
+    lsminfo = struct.pack('<ii', 0x0400494C, 500) + bytes(492)
+    _write_lsm_like_tiff(fn, lsminfo)
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField('CZ_LSMInfo') == lsminfo
+    assert 'magic_number=%d' % 0x0400494C in tiff.info()
+    # libtiff's file descriptor must still be usable
+    np.testing.assert_array_equal(tiff.read_image(), [[7]])
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="TIFF.copy skips the first directory and drops the last one")
+def test_copy_multipage(tmp_path):
+    arr = np.arange(3 * 5 * 6, dtype=np.uint16).reshape(3, 5, 6)
+    tiff = lt.TIFF.open(tmp_path / 'multipage.tiff', mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+
+    tiff = lt.TIFF.open(tmp_path / 'multipage.tiff')
+    tiff.copy(tmp_path / 'multipage_copy.tiff', compression='lzw')
+    tiff.close()
+
+    tiff = lt.TIFF.open(tmp_path / 'multipage_copy.tiff')
+    pages = list(tiff.iter_images())
+    assert tiff.GetField('Compression') == lt.COMPRESSION_LZW
+    tiff.close()
+    assert len(pages) == 3
+    np.testing.assert_array_equal(np.array(pages), arr)
+
+
+@pytest.mark.xfail(strict=True, reason="TIFF.copy checks tag names with assert instead of raising ValueError")
+def test_copy_unknown_tag(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'image.tiff', mode='w')
+    tiff.write_image(np.zeros((2, 2), np.uint8))
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'image.tiff')
+    with pytest.raises(ValueError):
+        tiff.copy(tmp_path / 'image_copy.tiff', notatag=1)
+    tiff.close()
+
+
+_XFAIL_TAG_DEFINE = pytest.mark.xfail(
+    strict=True, reason="get_tag_define uses str.title() and a single split, so most names raise KeyError")
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("compression", lt.TIFFTAG_COMPRESSION),
+        ("imagedescription", lt.TIFFTAG_IMAGEDESCRIPTION),
+        pytest.param("tifftag_artist", lt.TIFFTAG_ARTIST, marks=_XFAIL_TAG_DEFINE),
+        pytest.param("cz_lsminfo", lt.TIFFTAG_CZ_LSMINFO, marks=_XFAIL_TAG_DEFINE),
+        pytest.param("photometric_rgb", lt.PHOTOMETRIC_RGB, marks=_XFAIL_TAG_DEFINE),
+        pytest.param("PLANARCONFIG_CONTIG", lt.PLANARCONFIG_CONTIG, marks=_XFAIL_TAG_DEFINE),
+        pytest.param("compression_adobe_deflate", lt.COMPRESSION_ADOBE_DEFLATE, marks=_XFAIL_TAG_DEFINE),
+        pytest.param("sampleformat_ieeefp", lt.SAMPLEFORMAT_IEEEFP, marks=_XFAIL_TAG_DEFINE),
+        ("notatag", None),
+    ]
+)
+def test_get_tag_define(name, expected):
+    assert lt.TIFF.get_tag_define(name) == expected
+
+
+_XFAIL_BYTESWAP = pytest.mark.xfail(
+    strict=True, reason="write_image/write_tiles write non-native byte order arrays without byteswapping")
+
+
+@pytest.mark.parametrize("byteorder", ['<', pytest.param('>', marks=_XFAIL_BYTESWAP)])
+@pytest.mark.parametrize("dtype", ['u2', 'i4', 'f8'])
+def test_write_image_byteswapped(tmp_path, byteorder, dtype):
+    arr = np.arange(5 * 6).reshape(5, 6).astype(byteorder + dtype)
+    fn = tmp_path / 'byteswapped.tiff'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+    tiff = lt.TIFF.open(fn)
+    arr2 = tiff.read_image()
+    tiff.close()
+    np.testing.assert_array_equal(arr2, arr)
+
+
+@pytest.mark.parametrize("byteorder", ['<', pytest.param('>', marks=_XFAIL_BYTESWAP)])
+def test_write_tiles_byteswapped(tmp_path, byteorder):
+    arr = np.arange(40 * 24).reshape(40, 24).astype(byteorder + 'u2')
+    fn = tmp_path / 'byteswapped_tiles.tiff'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_tiles(arr, 16, 16)
+    tiff.close()
+    tiff = lt.TIFF.open(fn)
+    arr2 = tiff.read_image()
+    tiff.close()
+    np.testing.assert_array_equal(arr2, arr)
+
+
+@pytest.mark.xfail(strict=True, reason="write_image writes a 1-D array as a single column instead of a single row")
+def test_write_1d(tmp_path):
+    arr = np.arange(20, dtype=np.uint8)
+    tiff = lt.TIFF.open(tmp_path / 'strips_1d.tiff', mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'strips_1d.tiff')
+    np.testing.assert_array_equal(tiff.read_image(), arr[np.newaxis, :])
+    tiff.close()
+
+    tiff = lt.TIFF.open(tmp_path / 'tiles_1d.tiff', mode='w')
+    assert tiff.write_tiles(arr, 16, 16) == 16 * 16 * 2
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'tiles_1d.tiff')
+    np.testing.assert_array_equal(tiff.read_image(), arr[np.newaxis, :])
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="ReadTile returns a ctypes object instead of an int")
+def test_read_tile_errors(tmp_path):
+    arr = np.arange(32 * 32, dtype=np.uint16).reshape(32, 32)
+    tiff = lt.TIFF.open(tmp_path / 'tiles.tiff', mode='w')
+    tiff.write_tiles(arr, 16, 16)
+    tiff.close()
+
+    tiff = lt.TIFF.open(tmp_path / 'tiles.tiff')
+    buf = np.zeros((16, 16), np.uint16)
+    assert tiff.ReadTile(buf.ctypes.data, 16, 0, 0, 0) == buf.nbytes
+    np.testing.assert_array_equal(buf, arr[:16, 16:])
+    lt.suppress_errors()
+    try:
+        assert tiff.ReadTile(buf.ctypes.data, 1000, 0, 0, 0) == -1
+    finally:
+        lt.libtiff.TIFFSetErrorHandler(lt.TIFFErrorHandler())
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="TIFFReadEncodedTile is declared with the wrong argtypes and restype")
+def test_read_encoded_tile(tmp_path):
+    arr = np.arange(32 * 32, dtype=np.uint16).reshape(32, 32)
+    tiff = lt.TIFF.open(tmp_path / 'tiles.tiff', mode='w')
+    tiff.write_tiles(arr, 16, 16)
+    tiff.close()
+
+    tiff = lt.TIFF.open(tmp_path / 'tiles.tiff')
+    buf = np.zeros((16, 16), np.uint16)
+    size = lt.libtiff.TIFFReadEncodedTile(tiff, 1, buf.ctypes.data, buf.nbytes).value
+    tiff.close()
+    assert size == buf.nbytes
+    np.testing.assert_array_equal(buf, arr[:16, 16:])
+
+
+@pytest.mark.xfail(strict=True, reason="TIFFDefaultTileSize is declared with uint32 args instead of uint32 pointers")
+def test_default_tile_size(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'tiles.tiff', mode='w')
+    width = ctypes.c_uint32(0)
+    height = ctypes.c_uint32(0)
+    lt.libtiff.TIFFDefaultTileSize(tiff, ctypes.byref(width), ctypes.byref(height))
+    tiff.close()
+    assert width.value > 0 and width.value % 16 == 0
+    assert height.value > 0 and height.value % 16 == 0
+
+
+@pytest.mark.xfail(strict=True, reason="CurrentDirectory/CurrentStrip/CurrentTile return ctypes objects")
+def test_current_directory_is_int(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'multipage.tiff', mode='w')
+    tiff.write_image(np.zeros((2, 2, 2), np.uint8))
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'multipage.tiff')
+    tiff.ReadDirectory()
+    assert tiff.CurrentDirectory() == 1
+    assert isinstance(tiff.CurrentStrip(), int)
+    assert isinstance(tiff.CurrentTile(), int)
+    tiff.close()
+
+
+def test_open_missing_file(tmp_path):
+    lt.suppress_errors()
+    try:
+        with pytest.raises(TypeError, match='Failed to open file'):
+            lt.TIFF.open(tmp_path / 'does_not_exist.tif')
+    finally:
+        lt.libtiff.TIFFSetErrorHandler(lt.TIFFErrorHandler())
+
+
+@pytest.mark.parametrize("compression", [None, 'lzw', 'deflate', 'packbits'])
+@pytest.mark.parametrize("dtype", ['u1', 'u2', 'u4', 'u8', 'i1', 'i2', 'i4', 'i8', 'f4', 'f8', 'c8', 'c16'])
+def test_write_read_image_dtypes(tmp_path, dtype, compression):
+    arr = (np.arange(7 * 9).reshape(7, 9) - 20).astype(dtype)
+    fn = tmp_path / 'dtypes.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr, compression=compression)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    arr2 = tiff.read_image()
+    assert tiff.GetField('BitsPerSample') == arr.dtype.itemsize * 8
+    assert tiff.GetField('Compression') == lt.TIFF._fix_compression(compression)
+    tiff.close()
+    assert arr2.dtype == arr.dtype
+    np.testing.assert_array_equal(arr2, arr)
+
+
+def test_write_image_bool(tmp_path):
+    arr = np.arange(12).reshape(3, 4) % 3 == 0
+    tiff = lt.TIFF.open(tmp_path / 'bool.tif', mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'bool.tif')
+    arr2 = tiff.read_image()
+    tiff.close()
+    assert arr2.dtype == np.uint8
+    np.testing.assert_array_equal(arr2, arr)
+
+
+def test_write_image_unsupported(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'unsupported.tif', mode='w')
+    with pytest.raises(NotImplementedError):
+        tiff.write_image(np.array([['a']]))
+    with pytest.raises(NotImplementedError):
+        tiff.write_image(np.zeros((2, 2, 2, 2), np.uint8))
+    with pytest.raises(NotImplementedError):
+        tiff.write_image(np.zeros((2, 2), np.uint8), compression=1.5)
+    tiff.close()
+
+
+@pytest.mark.xfail(strict=True, reason="write_image only sets BitsPerSample, SampleFormat and Compression on "
+                                       "the first page of a 3-D array")
+def test_multipage_iter_images(tmp_path):
+    arr = np.arange(4 * 5 * 6, dtype=np.uint16).reshape(4, 5, 6)
+    fn = tmp_path / 'multipage.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert not tiff.IsTiled()
+    assert tiff.GetField('ImageWidth') == 6
+    assert tiff.GetField('ImageLength') == 5
+    pages = list(tiff.iter_images())
+    assert len(pages) == 4
+    np.testing.assert_array_equal(np.array(pages), arr)
+    # iter_images rewinds to the first directory
+    np.testing.assert_array_equal(tiff.read_image(), arr[0])
+    assert tiff.SetDirectory(2)
+    np.testing.assert_array_equal(tiff.read_image(), arr[2])
+    assert tiff.LastDirectory() == 0
+    assert tiff.SetDirectory(3)
+    assert tiff.LastDirectory() == 1
+    tiff.close()
+
+
+@pytest.mark.parametrize("depth", [3, 4])
+def test_write_rgb_contig(tmp_path, depth):
+    arr = np.arange(5 * 6 * depth, dtype=np.uint8).reshape(5, 6, depth)
+    fn = tmp_path / 'rgb.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr, write_rgb=True)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField('Photometric') == lt.PHOTOMETRIC_RGB
+    assert tiff.GetField('PlanarConfig') == lt.PLANARCONFIG_CONTIG
+    assert tiff.GetField('SamplesPerPixel') == depth
+    np.testing.assert_array_equal(tiff.read_image(), arr)
+    tiff.close()
+
+
+@pytest.mark.parametrize("depth", [3, 5])
+def test_write_rgb_separate(tmp_path, depth):
+    arr = np.arange(depth * 5 * 6, dtype=np.uint16).reshape(depth, 5, 6)
+    fn = tmp_path / 'rgb_separate.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr, write_rgb=True)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetField('Photometric') == lt.PHOTOMETRIC_RGB
+    assert tiff.GetField('PlanarConfig') == lt.PLANARCONFIG_SEPARATE
+    assert tiff.GetField('SamplesPerPixel') == depth
+    assert tiff.NumberOfStrips() == depth
+    np.testing.assert_array_equal(tiff.read_image(), arr)
+    tiff.close()
+
+
+def test_write_big_endian_file(tmp_path):
+    arr = np.arange(5 * 6, dtype=np.uint16).reshape(5, 6) * 257
+    fn = tmp_path / 'big_endian.tif'
+    tiff = lt.TIFF.open(fn, mode='wb')
+    tiff.write_image(arr)
+    tiff.close()
+    with open(fn, 'rb') as f:
+        assert f.read(4) == b'MM\x00*'
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.IsByteSwapped() == (sys.byteorder == 'little')
+    np.testing.assert_array_equal(tiff.read_image(), arr)
+    tiff.close()
+
+
+def test_strip_access(tmp_path):
+    arr = np.arange(4 * 10, dtype=np.uint8).reshape(4, 10)
+    fn = tmp_path / 'strips.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.GetMode() == os.O_RDONLY
+    assert tiff.FileName() == os.fsencode(fn)
+    assert tiff.NumberOfStrips() == 1
+    assert tiff.StripSize() == arr.nbytes
+    assert tiff.RawStripSize(0) == arr.nbytes
+    assert tiff.ScanlineSize() == 10
+    buf = np.zeros_like(arr)
+    assert tiff.ReadRawStrip(0, buf.ctypes.data, buf.nbytes) == arr.nbytes
+    np.testing.assert_array_equal(buf, arr)
+    line = np.zeros(10, np.uint8)
+    tiff.ReadScanline(line.ctypes.data, 2)
+    np.testing.assert_array_equal(line, arr[2])
+    tiff.close()
+
+
+def test_info(tmp_path):
+    fn = tmp_path / 'info.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.SetField('Artist', b'Some Body')
+    tiff.write_image(np.zeros((5, 6), np.uint16), compression='lzw')
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    info = tiff.info().splitlines()
+    tiff.close()
+    assert info[0] == 'filename: %s' % os.fsencode(fn)
+    assert "Artist: b'Some Body'" in info
+    assert 'ImageWidth: 6' in info
+    assert 'ImageLength: 5' in info
+    assert 'BitsPerSample: 16' in info
+    assert 'Compression: COMPRESSION_LZW' in info
+    assert 'PhotoMetric: PHOTOMETRIC_MINISBLACK' in info
+    assert 'Predictor: 2' in info
+
+
+@pytest.mark.parametrize(
+    ("value", "name"),
+    [
+        (lt.TIFFTAG_IMAGEWIDTH, 'TIFFTAG_IMAGEWIDTH'),
+        (lt.TIFFTAG_ARTIST, 'TIFFTAG_ARTIST'),
+        (123456, None),
+    ]
+)
+def test_get_tag_name(value, name):
+    assert lt.TIFF.get_tag_name(value) == name
+
+
+@pytest.mark.parametrize(
+    ("bits", "sample_format", "dtype"),
+    [
+        (8, None, np.uint8),
+        (16, lt.SAMPLEFORMAT_UINT, np.uint16),
+        (32, lt.SAMPLEFORMAT_INT, np.int32),
+        (64, lt.SAMPLEFORMAT_IEEEFP, np.float64),
+        (128, lt.SAMPLEFORMAT_COMPLEXIEEEFP, np.complex128),
+    ]
+)
+def test_get_numpy_type(bits, sample_format, dtype):
+    assert lt.TIFF.get_numpy_type(bits, sample_format) is dtype
+
+
+@pytest.mark.parametrize(("bits", "sample_format"), [(12, None), (8, lt.SAMPLEFORMAT_VOID)])
+def test_get_numpy_type_unsupported(bits, sample_format):
+    with pytest.raises(NotImplementedError):
+        lt.TIFF.get_numpy_type(bits, sample_format)
+
+
+def test_tiff3d_open_and_read_2d(tmp_path):
+    arr = np.arange(3 * 5 * 6, dtype=np.uint8).reshape(3, 5, 6)
+    fn = tmp_path / 'tiff3d.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_image(arr)
+    tiff.close()
+
+    tiff = lt.TIFF3D.open(fn)
+    assert isinstance(tiff, lt.TIFF3D)
+    np.testing.assert_array_equal(tiff.read_image(as3d=False), arr[0])
+    tiff.close()
+    # TIFF3D.open must not change what TIFF.open returns
+    tiff = lt.TIFF.open(fn)
+    assert type(tiff) is lt.TIFF
+    tiff.close()
+
+
+@pytest.mark.parametrize("planar", ['contig', 'separate'])
+def test_write_read_tiles_rgb(tmp_path, planar):
+    if planar == 'contig':
+        arr = np.arange(40 * 24 * 3, dtype=np.uint16).reshape(40, 24, 3)
+    else:
+        arr = np.arange(3 * 40 * 24, dtype=np.uint16).reshape(3, 40, 24)
+    fn = tmp_path / 'tiles_rgb.tif'
+    tiff = lt.TIFF.open(fn, mode='w')
+    tiff.write_tiles(arr, 16, 16, compression='lzw', write_rgb=True)
+    tiff.close()
+
+    tiff = lt.TIFF.open(fn)
+    assert tiff.IsTiled()
+    assert tiff.GetField('TileWidth') == 16
+    assert tiff.GetField('TileLength') == 16
+    np.testing.assert_array_equal(tiff.read_image(), arr)
+    np.testing.assert_array_equal(tiff.read_tiles(np.uint16), arr)
+    tiff.close()
+
+
+def test_read_tiles_not_tiled(tmp_path):
+    tiff = lt.TIFF.open(tmp_path / 'strips.tif', mode='w')
+    tiff.write_image(np.zeros((4, 4), np.uint8))
+    tiff.close()
+    tiff = lt.TIFF.open(tmp_path / 'strips.tif')
+    with pytest.raises(ValueError, match='TILEWIDTH'):
+        tiff.read_tiles()
+    with pytest.raises(ValueError, match='TILEWIDTH'):
+        tiff.read_one_tile(0, 0)
+    tiff.close()
