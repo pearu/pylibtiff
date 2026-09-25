@@ -524,6 +524,13 @@ tifftags = {
 
     TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda _d: _d.value)
     # offset to CZ_LSMINFO record
+
+    # Adding support for RAW images
+    TIFFTAG_CFAREPEATPATTERNDIM: (
+        ctypes.c_short * 2, lambda _d: _d.contents[:]),
+
+    TIFFTAG_CFAPATTERN: (ctypes.c_char_p, lambda _d: _d.value),
+
 }
 
 
