@@ -64,8 +64,10 @@ class TIFFentry:
 
     @property
     def offset_is_value(self):
+        if self.type_name == 'ASCII':
+            return not self.values
         return not self.values and self.count[0] == 1 and \
-            self.type_nbytes <= 4 and self.type_name != 'ASCII'
+            self.type_nbytes <= 4
 
     def __getitem__(self, index):
         if self.offset_is_value:
@@ -79,11 +81,19 @@ class TIFFentry:
             list(map(self.add_value, value))
         elif self.type_name == 'ASCII':
             value = str(value)
-            if self.count[0] == 0:
-                self.values.append(value)
+            encoded_value = value.encode('utf-8') + b'\x00'
+            total_len = len(encoded_value)
+            if total_len <= 4:
+                # Store in offset field
+                self.count[0] = total_len
+                self.offset.view(dtype='|S4')[0] = encoded_value.ljust(4, b'\x00')
             else:
-                self.values[0] += value
-            self.count[0] = len(self.values[0]) + 1
+                # Store in data area
+                if self.count[0] == 0:
+                    self.values.append(encoded_value)
+                else:
+                    self.values[0] += encoded_value
+                self.count[0] = len(self.values[0])
         elif self.type_nbytes <= 4:
             self.count[0] += 1
             if self.count[0] == 1:
@@ -119,11 +129,7 @@ class TIFFentry:
         # print(self.values)
         # print(dtype)
         if self.type_name == 'ASCII':
-            data = numpy.array([self.values[0] + '\0'])
-            # print(type(data), data)
-            data = numpy.array([self.values[0] + '\0'],
-                               dtype='|S{}'.format(len(self.values[0]) + 1)).view(dtype=numpy.ubyte)
-            # print(type(data), data)
+            data = numpy.frombuffer(self.values[0], dtype=numpy.ubyte)
             target[offset:offset + self.nbytes] = data
         else:
             for value in self.values:
