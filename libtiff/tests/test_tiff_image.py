@@ -184,7 +184,6 @@ def test_description(tmp_path):
 
 
 @darwin_mmap_resize
-@pytest.mark.xfail(strict=True, reason="TIFFimage writes ASCII values of up to 4 bytes out of line instead of inline")
 def test_short_description(tmp_path):
     fn = str(tmp_path / 'description.tif')
     TIFFimage(zeros((2, 3), uint8), description='abc').write_file(fn)
