@@ -7,6 +7,7 @@ from numpy import (uint8, uint16, uint32, uint64, int8, int16, int32,
                    int64, float32, float64, array, zeros, dtype,
                    complex64, complex128, issubdtype, integer)
 from libtiff import TIFFfile, TIFFimage, TIFF
+from libtiff.tiff_image import TIFFentry
 
 import pytest
 
@@ -203,6 +204,25 @@ def test_short_description(tmp_path, description, expected):
     tif.close()
     tif = TIFFfile(fn)
     assert tif.IFD[0].get_value('ImageDescription') == expected + b'\x00'
+    tif.close()
+
+
+@darwin_mmap_resize
+@pytest.mark.parametrize("description", ["", "a", "ab", "abc"])
+@pytest.mark.parametrize("pages", [1, 3])
+def test_read_old_pylibtiff_short_description(tmp_path, monkeypatch, description, pages):
+    def old_offset_is_value(self):
+        # pylibtiff <= 0.7 never stored ASCII values inline
+        return not self.values and self.count[0] == 1 and self.type_nbytes <= 4 and self.type_name != 'ASCII'
+
+    monkeypatch.setattr(TIFFentry, 'offset_is_value', property(old_offset_is_value))
+    fn = str(tmp_path / 'old_description.tif')
+    TIFFimage([zeros((2, 3), uint8)] * pages, description=description).write_file(fn)
+    monkeypatch.undo()
+    tif = TIFFfile(fn)
+    assert tif.IFD[0].get('ImageDescription').offset is not None
+    assert tif.IFD[0].get_value('ImageDescription') == description.encode() + b'\x00'
+    assert tif.IFD[0].get_value('Software') == b'http://code.google.com/p/pylibtiff/\x00'
     tif.close()
 
 

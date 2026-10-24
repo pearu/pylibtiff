@@ -157,6 +157,7 @@ class TIFFfile(TiffBase):
         n = self.get_uint16(IFD0)
         IFD_list = []
         IFD_offset = IFD0
+        IFD_end = 0
         while IFD_offset:
             n = self.get_uint16(IFD_offset)
             ifd = IFD(self)
@@ -168,6 +169,7 @@ class TIFFfile(TiffBase):
                     exif_offset = entry.value
             ifd.finalize()
             IFD_list.append(ifd)
+            IFD_end = max(IFD_end, IFD_offset + 2 + n * 12 + 4)
             self.memory_usage.append((IFD_offset, IFD_offset + 2 + n * 12 + 4,
                                       'IFD%s entries(%s)' % (
                                           len(IFD_list), len(ifd))))
@@ -181,11 +183,46 @@ class TIFFfile(TiffBase):
                 sys.stdout.flush()
 
         self.IFD = IFD_list
+        if IFD_list:
+            self._fix_old_pylibtiff_description(IFD_end)
         if verbose:
             sys.stdout.write(' done\n')
             sys.stdout.flush()
 
         self.time = None
+
+    def _fix_old_pylibtiff_description(self, IFD_end):
+        """Read a short ImageDescription written by pylibtiff <= 0.7.
+
+        Those versions stored ASCII values of up to 4 bytes out of line,
+        right after the IFDs, instead of inline in the offset field.
+        Only such a layout is accepted: the offset field must point at
+        the start of the description's data and the next out-of-line
+        value must follow it immediately.
+        """
+        ifd = self.IFD[0]
+        software = ifd.get('Software')
+        if software is None or getattr(software, 'value', None) != \
+                b'http://code.google.com/p/pylibtiff/\x00':
+            return
+        entry = ifd.get('ImageDescription')
+        if entry is None or entry.type_name != 'ASCII' or not 1 <= entry.count <= 4:
+            return
+        index = ifd.entries.index(entry)
+        start = IFD_end
+        for e in ifd.entries[:index]:
+            if e.offset is not None:
+                start = max(start, e.offset + e.bytes * e.count)
+        offset = int(self.get_uint32(self.IFD0 + 2 + index * 12 + 8))
+        end = offset + int(entry.count)
+        if offset != start or end > self.data.nbytes or self.data[end - 1] != 0:
+            return
+        following = [e.offset for e in ifd.entries[index + 1:] if e.offset is not None]
+        if not following or min(following) != end:
+            return
+        entry.offset = offset
+        entry.value = self.get_string(offset, entry.count)
+        entry.memory_usage = [(offset, end, entry.tag_name)]
 
     def set_time(self, time):
         self.time = time
