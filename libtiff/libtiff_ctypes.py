@@ -15,7 +15,7 @@ import numpy as np
 import ctypes
 import ctypes.util
 import struct
-import collections
+import collections.abc
 import locale
 import warnings
 
@@ -42,9 +42,9 @@ try:
             # try default installation path:
             lib = r'C:\Program Files\GnuWin32\bin\libtiff3.dll'
             if os.path.isfile(lib):
-                print('You should add %r to PATH environment'
-                      ' variable and reboot.'
-                      % (os.path.dirname(lib)))
+                warnings.warn('You should add %r to PATH environment'
+                              ' variable and reboot.'
+                              % (os.path.dirname(lib)), stacklevel=2)
             else:
                 lib = None
     else:
@@ -79,6 +79,8 @@ i = libtiff_version_str.lower().split().index(b'version')
 assert i != -1, repr(libtiff_version_str.decode())
 libtiff_version = libtiff_version_str.split()[i + 1].decode()
 libtiff_version_tuple = tuple(int(i) for i in libtiff_version.split('.'))
+if libtiff_version_tuple < (4, 0):
+    raise ImportError('libtiff >= 4.0 is required, found %s' % libtiff_version)
 
 tiff_h_name = 'tiff_h_%s' % (libtiff_version.replace('.', '_'))
 try:
@@ -222,7 +224,7 @@ class c_tsize_t(ctypes.c_ssize_t):
     pass
 
 
-class c_toff_t(ctypes.c_int32):
+class c_toff_t(ctypes.c_uint64):
     pass
 
 
@@ -341,13 +343,20 @@ class TIFFExtender(object):
 
         # ctypes callback function prototype (return void, arguments void
         # pointer)
-        self.EXT_FUNC = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+        self.EXT_FUNC = TIFFExtendProc
         # ctypes callback function instance
         self.EXT_FUNC_INST = self.EXT_FUNC(extender_pyfunc)
 
-        libtiff.TIFFSetTagExtender.restype = ctypes.CFUNCTYPE(None,
-                                                              ctypes.c_void_p)
         self._ParentExtender = libtiff.TIFFSetTagExtender(self.EXT_FUNC_INST)
+        # libtiff keeps a raw pointer to the callback (which chains to the
+        # previous extenders), so it must never be garbage-collected.
+        _extenders.append(self)
+
+
+# ctypes callback function prototype of TIFFExtendProc
+TIFFExtendProc = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+# Registry keeping every TIFFExtender alive for the lifetime of the process
+_extenders = []
 
 
 def add_tags(tag_list):
@@ -362,7 +371,8 @@ def add_tags(tag_list):
     Returns
     -------
         TIFFExtender: the new function that will be used by libtiff to support
-        the new custom tags.
+        the new custom tags. It is kept alive internally, so the caller does
+        not need to hold a reference to it.
     """
     tag_list_array = (TIFFFieldInfo * len(tag_list))(*tag_list)
     for field_info in tag_list_array:
@@ -459,21 +469,19 @@ tifftags = {
     TIFFTAG_IMAGEDEPTH: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_IMAGEWIDTH: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_IMAGELENGTH: (ctypes.c_uint32, lambda _d: _d.value),
-    TIFFTAG_SAMPLESPERPIXEL: (ctypes.c_uint32, lambda _d: _d.value),
+    TIFFTAG_SAMPLESPERPIXEL: (ctypes.c_uint16, lambda _d: _d.value),
     TIFFTAG_ROWSPERSTRIP: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_SUBFILETYPE: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_TILEDEPTH: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_TILELENGTH: (ctypes.c_uint32, lambda _d: _d.value),
     TIFFTAG_TILEWIDTH: (ctypes.c_uint32, lambda _d: _d.value),
 
-    TIFFTAG_STRIPBYTECOUNTS: (
-        ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
-    TIFFTAG_STRIPOFFSETS: (
-        ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
-    TIFFTAG_TILEBYTECOUNTS: (
-        ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
-    TIFFTAG_TILEOFFSETS: (
-        ctypes.POINTER(ctypes.c_uint32), lambda _d: _d.contents),
+    # uint64* arrays with one element per strip/tile, the conversion to a list
+    # is done in GetField as it needs the number of strips/tiles
+    TIFFTAG_STRIPBYTECOUNTS: (ctypes.POINTER(ctypes.c_uint64), None),
+    TIFFTAG_STRIPOFFSETS: (ctypes.POINTER(ctypes.c_uint64), None),
+    TIFFTAG_TILEBYTECOUNTS: (ctypes.POINTER(ctypes.c_uint64), None),
+    TIFFTAG_TILEOFFSETS: (ctypes.POINTER(ctypes.c_uint64), None),
     # Contrarily to the libtiff documentation, in libtiff 4.0, the
     # SubIFD array is always 64-bits
     TIFFTAG_SUBIFD: (
@@ -522,9 +530,14 @@ tifftags = {
     TIFFTAG_WHITEPOINT: (ctypes.c_float * 2, lambda _d: _d.contents[:]),
     TIFFTAG_YCBCRCOEFFICIENTS: (ctypes.c_float * 3, lambda _d: _d.contents[:]),
 
-    TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda _d: _d.value)
-    # offset to CZ_LSMINFO record
+    # CZ_LSMINFO is unknown to libtiff, so it is read as an anonymous
+    # variable length field: uint32* count and uint8** data (CZ_LSMInfo record)
+    TIFFTAG_CZ_LSMINFO: ((ctypes.c_uint32, ctypes.c_ubyte),
+                         lambda d: bytes(d[1][:d[0]]))
 }
+
+_strile_array_tags = (TIFFTAG_STRIPBYTECOUNTS, TIFFTAG_STRIPOFFSETS,
+                      TIFFTAG_TILEBYTECOUNTS, TIFFTAG_TILEOFFSETS)
 
 
 def debug(func):
@@ -579,8 +592,11 @@ class TIFF(ctypes.c_void_p):
     @staticmethod
     def get_tag_define(tagname):
         if '_' in tagname:
-            kind, _name = tagname.rsplit('_', 1)
-            return name_to_define_map[kind.title()][tagname.upper()]
+            for kind in name_to_define_map:
+                if tagname.upper().startswith(kind.upper() + '_'):
+                    tagvalue = name_to_define_map[kind].get(tagname.upper())
+                    if tagvalue is not None:
+                        return tagvalue
         for kind in define_to_name_map:
             tagvalue = name_to_define_map[kind].get(
                 (kind + '_' + tagname).upper())
@@ -738,6 +754,9 @@ class TIFF(ctypes.c_void_p):
         compression = self._fix_compression(compression)
 
         arr = np.ascontiguousarray(arr)
+        if not arr.dtype.isnative:
+            # libtiff expects the data in native byte order
+            arr = arr.astype(arr.dtype.newbyteorder('='))
         if np.issubdtype(arr.dtype, np.floating):
             sample_format = SAMPLEFORMAT_IEEEFP
         elif np.issubdtype(arr.dtype, np.unsignedinteger) or np.issubdtype(arr.dtype, np.bool_):
@@ -751,20 +770,23 @@ class TIFF(ctypes.c_void_p):
         shape = arr.shape
         bits = arr.itemsize * 8
 
-        self.SetField(TIFFTAG_COMPRESSION, compression)
-        if compression == COMPRESSION_LZW and sample_format in \
-                [SAMPLEFORMAT_INT, SAMPLEFORMAT_UINT]:
-            # This field can only be set after compression and before
-            # writing data. Horizontal predictor often improves compression,
-            # but some rare readers might support LZW only without predictor.
-            self.SetField(TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL)
+        def set_common_fields():
+            self.SetField(TIFFTAG_COMPRESSION, compression)
+            if compression == COMPRESSION_LZW and sample_format in \
+                    [SAMPLEFORMAT_INT, SAMPLEFORMAT_UINT]:
+                # This field can only be set after compression and before
+                # writing data. Horizontal predictor often improves compression,
+                # but some rare readers might support LZW only without predictor.
+                self.SetField(TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL)
 
-        self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
-        self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
-        self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
+            self.SetField(TIFFTAG_BITSPERSAMPLE, bits)
+            self.SetField(TIFFTAG_SAMPLEFORMAT, sample_format)
+            self.SetField(TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT)
+
+        set_common_fields()
 
         if len(shape) == 1:
-            shape = (shape[0], 1)  # Same as 2D with height == 1
+            shape = (1, shape[0])  # Same as 2D with height == 1
 
         if len(shape) == 2:
             height, width = shape
@@ -811,6 +833,9 @@ class TIFF(ctypes.c_void_p):
                 depth, height, width = shape
                 size = width * height * arr.itemsize
                 for _n in range(depth):
+                    if _n > 0:
+                        # WriteDirectory resets all the fields
+                        set_common_fields()
                     self.SetField(TIFFTAG_IMAGEWIDTH, width)
                     self.SetField(TIFFTAG_IMAGELENGTH, height)
                     self.SetField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK)
@@ -825,6 +850,12 @@ class TIFF(ctypes.c_void_p):
                     compression=None, write_rgb=False):
         compression = self._fix_compression(compression)
 
+        arr = np.asarray(arr)
+        if not arr.dtype.isnative:
+            # libtiff expects the data in native byte order
+            arr = arr.astype(arr.dtype.newbyteorder('='))
+        if arr.ndim == 1:
+            arr = arr.reshape((1, -1))  # Same as 2D with height == 1
         if np.issubdtype(arr.dtype, np.floating):
             sample_format = SAMPLEFORMAT_IEEEFP
         elif np.issubdtype(arr.dtype, np.unsignedinteger) or np.issubdtype(arr.dtype, np.bool_):
@@ -862,8 +893,6 @@ class TIFF(ctypes.c_void_p):
         self.SetField(TIFFTAG_TILELENGTH, tile_height)
 
         total_written_bytes = 0
-        if len(shape) == 1:
-            shape = (shape[0], 1)  # Same as 2D with height == 1
 
         def write_plane(arr, tile_arr, width, height,
                         plane_index=0, depth_index=0):
@@ -920,12 +949,10 @@ class TIFF(ctypes.c_void_p):
                 self.SetField(TIFFTAG_PLANARCONFIG, planar_config)
                 if depth == 4:  # RGBA
                     self.SetField(TIFFTAG_EXTRASAMPLES,
-                                  [EXTRASAMPLE_UNASSALPHA],
-                                  count=1)
+                                  [EXTRASAMPLE_UNASSALPHA])
                 elif depth > 4:  # No idea...
                     self.SetField(TIFFTAG_EXTRASAMPLES,
-                                  [EXTRASAMPLE_UNSPECIFIED] * (depth - 3),
-                                  count=(depth - 3))
+                                  [EXTRASAMPLE_UNSPECIFIED] * (depth - 3))
 
                 if planar_config == PLANARCONFIG_CONTIG:
                     # if there is more than one sample per pixel and
@@ -1051,7 +1078,7 @@ class TIFF(ctypes.c_void_p):
             # the z parameter is not read
             r = self.ReadTile(tile_plane.ctypes.data, x, y,
                               depth_index, plane_index)
-            if not r:
+            if r < 0:
                 raise ValueError(
                     "Could not read tile x:%d,y:%d,z:%d,sample:%d from file" %
                     (x, y, depth_index, plane_index))
@@ -1139,11 +1166,11 @@ class TIFF(ctypes.c_void_p):
                 for x in range(0, num_icols, num_tcols):
                     r = self.ReadTile(tmp_tile.ctypes.data, x, y,
                                       depth_index, plane_index)
-                    if not r:
+                    if r < 0:
                         raise ValueError(
                             "Could not read tile x:%d,y:%d,z:%d,sample:%d"
                             " from file" %
-                            (x, y, plane_index, depth_index))
+                            (x, y, depth_index, plane_index))
 
                     # if the tile is on the edge, it is smaller
                     tile_width = min(num_tcols, num_icols - x)
@@ -1215,17 +1242,17 @@ class TIFF(ctypes.c_void_p):
 
     @debug
     def CurrentStrip(self):
-        return libtiff.TIFFCurrentStrip(self)
+        return libtiff.TIFFCurrentStrip(self).value
     currentstrip = CurrentStrip
 
     @debug
     def CurrentTile(self):
-        return libtiff.TIFFCurrentTile(self)
+        return libtiff.TIFFCurrentTile(self).value
     currenttile = CurrentTile
 
     @debug
     def CurrentDirectory(self):
-        return libtiff.TIFFCurrentDirectory(self)
+        return libtiff.TIFFCurrentDirectory(self).value
     currentdirectory = CurrentDirectory
 
     @debug
@@ -1241,7 +1268,8 @@ class TIFF(ctypes.c_void_p):
     @debug
     def WriteDirectory(self):
         r = libtiff.TIFFWriteDirectory(self)
-        assert r == 1, repr(r)
+        if r != 1:
+            raise IOError("Failed to write directory (TIFFWriteDirectory returned %r)" % (r,))
     writedirectory = WriteDirectory
 
     @debug
@@ -1315,6 +1343,11 @@ class TIFF(ctypes.c_void_p):
     numberofstrips = NumberOfStrips
 
     @debug
+    def NumberOfTiles(self):
+        return libtiff.TIFFNumberOfTiles(self).value
+    numberoftiles = NumberOfTiles
+
+    @debug
     def WriteScanline(self, buf, row, sample=0):
         return libtiff.TIFFWriteScanline(self, buf, row, sample)
     writescanline = WriteScanline
@@ -1348,13 +1381,15 @@ class TIFF(ctypes.c_void_p):
     @debug
     def WriteRawStrip(self, strip, buf, size):
         r = libtiff.TIFFWriteRawStrip(self, strip, buf, size)
-        assert r.value == size, repr((r.value, size))
+        if r.value != size:
+            raise IOError("Failed to write raw strip %d (wrote %d of %d bytes)" % (strip, r.value, size))
     writerawstrip = WriteRawStrip
 
     @debug
     def WriteEncodedStrip(self, strip, buf, size):
         r = libtiff.TIFFWriteEncodedStrip(self, strip, buf, size)
-        assert r.value == size, repr((r.value, size))
+        if r.value != size:
+            raise IOError("Failed to write encoded strip %d (wrote %d of %d bytes)" % (strip, r.value, size))
     writeencodedstrip = WriteEncodedStrip
 
     @debug
@@ -1386,7 +1421,7 @@ class TIFF(ctypes.c_void_p):
             -1 if it detects an error;
             otherwise the number of bytes in the decoded tile is returned.
         """
-        return libtiff.TIFFReadTile(self, buf, x, y, z, sample)
+        return libtiff.TIFFReadTile(self, buf, x, y, z, sample).value
 
     @debug
     def WriteTile(self, buf, x, y, z, sample):
@@ -1418,7 +1453,8 @@ class TIFF(ctypes.c_void_p):
             otherwise the number of bytes in the tile is returned.
         """
         r = libtiff.TIFFWriteTile(self, buf, x, y, z, sample)
-        assert r.value >= 0, repr(r.value)
+        if r.value < 0:
+            raise IOError("Failed to write tile x:%d,y:%d,z:%d,sample:%d" % (x, y, z, sample))
         return r
 
     closed = False
@@ -1446,30 +1482,35 @@ class TIFF(ctypes.c_void_p):
             _i = descr.find(tag.encode("ascii"))
             if _i == -1:
                 return
-            _value = eval(descr[_i + len(tag):].lstrip().split()[0])
-            return _value
+            _words = descr[_i + len(tag):].split()
+            if not _words:
+                return
+            try:
+                return float(_words[0])
+            except ValueError:
+                return
 
         if isinstance(tag, str):
             tag = globals()['TIFFTAG_' + tag.upper()]
         t = tifftags.get(tag)
         if t is None:
             if not ignore_undefined_tag:
-                print('Warning: no tag %r defined' % tag)
+                warnings.warn('No tag %r defined' % tag, stacklevel=2)
             return
         data_type, convert = t
 
         if tag == TIFFTAG_COLORMAP:
             bps = self.GetField("BitsPerSample")
             if bps is None:
-                print(
-                    "Warning: BitsPerSample is required to get ColorMap, "
-                    "assuming 8 bps...")
+                warnings.warn(
+                    "BitsPerSample is required to get ColorMap, "
+                    "assuming 8 bps...", stacklevel=2)
                 bps = 8
             elif bps > 16:
                 # There is no way to check whether a field is present without
                 # passing all the arguments. With more than 16 bits, it'd be a
                 # lot of memory needed (and COLORMAP is very unlikely).
-                print("Not trying to read COLORMAP tag with %d bits" % (bps,))
+                warnings.warn("Not trying to read COLORMAP tag with %d bits" % (bps,), stacklevel=2)
                 return None
 
             num_cmap_elems = 1 << bps
@@ -1512,10 +1553,15 @@ class TIFF(ctypes.c_void_p):
                                          count, ctypes.byref(data))
         if not r:  # tag not defined for current directory
             if not ignore_undefined_tag:
-                print(
-                    'Warning: tag %r not defined in currect directory' % tag)
+                warnings.warn(
+                    'Tag %r not defined in current directory' % tag, stacklevel=2)
             return None
 
+        if tag in _strile_array_tags:
+            # copy the libtiff-owned array, one element per strip/tile
+            if self.IsTiled():
+                return data[:self.NumberOfTiles()]
+            return data[:self.NumberOfStrips()]
         return convert(data)
 
     # @debug
@@ -1526,13 +1572,13 @@ class TIFF(ctypes.c_void_p):
         string containing <tagname>.
         """
         if count is not None:
-            print("Warning: count argument is deprecated")
+            warnings.warn("count argument is deprecated", DeprecationWarning, stacklevel=2)
 
         if isinstance(tag, str):
             tag = globals()['TIFFTAG_' + tag.upper()]
         t = tifftags.get(tag)
         if t is None:
-            print('Warning: no tag %r defined' % tag)
+            warnings.warn('No tag %r defined' % tag, stacklevel=2)
             return
         data_type, convert = t
         if data_type == ctypes.c_float:
@@ -1547,18 +1593,15 @@ class TIFF(ctypes.c_void_p):
             try:
                 r_arr, g_arr, b_arr = _value
             except (TypeError, ValueError):
-                print(
-                    "Error: TIFFTAG_COLORMAP expects 3 uint16* arrays as a "
-                    "list/tuple of lists")
-                r_arr, g_arr, b_arr = None, None, None
-            if r_arr is None:
-                return
+                raise ValueError(
+                    "TIFFTAG_COLORMAP expects 3 uint16* arrays as a "
+                    "list/tuple of lists") from None
 
             bps = self.GetField("BitsPerSample")
             if bps is None:
-                print(
-                    "Warning: BitsPerSample is required to get ColorMap, "
-                    "assuming 8 bps...")
+                warnings.warn(
+                    "BitsPerSample is required to get ColorMap, "
+                    "assuming 8 bps...", stacklevel=2)
                 bps = 8
             num_cmap_elems = 1 << bps
             data_type *= num_cmap_elems
@@ -1578,13 +1621,12 @@ class TIFF(ctypes.c_void_p):
                 data = data_type(*_value)
             elif issubclass(data_type,
                             ctypes._Pointer):  # does not include c_char_p
-                # convert to the base type, ctypes will take care of actually
-                # sending it by reference
+                # convert to an array of the base type, which ctypes passes
+                # as a pointer to its first element
                 base_type = data_type._type_
-                if isinstance(_value, collections.Iterable):
-                    data = base_type(*_value)
-                else:
-                    data = base_type(_value)
+                if not isinstance(_value, collections.abc.Iterable):
+                    _value = [_value]
+                data = (base_type * len(_value))(*_value)
             else:
                 data = data_type(_value)
 
@@ -1628,11 +1670,11 @@ class TIFF(ctypes.c_void_p):
                         ]:
             v = self.GetField(tagname)
             if v:
+                if tagname == 'CZ_LSMInfo':
+                    v = CZ_LSMInfo(self)
                 if isinstance(v, int):
                     v = define_to_name_map.get(tagname, {}).get(v, v)
                 _l.append('%s: %s' % (tagname, v))
-                if tagname == 'CZ_LSMInfo':
-                    print(CZ_LSMInfo(self))
         return '\n'.join(_l)
 
     def copy(self, filename, **kws):
@@ -1655,7 +1697,9 @@ class TIFF(ctypes.c_void_p):
         define_rewrite = {}
         for _name, _value in list(kws.items()):
             define = TIFF.get_tag_define(_name)
-            assert define is not None
+            if define is None:
+                other.close()
+                raise ValueError('Unknown tag %r' % (_name,))
             if _name == 'compression':
                 _value = TIFF._fix_compression(_value)
             if _name == 'sampleformat':
@@ -1663,12 +1707,12 @@ class TIFF(ctypes.c_void_p):
             define_rewrite[define] = _value
         name_define_list = list(name_to_define_map['TiffTag'].items())
         self.SetDirectory(0)
-        self.ReadDirectory()
         while 1:
-            other.SetDirectory(self.CurrentDirectory())
             bits = self.GetField('BitsPerSample')
             sample_format = self.GetField('SampleFormat')
-            assert bits >= 8, repr((bits, sample_format))
+            if bits is None or bits < 8:
+                other.close()
+                raise NotImplementedError(repr((bits, sample_format)))
             itemsize = bits // 8
             dtype = self.get_numpy_type(bits, sample_format)
             for _name, define in name_define_list:
@@ -1694,9 +1738,10 @@ class TIFF(ctypes.c_void_p):
                 other.SetField(define, _value)
             new_bits = other.GetField('BitsPerSample')
             new_sample_format = other.GetField('SampleFormat')
+            if new_bits is None or new_bits < 8:
+                other.close()
+                raise NotImplementedError(repr((new_bits, new_sample_format)))
             new_dtype = other.get_numpy_type(new_bits, new_sample_format)
-            assert new_bits >= 8, repr(
-                (new_bits, new_sample_format, new_dtype))
             new_itemsize = new_bits // 8
             strip_size = self.StripSize()
             buf = np.zeros(strip_size // itemsize, dtype)
@@ -1707,10 +1752,12 @@ class TIFF(ctypes.c_void_p):
                     new_buf = buf.astype(new_dtype)
                     other.WriteEncodedStrip(strip, new_buf.ctypes.data,
                                             (elem * new_itemsize) // itemsize)
-            self.ReadDirectory()
+            other.WriteDirectory()
             if self.LastDirectory():
                 break
+            self.ReadDirectory()
         other.close()
+        self.SetDirectory(0)
 
 
 class TIFF3D(TIFF):
@@ -1775,18 +1822,7 @@ class TIFF3D(TIFF):
         compression = self.GetField('Compression')
 
         typ = self.get_numpy_type(bits, sample_format)
-
-        if typ is None:
-            if bits == 1:
-                typ = np.uint8
-                itemsize = 1
-            elif bits == 4:
-                typ = np.uint32
-                itemsize = 4
-            else:
-                raise NotImplementedError(repr(bits))
-        else:
-            itemsize = bits / 8
+        itemsize = bits // 8
 
         # in order to allocate the numpy array, we must count the directories:
         # code borrowed from TIFF.iter_images():
@@ -1807,14 +1843,13 @@ class TIFF3D(TIFF):
         layer = 0
         while True:
             pos = 0
-            elem = None
             datal = arr.ctypes.data + layer * layer_size
             for strip in range(self.NumberOfStrips()):
-                if elem is None:
-                    elem = self.ReadEncodedStrip(strip, datal + pos, layer_size)
-                elif elem:
-                    elem = self.ReadEncodedStrip(strip, datal + pos,
-                                                 min(layer_size - pos, elem))
+                elem = self.ReadEncodedStrip(strip, datal + pos,
+                                             max(layer_size - pos, 0))
+                if elem <= 0:
+                    raise IOError("Failed to read strip %d of directory %d"
+                                  % (strip, layer))
                 pos += elem
             if self.LastDirectory():
                 break
@@ -1828,34 +1863,23 @@ class CZ_LSMInfo:
     def __init__(self, tiff):
         self.tiff = tiff
         self.filename = tiff.filename()
-        self.offset = tiff.GetField(TIFFTAG_CZ_LSMINFO)
+        # raw bytes of the CZ_LSMInfo record (None if not present)
+        self.data = tiff.GetField(TIFFTAG_CZ_LSMINFO)
+        self.magic_number = None
+        self.structure_size = None
         self.extract_info()
 
     def extract_info(self):
-        if self.offset is None:
+        if self.data is None or len(self.data) < 8:
             return
-        _f = libtiff.TIFFFileno(self.tiff)
-        fd = os.fdopen(_f, 'r')
-        pos = fd.tell()
-        self.offset = self.tiff.GetField(TIFFTAG_CZ_LSMINFO)
-        print(os.lseek(_f, 0, 1))
-
-        print(pos)
-        # print libtiff.TIFFSeekProc(self.tiff, 0, 1)
-        fd.seek(0)
-        print(struct.unpack('HH', fd.read(4)))
-        print(struct.unpack('I', fd.read(4)))
-        print(struct.unpack('H', fd.read(2)))
-        fd.seek(self.offset)
-        _d = [('magic_number', 'i4'),
-              ('structure_size', 'i4')]
-        print(pos, np.rec.fromfile(fd, _d, 1))
-        fd.seek(pos)
-        # print hex (struct.unpack('I', fd.read (4))[0])
-        # fd.close()
+        # The record has the byte order of the TIFF file
+        file_is_big_endian = bool(self.tiff.IsByteSwapped()) != (sys.byteorder == 'big')
+        byteorder = '>' if file_is_big_endian else '<'
+        self.magic_number, self.structure_size = struct.unpack(byteorder + 'ii', self.data[:8])
 
     def __str__(self):
-        return '%s: %s' % (self.filename, self.offset)
+        return '%s: magic_number=%s, structure_size=%s' % (
+            self.filename, self.magic_number, self.structure_size)
 
 
 libtiff.TIFFOpen.restype = TIFF
@@ -1995,9 +2019,8 @@ libtiff.TIFFWriteTile.argtypes = [TIFF, c_tdata_t, ctypes.c_uint32,
                                   ctypes.c_uint32, ctypes.c_uint32,
                                   c_tsample_t]
 
-libtiff.TIFFReadEncodedTile.restype = ctypes.c_int
-libtiff.TIFFReadEncodedTile.argtypes = [TIFF, ctypes.c_ulong, ctypes.c_char_p,
-                                        ctypes.c_ulong]
+libtiff.TIFFReadEncodedTile.restype = c_tsize_t
+libtiff.TIFFReadEncodedTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
 
 libtiff.TIFFReadRawTile.restype = c_tsize_t
 libtiff.TIFFReadRawTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
@@ -2013,7 +2036,11 @@ libtiff.TIFFWriteRawTile.restype = c_tsize_t
 libtiff.TIFFWriteRawTile.argtypes = [TIFF, c_ttile_t, c_tdata_t, c_tsize_t]
 
 libtiff.TIFFDefaultTileSize.restype = None
-libtiff.TIFFDefaultTileSize.argtypes = [TIFF, ctypes.c_uint32, ctypes.c_uint32]
+libtiff.TIFFDefaultTileSize.argtypes = [TIFF, ctypes.POINTER(ctypes.c_uint32),
+                                        ctypes.POINTER(ctypes.c_uint32)]
+
+libtiff.TIFFSetTagExtender.restype = TIFFExtendProc
+libtiff.TIFFSetTagExtender.argtypes = [TIFFExtendProc]
 
 libtiff.TIFFClose.restype = None
 libtiff.TIFFClose.argtypes = [TIFF]
@@ -2028,14 +2055,30 @@ TIFFErrorHandler = ctypes.CFUNCTYPE(None,
                                     ctypes.c_char_p,  # Format
                                     ctypes.c_void_p)  # va_list
 
+libtiff.TIFFSetWarningHandler.restype = TIFFWarningHandler
+libtiff.TIFFSetWarningHandler.argtypes = [TIFFWarningHandler]
+
+libtiff.TIFFSetErrorHandler.restype = TIFFErrorHandler
+libtiff.TIFFSetErrorHandler.argtypes = [TIFFErrorHandler]
+
 # This has to be at module scope so it is not garbage-collected
 _null_warning_handler = TIFFWarningHandler(lambda module, fmt, va_list: None)
 _null_error_handler = TIFFErrorHandler(lambda module, fmt, va_list: None)
 
 
 def suppress_warnings():
-    libtiff.TIFFSetWarningHandler(_null_warning_handler)
+    """Silence libtiff warnings.
+
+    Returns the previous handler, which can be restored with
+    ``libtiff.TIFFSetWarningHandler(previous)``.
+    """
+    return libtiff.TIFFSetWarningHandler(_null_warning_handler)
 
 
 def suppress_errors():
-    libtiff.TIFFSetErrorHandler(_null_error_handler)
+    """Silence libtiff errors.
+
+    Returns the previous handler, which can be restored with
+    ``libtiff.TIFFSetErrorHandler(previous)``.
+    """
+    return libtiff.TIFFSetErrorHandler(_null_error_handler)
