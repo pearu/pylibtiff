@@ -154,7 +154,6 @@ def test_read_rgb_ctypes_file(tmp_path):
     tif.close()
 
 
-@pytest.mark.xfail(strict=True, reason="IFD entries with count > 1 that fit in 4 bytes are not read inline")
 def test_read_inline_ascii_value(tmp_path):
     image = numpy.zeros((2, 3), uint8)
     tif = TIFF.open(tmp_path / 'artist.tif', 'w')

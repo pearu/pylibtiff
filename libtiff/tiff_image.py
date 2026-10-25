@@ -64,11 +64,15 @@ class TIFFentry:
 
     @property
     def offset_is_value(self):
+        if self.type_name == 'ASCII':
+            # ASCII values (including the NUL terminator) of up to 4 bytes
+            # are stored inline in the offset field.
+            return self.count[0] <= 4
         return not self.values and self.count[0] == 1 and \
-            self.type_nbytes <= 4 and self.type_name != 'ASCII'
+            self.type_nbytes <= 4
 
     def __getitem__(self, index):
-        if self.offset_is_value:
+        if self.offset_is_value and self.type_name != 'ASCII':
             if index > 0:
                 raise IndexError(repr(index))
             return self.offset[0]
@@ -78,12 +82,18 @@ class TIFFentry:
         if isinstance(value, (list, tuple)):
             list(map(self.add_value, value))
         elif self.type_name == 'ASCII':
-            value = str(value)
-            if self.count[0] == 0:
-                self.values.append(value)
+            # values[0] holds the whole string as bytes with a single
+            # trailing NUL; repeated calls concatenate.
+            encoded = str(value).encode('utf-8')
+            if self.values:
+                self.values[0] = self.values[0][:-1] + encoded + b'\x00'
             else:
-                self.values[0] += value
-            self.count[0] = len(self.values[0]) + 1
+                self.values.append(encoded + b'\x00')
+            self.count[0] = len(self.values[0])
+            # Keep the inline copy in sync; write_file overwrites it with
+            # the data offset when the string does not fit.
+            self.offset.view(dtype='|S4')[0] = self.values[0][:4].ljust(
+                4, b'\x00') if self.count[0] <= 4 else b''
         elif self.type_nbytes <= 4:
             self.count[0] += 1
             if self.count[0] == 1:
@@ -119,11 +129,7 @@ class TIFFentry:
         # print(self.values)
         # print(dtype)
         if self.type_name == 'ASCII':
-            data = numpy.array([self.values[0] + '\0'])
-            # print(type(data), data)
-            data = numpy.array([self.values[0] + '\0'],
-                               dtype='|S{}'.format(len(self.values[0]) + 1)).view(dtype=numpy.ubyte)
-            # print(type(data), data)
+            data = numpy.frombuffer(self.values[0], dtype=numpy.ubyte)
             target[offset:offset + self.nbytes] = data
         else:
             for value in self.values:
