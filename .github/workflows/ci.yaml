@@ -66,7 +66,9 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v4
         with:
-          miniforge-version: 26.7.2-0  # 26.9.4-0 breaks `conda init` on Windows
+          # Miniforge3 26.9.4-0: `conda init --all` fails on Windows
+          # (conda-forge/miniforge#913)
+          miniforge-version: ${{ runner.os == 'Windows' && '26.7.2-1' || 'latest' }}
           conda-remove-defaults: true
           channels: conda-forge
           python-version: ${{ matrix.python-version }}
