@@ -522,16 +522,28 @@ tifftags = {
     TIFFTAG_WHITEPOINT: (ctypes.c_float * 2, lambda _d: _d.contents[:]),
     TIFFTAG_YCBCRCOEFFICIENTS: (ctypes.c_float * 3, lambda _d: _d.contents[:]),
 
-    TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda _d: _d.value)
+    TIFFTAG_CZ_LSMINFO: (c_toff_t, lambda _d: _d.value),
     # offset to CZ_LSMINFO record
 
-    # Adding support for RAW images
-    TIFFTAG_CFAREPEATPATTERNDIM: (
-        ctypes.c_short * 2, lambda _d: _d.contents[:]),
-
-    TIFFTAG_CFAPATTERN: (ctypes.c_char_p, lambda _d: _d.value),
-
+    # Color filter array (CFA) tags of TIFF/EP and DNG raw images
+    TIFFTAG_CFAPLANECOLOR: (
+        (ctypes.c_uint16, ctypes.c_uint8),
+        lambda d: d[1][:d[0]]),  # uint16*, uint8**  count & colors array
+    TIFFTAG_CFALAYOUT: (ctypes.c_uint16, lambda _d: _d.value),
 }
+
+# libtiff defines CFARepeatPatternDim and CFAPattern since 4.0.4;
+# CFAPattern has 4 values before 4.2.0 and a variable count since.
+if libtiff_version_tuple >= (4, 0, 4):
+    tifftags[TIFFTAG_CFAREPEATPATTERNDIM] = (
+        ctypes.c_uint16 * 2, lambda _d: _d.contents[:])
+    if libtiff_version_tuple >= (4, 2, 0):
+        tifftags[TIFFTAG_CFAPATTERN] = (
+            (ctypes.c_uint16, ctypes.c_uint8),
+            lambda d: d[1][:d[0]])  # uint16*, uint8**  count & pattern array
+    else:
+        tifftags[TIFFTAG_CFAPATTERN] = (
+            ctypes.c_uint8 * 4, lambda _d: _d.contents[:])
 
 
 def debug(func):

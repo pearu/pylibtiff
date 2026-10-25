@@ -443,6 +443,51 @@ def test_tags_read(tmp_path):
     print("Tag Read: SUCCESS")
 
 
+def test_cfa_tags(tmp_path):
+    if lt.libtiff_version_tuple < (4, 0, 4):
+        pytest.skip("libtiff < 4.0.4 has no CFARepeatPatternDim/CFAPattern")
+    filename = tmp_path / 'libtiff_cfa_tags.tiff'
+    tiff = lt.TIFF.open(filename, mode='w')
+    assert tiff.SetField("CFARepeatPatternDim", [2, 2]) == 1
+    # RGGB, the leading 0 (red) must survive the round-trip
+    assert tiff.SetField("CFAPattern", [0, 1, 1, 2]) == 1
+    assert tiff.SetField("CFAPlaneColor", [0, 1, 2]) == 1
+    assert tiff.SetField("CFALayout", 1) == 1
+    tiff.write_image(np.arange(16, dtype=np.uint16).reshape(4, 4))
+    tiff.close()
+
+    tiff = lt.TIFF.open(filename)
+    assert tiff.GetField("CFARepeatPatternDim") == [2, 2]
+    assert tiff.GetField("CFAPattern") == [0, 1, 1, 2]
+    assert tiff.GetField("CFAPlaneColor") == [0, 1, 2]
+    assert tiff.GetField("CFALayout") == 1
+    tiff.close()
+
+
+def test_cfa_pattern_variable_count(tmp_path):
+    if lt.libtiff_version_tuple < (4, 2, 0):
+        pytest.skip("libtiff < 4.2.0 fixes CFAPattern at 4 values")
+    # A 6x6 (X-Trans style) pattern: 36 values, so it cannot pass through
+    # the fixed 4-value form that older libtiff versions use.
+    pattern = [0, 1, 0, 2, 1, 2,
+               1, 2, 1, 1, 0, 1,
+               1, 0, 1, 1, 2, 1,
+               2, 1, 2, 0, 1, 0,
+               1, 0, 1, 1, 2, 1,
+               1, 2, 1, 1, 0, 1]
+    filename = tmp_path / 'libtiff_cfa_pattern_6x6.tiff'
+    tiff = lt.TIFF.open(filename, mode='w')
+    assert tiff.SetField("CFARepeatPatternDim", [6, 6]) == 1
+    assert tiff.SetField("CFAPattern", pattern) == 1
+    tiff.write_image(np.arange(36, dtype=np.uint16).reshape(6, 6))
+    tiff.close()
+
+    tiff = lt.TIFF.open(filename)
+    assert tiff.GetField("CFARepeatPatternDim") == [6, 6]
+    assert tiff.GetField("CFAPattern") == pattern
+    tiff.close()
+
+
 def test_write(tmp_path):
     tiff = lt.TIFF.open(tmp_path / 'libtiff_test_write.tiff', mode='w')
     arr = np.zeros((5, 6), np.uint32)
