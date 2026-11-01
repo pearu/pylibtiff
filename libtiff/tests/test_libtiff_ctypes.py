@@ -444,8 +444,8 @@ def test_tags_read(tmp_path):
 
 
 def test_cfa_tags(tmp_path):
-    if lt.libtiff_version_tuple < (4, 0, 4):
-        pytest.skip("libtiff < 4.0.4 has no CFARepeatPatternDim/CFAPattern")
+    if lt.TIFFTAG_CFAREPEATPATTERNDIM not in lt.tifftags:
+        pytest.skip("libtiff %s has no CFARepeatPatternDim/CFAPattern" % lt.libtiff_version)
     filename = tmp_path / 'libtiff_cfa_tags.tiff'
     tiff = lt.TIFF.open(filename, mode='w')
     assert tiff.SetField("CFARepeatPatternDim", [2, 2]) == 1
@@ -465,6 +465,8 @@ def test_cfa_tags(tmp_path):
 
 
 def test_cfa_pattern_variable_count(tmp_path):
+    if lt.TIFFTAG_CFAREPEATPATTERNDIM not in lt.tifftags:
+        pytest.skip("libtiff %s has no CFARepeatPatternDim/CFAPattern" % lt.libtiff_version)
     if lt.libtiff_version_tuple < (4, 2, 0):
         pytest.skip("libtiff < 4.2.0 fixes CFAPattern at 4 values")
     # A 6x6 (X-Trans style) pattern: 36 values, so it cannot pass through

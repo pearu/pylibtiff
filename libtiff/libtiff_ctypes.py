@@ -532,9 +532,10 @@ tifftags = {
     TIFFTAG_CFALAYOUT: (ctypes.c_uint16, lambda _d: _d.value),
 }
 
-# libtiff defines CFARepeatPatternDim and CFAPattern since 4.0.4;
+# libtiff defines CFARepeatPatternDim and CFAPattern since 4.0.4, except
+# 4.5.1 to 4.6.x, where they are disabled with the other TIFF/EP tags;
 # CFAPattern has 4 values before 4.2.0 and a variable count since.
-if libtiff_version_tuple >= (4, 0, 4):
+if (4, 0, 4) <= libtiff_version_tuple < (4, 5, 1) or libtiff_version_tuple >= (4, 7, 0):
     tifftags[TIFFTAG_CFAREPEATPATTERNDIM] = (
         ctypes.c_uint16 * 2, lambda _d: _d.contents[:])
     if libtiff_version_tuple >= (4, 2, 0):
