@@ -123,10 +123,6 @@ class TIFFfile(TiffBase):
             if 'Operation not permitted' in str(msg):
                 raise IOError(OSError_operation_not_permitted_hint % msg)
             raise
-        except OSError as msg:
-            if 'Operation not permitted' in str(msg):
-                raise OSError(OSError_operation_not_permitted_hint % msg)
-            raise
         except mmap.error as msg:
             if 'Too many open files' in str(msg):
                 raise mmap.error(IOError_too_many_open_files_hint % msg)
